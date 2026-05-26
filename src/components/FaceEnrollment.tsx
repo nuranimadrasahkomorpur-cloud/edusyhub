@@ -131,7 +131,7 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
 
             setProgress(40);
             const detections = await faceapi
-                .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320 }))
+                .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor();
 
@@ -180,7 +180,7 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
             const response = await fetch(`/api/students/${studentId}/face`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ descriptor: Array.from(detections.descriptor) }),
+                body: JSON.stringify({ descriptor: [Array.from(detections.descriptor)] }),
             });
 
             if (!response.ok) throw new Error('Failed to save face data');
@@ -221,55 +221,65 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
 
         try {
             setStatus('CAPTURING');
-            setProgress(20);
+            setProgress(10);
 
-            const detections = await faceapi
-                .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320 }))
-                .withFaceLandmarks()
-                .withFaceDescriptor();
+            const capturedDescriptors: number[][] = [];
+            const targetCount = 3;
+            const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-            if (!detections) {
+            for (let i = 0; i < 15; i++) {
+                if (capturedDescriptors.length >= targetCount) break;
+                
+                const detections = await faceapi
+                    .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+
+                if (detections && detections.detection.score >= 0.90) {
+                    // Check duplicate only on the first frame to save time
+                    if (capturedDescriptors.length === 0) {
+                        try {
+                            const checkRes = await fetch(`/api/admin/students/check-duplicate-face`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ descriptor: Array.from(detections.descriptor) })
+                            });
+                            
+                            if (checkRes.ok) {
+                                const checkData = await checkRes.json();
+                                if (checkData.isDuplicate && checkData.studentId !== studentId) {
+                                    setError(`এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে।`);
+                                    setStatus('ERROR');
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            console.warn('Collision check failed, proceeding with baseline accuracy.');
+                        }
+                    }
+                    
+                    capturedDescriptors.push(Array.from(detections.descriptor));
+                    setProgress(10 + (capturedDescriptors.length * 25));
+                }
+                
+                // Wait before taking next picture to allow user to turn head slightly
+                await delay(600);
+            }
+
+            if (capturedDescriptors.length === 0) {
                 setError('আপনার মুখ স্পষ্টভাবে বোঝা যাচ্ছে না। পর্যাপ্ত আলোতে আবার চেষ্টা করুন।');
                 setStatus('READY');
                 return;
             }
 
-            // High Precision Quality Check
-            const { score } = detections.detection;
-            if (score < 0.95) {
-                setError('ছবিটি যথেষ্ট পরিষ্কার নয়। দয়া করে স্থির হয়ে পর্যাপ্ত আলোতে আবার চেষ্টা করুন।');
-                setStatus('READY');
-                return;
-            }
-
-            // Check for potential duplicates (Collision Detection)
-            try {
-                const checkRes = await fetch(`/api/admin/students/check-duplicate-face`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ descriptor: Array.from(detections.descriptor) })
-                });
-                
-                if (checkRes.ok) {
-                    const checkData = await checkRes.json();
-                    if (checkData.isDuplicate && checkData.studentId !== studentId) {
-                        setError(`এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে। এটি নতুন করে যুক্ত করা সম্ভব নয়।`);
-                        setStatus('ERROR');
-                        return;
-                    }
-                }
-            } catch (err) {
-                console.warn('Collision check failed, proceeding with baseline accuracy.');
-            }
-
-            setProgress(60);
+            setProgress(90);
             setStatus('SAVING');
 
             // Save to database
             const response = await fetch(`/api/students/${studentId}/face`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ descriptor: Array.from(detections.descriptor) }),
+                body: JSON.stringify({ descriptor: capturedDescriptors }), // SENDING ARRAY OF ARRAYS
             });
 
             if (!response.ok) throw new Error('Failed to save face data');
@@ -390,14 +400,23 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
                         )}
                     </AnimatePresence>
 
-                    {/* Progress Bar */}
+                    {/* Progress Bar & Text */}
                     {(status === 'CAPTURING' || status === 'SAVING') && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/10 overflow-hidden">
-                            <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${progress}%` }}
-                                className="h-full bg-[#045c84]"
-                            />
+                        <div className="absolute bottom-0 left-0 right-0">
+                            {status === 'CAPTURING' && (
+                                <div className="text-center pb-3 text-white">
+                                    <p className="text-[12px] font-black uppercase tracking-widest bg-black/40 inline-block px-4 py-1.5 rounded-full backdrop-blur-md">
+                                        মাথা হালকা ডানে এবং বামে ঘোরান...
+                                    </p>
+                                </div>
+                            )}
+                            <div className="h-1.5 bg-white/10 overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${progress}%` }}
+                                    className="h-full bg-[#045c84]"
+                                />
+                            </div>
                         </div>
                     )}
                 </div>

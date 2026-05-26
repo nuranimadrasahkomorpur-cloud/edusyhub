@@ -3,27 +3,19 @@ import prisma from './db';
 
 export async function getServerSession() {
     const cookieStore = await cookies();
-    let token = cookieStore.get('edusy_auth_token')?.value;
+    const token = cookieStore.get('edusy_auth_token')?.value;
 
-    if (!token) {
-        console.log('getServerSession - NO TOKEN FOUND in cookies');
-        return null;
-    }
+    if (!token) return null;
 
     // Sanitize token (remove quotes or extra spaces if any)
-    token = token.replace(/['"]+/g, '').trim();
+    const sanitizedToken = token.replace(/['"]+/g, '').trim();
 
     try {
-        console.log(`getServerSession - Checking DB for sanitized token: [${token}] length: ${token.length}`);
-        
         // MongoDB ObjectIDs must be 24-char hex
-        if (token.length !== 24) {
-            console.log('getServerSession - INVALID TOKEN LENGTH. Not a MongoDB ObjectId.');
-            return null;
-        }
+        if (sanitizedToken.length !== 24) return null;
 
         const user = await prisma.user.findUnique({
-            where: { id: token },
+            where: { id: sanitizedToken },
             select: {
                 id: true,
                 email: true,
@@ -39,8 +31,6 @@ export async function getServerSession() {
             }
         });
         
-        console.log('getServerSession - db user result:', user ? `Found user: ${user.email || user.id}` : 'USER NOT FOUND IN DB');
-
         if (!user) return null;
 
         return {
@@ -50,7 +40,7 @@ export async function getServerSession() {
             }
         };
     } catch (error: any) {
-        console.error('CRITICAL: getServerSession DB Error:', error.message);
+        console.error('❌ [AUTH ERROR] Session validation failed:', error);
         return null;
     }
 }

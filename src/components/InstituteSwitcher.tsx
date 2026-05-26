@@ -121,6 +121,9 @@ export default function InstituteSwitcher() {
                                         <span className="font-bold text-sm text-slate-800 truncate font-bengali">
                                             {inst.name}
                                         </span>
+                                        <span className="text-[9px] font-mono text-slate-400 bg-slate-50 px-1 rounded border border-slate-100">
+                                            #{inst.id.slice(-4)}
+                                        </span>
                                         {isOwner ? (
                                             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold rounded-md border border-amber-200">
                                                 <Crown size={10} />
@@ -133,6 +136,11 @@ export default function InstituteSwitcher() {
                                             </span>
                                         )}
                                     </div>
+                                    {inst.address && (
+                                        <p className="text-[10px] text-slate-500 truncate font-bengali mt-0.5">
+                                            {inst.address}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {!isOwner && (

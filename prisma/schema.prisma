@@ -75,6 +75,7 @@ model Institute {
 
   assignments Assignment[]
   attendances Attendance[]
+  subscriptions Subscription[]
 }
 
 model Class {
@@ -394,4 +395,40 @@ enum TransactionStatus {
   COMPLETED
   PENDING
   CANCELLED
+}
+
+model Package {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  price       Float
+  duration    Int      // in days
+  features    String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  instituteId String   @db.ObjectId
+  institute   Institute @relation(fields: [instituteId], references: [id])
+  packageId   String   @db.ObjectId
+  package     Package  @relation(fields: [packageId], references: [id])
+  status      String   @default("ACTIVE") // ACTIVE, EXPIRED, CANCELLED
+  startDate   DateTime @default(now())
+  endDate     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  content     String
+  type        String   @default("GLOBAL") // GLOBAL, INSTITUTE
+  instituteId String?  @db.ObjectId
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

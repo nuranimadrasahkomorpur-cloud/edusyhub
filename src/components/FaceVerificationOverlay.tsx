@@ -35,11 +35,17 @@ export default function FaceVerificationOverlay({
 
     const faceMatcher = React.useMemo(() => {
         if (!studentFaceDescriptor || studentFaceDescriptor.length === 0) return null;
+        let descArray = [];
+        if (Array.isArray(studentFaceDescriptor[0])) {
+            descArray = studentFaceDescriptor.map((d: any) => new Float32Array(d));
+        } else {
+            descArray = [new Float32Array(studentFaceDescriptor)];
+        }
         const labeledDescriptor = new faceapi.LabeledFaceDescriptors(
             studentName,
-            [new Float32Array(studentFaceDescriptor)]
+            descArray.length > 0 ? descArray : [new Float32Array(128)]
         );
-        return new faceapi.FaceMatcher([labeledDescriptor], 0.5); // Slightly more relaxed for mobile/webcam
+        return new faceapi.FaceMatcher([labeledDescriptor], 0.38);
     }, [studentName, studentFaceDescriptor]);
 
     useEffect(() => {
@@ -139,7 +145,7 @@ export default function FaceVerificationOverlay({
             const img = await faceapi.bufferToImage(file);
 
             const detection = await faceapi
-                .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320 }))
+                .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor();
 
@@ -148,7 +154,7 @@ export default function FaceVerificationOverlay({
                 const score = Math.max(0, 1 - match.distance);
                 setMatchScore(score);
 
-                if (match.label === studentName && match.distance < 0.5) {
+                if (match.label === studentName && match.distance <= 0.38) {
                     setStatus('SUCCESS');
                     stopCamera();
                     setTimeout(() => {
@@ -173,10 +179,10 @@ export default function FaceVerificationOverlay({
         }
     };
 
-    // Processing loop
     useEffect(() => {
         let animationFrameId: number;
         let isProcessing = false;
+        let consecutiveMatches = 0;
 
         const processFrame = async () => {
             if (status !== 'VERIFYING' || !videoRef.current || !faceMatcher || isProcessing || isPaused) {
@@ -188,10 +194,10 @@ export default function FaceVerificationOverlay({
                 return;
             }
 
-            // Frame Throttling Logic (Process every ~500ms for better performance)
+            // Frame Throttling Logic (Process every ~150ms for faster matching)
             const now = Date.now();
             const lastProcess = (videoRef.current as any).lastProcessTime || 0;
-            if (now - lastProcess < 500) {
+            if (now - lastProcess < 150) {
                 animationFrameId = requestAnimationFrame(processFrame);
                 return;
             }
@@ -199,9 +205,9 @@ export default function FaceVerificationOverlay({
 
             isProcessing = true;
             try {
-                // Increased inputSize (224 -> 320) for better accuracy
+                // Increased inputSize for better accuracy and strict score threshold
                 const detection = await faceapi
-                    .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320 }))
+                    .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
                     .withFaceLandmarks()
                     .withFaceDescriptor();
 
@@ -213,13 +219,18 @@ export default function FaceVerificationOverlay({
                     const score = Math.max(0, 1 - match.distance);
                     setMatchScore(score);
 
-                    if (match.label === studentName && match.distance < 0.42) {
-                        setStatus('SUCCESS');
-                        stopCamera();
-                        setTimeout(() => {
-                            onVerifySuccess();
-                        }, 1500);
-                        return;
+                    if (match.label === studentName && match.distance <= 0.38) {
+                        consecutiveMatches += 1;
+                        if (consecutiveMatches >= 4) {
+                            setStatus('SUCCESS');
+                            stopCamera();
+                            setTimeout(() => {
+                                onVerifySuccess();
+                            }, 1500);
+                            return;
+                        }
+                    } else {
+                        consecutiveMatches = 0;
                     }
                 }
             } catch (err) {

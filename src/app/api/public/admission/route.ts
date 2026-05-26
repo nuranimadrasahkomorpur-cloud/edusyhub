@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 import { getNextStudentId, getNextRollNumber } from '@/utils/student-utils';
+import { normalizeAuthIdentifier, normalizePassword } from '@/utils/digit-utils';
 
 export async function POST(req: NextRequest) {
     let body: any = {};
@@ -13,10 +14,11 @@ export async function POST(req: NextRequest) {
         }
 
         const skipAccountSetup = body.skipAccountSetup || metadata?.skipAccountSetup;
-        const gPhone = guardianPhone?.trim();
+        const gPhone = normalizeAuthIdentifier(guardianPhone || '');
         const studentEmail = email?.trim();
+        const studentPhoneNormalized = normalizeAuthIdentifier(phone || '');
 
-        if (!skipAccountSetup && !phone && !studentEmail && !gPhone) {
+        if (!skipAccountSetup && !studentPhoneNormalized && !studentEmail && !gPhone) {
             return NextResponse.json({ message: 'শিক্ষার্থীর মোবাইল, ইমেইল অথবা অভিভাবকের মোবাইল নম্বর - যেকোনো একটি অবশ্যই দিতে হবে।' }, { status: 400 });
         }
 
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
         const studentId = metadata?.studentId || phone;
 
         // Check Student ID, Phone, Email
-        const studentChecks: any[] = [{ phone: phone }];
+        const studentChecks: any[] = [{ phone: studentPhoneNormalized }];
         if (studentId) studentChecks.push({ "metadata.studentId": studentId });
         if (email && email.trim() !== '') studentChecks.push({ email: email.trim() });
 
@@ -85,9 +87,9 @@ export async function POST(req: NextRequest) {
         const newStudent = await prisma.user.create({
             data: {
                 name: String(name || ''),
-                phone: phone ? String(phone) : null,
+                phone: studentPhoneNormalized || null,
                 email: studentEmail && studentEmail !== '' ? studentEmail : null,
-                password: String(password),
+                password: normalizePassword(password),
                 role: 'STUDENT',
                 instituteIds: instIds,
                 metadata: {
@@ -110,7 +112,7 @@ export async function POST(req: NextRequest) {
                         data: {
                             name: String(guardianName),
                             phone: String(gPhone),
-                            password: String(guardianPassword || gPhone),
+                            password: normalizePassword(guardianPassword || gPhone),
                             role: 'GUARDIAN',
                             instituteIds: instIds,
                             metadata: { childrenIds: [newStudent.id] }

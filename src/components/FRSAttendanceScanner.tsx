@@ -86,6 +86,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
     const [ambiguousMatches, setAmbiguousMatches] = useState<EnrolledStudent[]>([]);
     const [isProcessingLocked, setIsProcessingLocked] = useState(false);
     const ignoredFaces = useRef<{ [descriptorHash: string]: number }>({});
+    const consensusTracker = useRef<{ [studentId: string]: { frames: number, angles: Set<number> } }>({});
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -228,10 +229,18 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                 }
 
                 if (enrolled.length > 0) {
-                    const labeledDescriptors = enrolled.map((s: any) =>
-                        new faceapi.LabeledFaceDescriptors(s.id, [new Float32Array(s.faceDescriptor)])
-                    );
-                    setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.42));
+                    const labeledDescriptors = enrolled.map((s: any) => {
+                        let descArray = [];
+                        if (s.faceDescriptor && s.faceDescriptor.length > 0) {
+                            if (Array.isArray(s.faceDescriptor[0])) {
+                                descArray = s.faceDescriptor.map((d: number[]) => new Float32Array(d));
+                            } else {
+                                descArray = [new Float32Array(s.faceDescriptor)];
+                            }
+                        }
+                        return new faceapi.LabeledFaceDescriptors(s.id, descArray.length > 0 ? descArray : [new Float32Array(128)]);
+                    });
+                    setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.38));
                 } else {
                     setFaceMatcher(null);
                 }
@@ -627,10 +636,18 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             // Re-initialize FaceMatcher
             const enrolled = updatedStudents.filter((s: any) => s.faceDescriptor && s.faceDescriptor.length > 0);
             if (enrolled.length > 0) {
-                const labeledDescriptors = enrolled.map((s: any) =>
-                    new faceapi.LabeledFaceDescriptors(s.id, [new Float32Array(s.faceDescriptor)])
-                );
-                setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.42));
+                const labeledDescriptors = enrolled.map((s: any) => {
+                    let descArray = [];
+                    if (s.faceDescriptor && s.faceDescriptor.length > 0) {
+                        if (Array.isArray(s.faceDescriptor[0])) {
+                            descArray = s.faceDescriptor.map((d: number[]) => new Float32Array(d));
+                        } else {
+                            descArray = [new Float32Array(s.faceDescriptor)];
+                        }
+                    }
+                    return new faceapi.LabeledFaceDescriptors(s.id, descArray.length > 0 ? descArray : [new Float32Array(128)]);
+                });
+                setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.38));
             }
 
             showToast(`${successCount} জন শিক্ষার্থীর ফেস ডেটা সফলভাবে বিশ্লেষণ করা হয়েছে।`, 'SUCCESS');
@@ -668,9 +685,15 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                             photo: s.metadata?.photo
                         }));
                     currentStudents = enrolled;
-                    const labeledDescriptors = enrolled.map((s: any) =>
-                        new faceapi.LabeledFaceDescriptors(s.id, [new Float32Array(s.faceDescriptor)])
-                    );
+                    const labeledDescriptors = enrolled.map((s: any) => {
+                        let descArray = [];
+                        if (Array.isArray(s.faceDescriptor[0])) {
+                            descArray = s.faceDescriptor.map((d: number[]) => new Float32Array(d));
+                        } else {
+                            descArray = [new Float32Array(s.faceDescriptor)];
+                        }
+                        return new faceapi.LabeledFaceDescriptors(s.id, descArray.length > 0 ? descArray : [new Float32Array(128)]);
+                    });
                     currentMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
                 }
             }
@@ -767,10 +790,10 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                 return;
             }
 
-            // Frame Throttling Logic (Process every ~500ms for better performance on mobile/low-end devices)
+            // Frame Throttling Logic (Process every ~150ms for faster matching within 1 sec)
             const now = Date.now();
             const lastProcess = (videoRef.current as any).lastProcessTime || 0;
-            if (now - lastProcess < 500 || isProcessingLocked) {
+            if (now - lastProcess < 150 || isProcessingLocked) {
                 requestRef.current = requestAnimationFrame(processFrame);
                 return;
             }
@@ -778,9 +801,9 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
 
             isProcessing = true;
             try {
-                // Increased inputSize (224 -> 320) for better accuracy
+                // Increased inputSize for better accuracy and strict score threshold
                 const detections = await faceapi
-                    .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
+                    .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
                     .withFaceLandmarks()
                     .withFaceDescriptors();
 
@@ -798,19 +821,39 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
 
                     if (ctx) {
                         ctx.clearRect(0, 0, displaySize.width, displaySize.height);
+                        const seenInFrame = new Set<string>();
+
                         resizedDetections.forEach(detection => {
                             if (locallyLocked || isProcessingLocked) return;
 
                             // Find all potential candidates with distance < 0.5 (or stricter 0.45)
                             // We use faceMatcher.labeledDescriptors directly to find all matches
-                            const candidates: { student: EnrolledStudent; distance: number }[] = [];
+                            const candidates: { student: EnrolledStudent; distance: number; matchedAngleIndex: number; hasMultiAngle: boolean }[] = [];
                             
                             // Iterate through enrolled students to find all plausible matches
                             students.forEach(s => {
                                 if (s.faceDescriptor && s.faceDescriptor.length > 0) {
-                                    const distance = faceapi.euclideanDistance(detection.descriptor, new Float32Array(s.faceDescriptor));
-                                    if (distance < 0.42) {
-                                        candidates.push({ student: s, distance });
+                                    let minDistance = 1.0;
+                                    let matchedAngleIndex = -1;
+                                    let hasMultiAngle = false;
+
+                                    if (Array.isArray(s.faceDescriptor[0])) {
+                                        hasMultiAngle = s.faceDescriptor.length > 1;
+                                        s.faceDescriptor.forEach((d: number[], idx: number) => {
+                                            const dist = faceapi.euclideanDistance(detection.descriptor, new Float32Array(d));
+                                            if (dist < minDistance) {
+                                                minDistance = dist;
+                                                matchedAngleIndex = idx;
+                                            }
+                                        });
+                                    } else {
+                                        minDistance = faceapi.euclideanDistance(detection.descriptor, new Float32Array(s.faceDescriptor));
+                                        matchedAngleIndex = 0;
+                                        hasMultiAngle = false;
+                                    }
+
+                                    if (minDistance <= 0.38) {
+                                        candidates.push({ student: s, distance: minDistance, matchedAngleIndex, hasMultiAngle });
                                     }
                                 }
                             });
@@ -818,7 +861,8 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                             // Sort candidates by distance (best match first)
                             candidates.sort((a, b) => a.distance - b.distance);
 
-                            const student = candidates.length > 0 ? candidates[0].student : null;
+                            const candidate = candidates.length > 0 ? candidates[0] : null;
+                            const student = candidate ? candidate.student : null;
                             const box = detection.detection.box;
 
                             // NEW: If there are multiple close matches, trigger selection UI
@@ -855,7 +899,32 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                 lastSoundPlayed.current[trackLabel] = now;
                             }
 
-                            if (student) markAttendance(student.id, student.name, student.classId);
+                            if (student && candidate) {
+                                seenInFrame.add(student.id);
+
+                                if (!consensusTracker.current[student.id]) {
+                                    consensusTracker.current[student.id] = { frames: 0, angles: new Set() };
+                                }
+                                
+                                consensusTracker.current[student.id].frames += 1;
+                                consensusTracker.current[student.id].angles.add(candidate.matchedAngleIndex);
+                                
+                                const tracker = consensusTracker.current[student.id];
+                                const requiredAngles = candidate.hasMultiAngle ? 2 : 1;
+
+                                // Require minimum 3 frames total, AND at least 2 distinct angles matched
+                                if (tracker.frames >= 3 && tracker.angles.size >= requiredAngles) {
+                                    markAttendance(student.id, student.name, student.classId);
+                                    delete consensusTracker.current[student.id];
+                                }
+                            }
+                        });
+
+                        // Reset counts for students not seen in this frame
+                        Object.keys(consensusTracker.current).forEach(id => {
+                            if (!seenInFrame.has(id)) {
+                                delete consensusTracker.current[id];
+                            }
                         });
                     }
                 } else if (canvasRef.current) {

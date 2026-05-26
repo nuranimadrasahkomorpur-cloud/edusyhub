@@ -31,22 +31,34 @@ export async function POST(req: NextRequest) {
         const THRESHOLD = 0.38; // Strict threshold for duplicate detection
 
         for (const student of students) {
-            const studentDescriptor = new Float32Array(student.faceDescriptor);
+            const faceDesc: any = student.faceDescriptor;
+            if (!faceDesc || faceDesc.length === 0) continue;
             
-            // Euclidean Distance Calculation
-            let sum = 0;
-            for (let i = 0; i < 128; i++) {
-                const diff = inputDescriptor[i] - studentDescriptor[i];
-                sum += diff * diff;
+            let descriptorsToCheck: number[][] = [];
+            if (Array.isArray(faceDesc[0])) {
+                descriptorsToCheck = faceDesc;
+            } else {
+                descriptorsToCheck = [faceDesc];
             }
-            const distance = Math.sqrt(sum);
 
-            if (distance < THRESHOLD) {
-                return NextResponse.json({
-                    isDuplicate: true,
-                    studentId: student.id,
-                    studentName: student.name
-                });
+            for (const desc of descriptorsToCheck) {
+                const studentDescriptor = new Float32Array(desc);
+                
+                // Euclidean Distance Calculation
+                let sum = 0;
+                for (let i = 0; i < 128; i++) {
+                    const diff = inputDescriptor[i] - studentDescriptor[i];
+                    sum += diff * diff;
+                }
+                const distance = Math.sqrt(sum);
+
+                if (distance < THRESHOLD) {
+                    return NextResponse.json({
+                        isDuplicate: true,
+                        studentId: student.id,
+                        studentName: student.name
+                    });
+                }
             }
         }
 

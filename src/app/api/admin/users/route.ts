@@ -26,6 +26,7 @@ export async function GET(req: Request) {
         const { id: userId, role: baseRole, instituteIds, teacherProfiles } = session.user as any;
         const activeRole = activeRoleQuery || baseRole;
 
+
         // Support fetching a single user by ID
         if (id) {
             const user = await prisma.user.findUnique({

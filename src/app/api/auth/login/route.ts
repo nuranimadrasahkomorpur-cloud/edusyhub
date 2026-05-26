@@ -1,27 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/utils/db';
+import { normalizeAuthIdentifier, normalizePassword } from '@/utils/digit-utils';
 
-const toEnglishNumerals = (str: string) => {
-    const bengaliNumerals = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-    return str.split('').map(c => {
-        const index = bengaliNumerals.indexOf(c);
-        return index !== -1 ? index.toString() : c;
-    }).join('');
-};
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        let identifier = (String(body.email || '') || String(body.phone || '') || String(body.username || '') || '').trim();
-        let password = String(body.password || '').trim();
-
-        // --- NORMALIZATION ---
-        identifier = toEnglishNumerals(identifier);
-        password = toEnglishNumerals(password);
-
-        // Remove +88 or 88 from mobile if present (assuming internal numbers don't store them)
-        if (identifier.startsWith('+88')) identifier = identifier.slice(3);
-        else if (identifier.startsWith('88')) identifier = identifier.slice(2);
+        let identifier = normalizeAuthIdentifier(String(body.email || '') || String(body.phone || '') || String(body.username || '') || '');
+        let password = normalizePassword(String(body.password || ''));
 
         if (!identifier || !password) {
             return NextResponse.json({ message: 'Missing fields' }, { status: 400 });
@@ -37,7 +23,7 @@ export async function POST(req: Request) {
                 user = await prisma.user.findFirst({
                     where: { email: { equals: identifier, mode: 'insensitive' } },
                     include: {
-                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true } },
+                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
                         teacherProfiles: true
                     }
                 });
@@ -50,9 +36,17 @@ export async function POST(req: Request) {
         if (!user) {
             try {
                 user = await prisma.user.findFirst({
-                    where: { phone: identifier },
+                    where: { 
+                        OR: [
+                            { phone: identifier },
+                            { phone: `+88${identifier}` },
+                            { phone: `88${identifier}` },
+                            ...(identifier.startsWith('0') ? [{ phone: identifier.slice(1) }] : []),
+                            ...(!identifier.startsWith('0') ? [{ phone: `0${identifier}` }] : [])
+                        ]
+                    },
                     include: {
-                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true } },
+                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
                         teacherProfiles: true
                     }
                 });
@@ -75,7 +69,7 @@ export async function POST(req: Request) {
                         user = await prisma.user.findUnique({
                             where: { id },
                             include: {
-                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true } },
+                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
                                 teacherProfiles: true
                             }
                         });
@@ -107,7 +101,7 @@ export async function POST(req: Request) {
                         user = await prisma.user.findUnique({
                             where: { id },
                             include: {
-                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true } },
+                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
                                 teacherProfiles: true
                             }
                         });
