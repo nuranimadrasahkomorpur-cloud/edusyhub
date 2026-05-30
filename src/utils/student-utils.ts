@@ -62,13 +62,42 @@ async function getMaxMetadataValue(instituteId: string, filterExtras: any, field
     }
 }
 
-/**
- * Calculates the next available Student ID for an institute.
- * Returns a 4-digit zero-padded string (e.g., "0001", "0025").
- */
 export async function getNextStudentId(instituteId: string): Promise<string> {
+    let result = await (prisma as any).$runCommandRaw({
+        findAndModify: 'Counter',
+        query: { _id: `${instituteId}_studentId` },
+        update: { $inc: { seq: 1 } },
+        new: true
+    });
+
+    if (result?.value?.seq) {
+        return result.value.seq.toString();
+    }
+
     const maxId = await getMaxMetadataValue(instituteId, {}, 'studentId');
-    return (maxId + 1).toString().padStart(4, '0');
+    const startValue = maxId < 100 ? 101 : maxId + 1;
+
+    result = await (prisma as any).$runCommandRaw({
+        findAndModify: 'Counter',
+        query: { _id: `${instituteId}_studentId` },
+        update: { 
+            $setOnInsert: { seq: startValue } 
+        },
+        new: true,
+        upsert: true
+    });
+
+    if (result?.lastErrorObject?.updatedExisting === false) {
+        return startValue.toString();
+    } else {
+        result = await (prisma as any).$runCommandRaw({
+            findAndModify: 'Counter',
+            query: { _id: `${instituteId}_studentId` },
+            update: { $inc: { seq: 1 } },
+            new: true
+        });
+        return result.value.seq.toString();
+    }
 }
 
 /**
@@ -77,6 +106,40 @@ export async function getNextStudentId(instituteId: string): Promise<string> {
  */
 export async function getNextRollNumber(instituteId: string, classId: string): Promise<string> {
     if (!classId) return "1";
+
+    let result = await (prisma as any).$runCommandRaw({
+        findAndModify: 'Counter',
+        query: { _id: `${instituteId}_${classId}_rollNumber` },
+        update: { $inc: { seq: 1 } },
+        new: true
+    });
+
+    if (result?.value?.seq) {
+        return result.value.seq.toString();
+    }
+
     const maxRoll = await getMaxMetadataValue(instituteId, { 'metadata.classId': classId }, 'rollNumber');
-    return (maxRoll + 1).toString();
+    const startValue = maxRoll + 1;
+
+    result = await (prisma as any).$runCommandRaw({
+        findAndModify: 'Counter',
+        query: { _id: `${instituteId}_${classId}_rollNumber` },
+        update: { 
+            $setOnInsert: { seq: startValue } 
+        },
+        new: true,
+        upsert: true
+    });
+
+    if (result?.lastErrorObject?.updatedExisting === false) {
+        return startValue.toString();
+    } else {
+        result = await (prisma as any).$runCommandRaw({
+            findAndModify: 'Counter',
+            query: { _id: `${instituteId}_${classId}_rollNumber` },
+            update: { $inc: { seq: 1 } },
+            new: true
+        });
+        return result.value.seq.toString();
+    }
 }

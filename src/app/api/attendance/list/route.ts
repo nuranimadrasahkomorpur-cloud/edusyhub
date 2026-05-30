@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
+import { getServerSession } from '@/utils/auth-utils';
 
 export async function GET(req: NextRequest) {
     try {
@@ -7,9 +8,15 @@ export async function GET(req: NextRequest) {
         const classId = searchParams.get('classId');
         const instituteId = searchParams.get('instituteId');
         const dateString = searchParams.get('date');
+        const month = searchParams.get('month'); // e.g. "2026-05" for full-month register view
 
-        if ((!classId && !instituteId) || !dateString) {
-            return NextResponse.json({ error: 'Missing classId/instituteId or date' }, { status: 400 });
+        if ((!classId && !instituteId) || (!dateString && !month)) {
+            return NextResponse.json({ error: 'Missing classId/instituteId or date/month' }, { status: 400 });
+        }
+
+        const session = await getServerSession();
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         // Helper to validate and format MongoDB ObjectId
@@ -17,55 +24,95 @@ export async function GET(req: NextRequest) {
             if (/^[0-9a-fA-F]{24}$/.test(id)) {
                 return { $oid: id };
             }
-            return id; // Return as is if not a valid OID hex string
+            return id;
         };
 
         // Build native MongoDB filter
-        const filter: any = { dateString };
-        if (classId && classId !== 'all' && classId !== '') {
-            filter.classId = toOid(classId);
+        const filter: any = {};
+
+        if (month) {
+            // Match all dateStrings starting with the given month prefix e.g. "2026-05"
+            filter.dateString = { $regex: `^${month}-` };
+        } else {
+            filter.dateString = dateString;
         }
+
         if (instituteId) {
             filter.instituteId = toOid(instituteId);
         }
 
+        const { role: baseRole, teacherProfiles } = session.user as any;
+        const isTeacher = baseRole === 'TEACHER' || (teacherProfiles && (teacherProfiles || []).some((p: any) => p.instituteId === instituteId));
+
+        if (isTeacher && instituteId) {
+            const profile = await prisma.teacherProfile.findUnique({
+                where: {
+                    userId_instituteId: {
+                        userId: session.user.id,
+                        instituteId: instituteId
+                    }
+                }
+            });
+
+            if (!profile || profile.status !== 'ACTIVE') {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+
+            if (!profile.isAdmin) {
+                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                if (assignedClassIds.length === 0) {
+                    return NextResponse.json([]); // Return empty list, no classes assigned
+                }
+
+                if (classId && classId !== 'all' && classId !== '') {
+                    if (!assignedClassIds.includes(classId)) {
+                        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                    }
+                    filter.classId = toOid(classId);
+                } else {
+                    filter.classId = { $in: assignedClassIds.map(id => toOid(id)) };
+                }
+            } else {
+                if (classId && classId !== 'all' && classId !== '') {
+                    filter.classId = toOid(classId);
+                }
+            }
+        } else {
+            if (classId && classId !== 'all' && classId !== '') {
+                filter.classId = toOid(classId);
+            }
+        }
+
         console.log('Fetching attendance with raw filter:', JSON.stringify(filter));
 
-        // Use raw MongoDB command to fetch attendance
         let result: any;
         try {
-            // Prisma's $runCommandRaw for MongoDB
-            // Using aggregate instead of find as it's sometimes more reliable with $runCommandRaw
             result = await (prisma as any).$runCommandRaw({
                 aggregate: 'Attendance',
                 pipeline: [
                     { $match: filter }
                 ],
-                cursor: { batchSize: 5000 }
+                cursor: { batchSize: 10000 }
             });
         } catch (rawError: any) {
             console.error('Raw MongoDB command (Attendance) failed:', rawError);
-
-            // Fallback: Try lowercase collection name
             try {
                 result = await (prisma as any).$runCommandRaw({
                     aggregate: 'attendance',
                     pipeline: [
                         { $match: filter }
                     ],
-                    cursor: { batchSize: 5000 }
+                    cursor: { batchSize: 10000 }
                 });
             } catch (secondError: any) {
                 console.error('Fallback raw command (attendance) also failed:', secondError);
-                throw rawError; // Throw the original error
+                throw rawError;
             }
         }
 
-        // Extract documents from cursor
         const documents = result.cursor?.firstBatch || [];
         console.log(`Found ${documents.length} attendance records.`);
 
-        // Normalize OIDs for the frontend
         const normalized = documents.map((doc: any) => ({
             ...doc,
             id: doc._id?.$oid || String(doc._id),
@@ -77,8 +124,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(normalized);
     } catch (error: any) {
         console.error('CRITICAL: Error fetching attendance list:', error);
-
-        // Return a very detailed error object for debugging
         return NextResponse.json({
             error: error.message,
             name: error.name,

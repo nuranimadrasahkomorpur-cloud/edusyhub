@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
+import { getServerSession } from '@/utils/auth-utils';
 
 export async function GET(req: NextRequest) {
     try {
@@ -13,12 +14,60 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Missing instituteId' }, { status: 400 });
         }
 
-        const filter: any = { instituteId: { $oid: instituteId } };
-        if (classId && classId !== 'all' && classId !== '') {
-            filter.classId = { $oid: classId };
+        const session = await getServerSession();
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const filter: any = { instituteId: { $oid: instituteId } };
         if (startDate && endDate) {
             filter.dateString = { $gte: startDate, $lte: endDate };
+        }
+
+        const { role: baseRole, teacherProfiles } = session.user as any;
+        const isTeacher = baseRole === 'TEACHER' || (teacherProfiles && (teacherProfiles || []).some((p: any) => p.instituteId === instituteId));
+
+        if (isTeacher) {
+            const profile = await prisma.teacherProfile.findUnique({
+                where: {
+                    userId_instituteId: {
+                        userId: session.user.id,
+                        instituteId: instituteId
+                    }
+                }
+            });
+
+            if (!profile || profile.status !== 'ACTIVE') {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+
+            if (!profile.isAdmin) {
+                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                if (assignedClassIds.length === 0) {
+                    return NextResponse.json({
+                        summary: { present: 0, absent: 0, late: 0, leave: 0, totalCount: 0 },
+                        dailyTrends: [],
+                        classBreakdown: []
+                    });
+                }
+
+                if (classId && classId !== 'all' && classId !== '') {
+                    if (!assignedClassIds.includes(classId)) {
+                        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                    }
+                    filter.classId = { $oid: classId };
+                } else {
+                    filter.classId = { $in: assignedClassIds.map(id => ({ $oid: id })) };
+                }
+            } else {
+                if (classId && classId !== 'all' && classId !== '') {
+                    filter.classId = { $oid: classId };
+                }
+            }
+        } else {
+            if (classId && classId !== 'all' && classId !== '') {
+                filter.classId = { $oid: classId };
+            }
         }
 
         // 1. Overall Attendance Stats
@@ -33,7 +82,7 @@ export async function GET(req: NextRequest) {
                         present: { $sum: { $cond: [{ $eq: ['$status', 'PRESENT'] }, 1, 0] } },
                         absent: { $sum: { $cond: [{ $eq: ['$status', 'ABSENT'] }, 1, 0] } },
                         late: { $sum: { $cond: [{ $eq: ['$status', 'LATE'] }, 1, 0] } },
-                        leave: { $sum: { $cond: [{ $eq: ['$status', 'LEAVE'] }, 1, 0] } }
+                        leave: { $sum: { $cond: [{ $in: ['$status', ['LEAVE', 'LEAVE_PENDING']] }, 1, 0] } }
                     }
                 }
             ],
@@ -50,7 +99,8 @@ export async function GET(req: NextRequest) {
                         _id: '$dateString',
                         present: { $sum: { $cond: [{ $eq: ['$status', 'PRESENT'] }, 1, 0] } },
                         absent: { $sum: { $cond: [{ $eq: ['$status', 'ABSENT'] }, 1, 0] } },
-                        late: { $sum: { $cond: [{ $eq: ['$status', 'LATE'] }, 1, 0] } }
+                        late: { $sum: { $cond: [{ $eq: ['$status', 'LATE'] }, 1, 0] } },
+                        leave: { $sum: { $cond: [{ $in: ['$status', ['LEAVE', 'LEAVE_PENDING']] }, 1, 0] } }
                     }
                 },
                 { $sort: { _id: 1 } }
@@ -58,7 +108,24 @@ export async function GET(req: NextRequest) {
             cursor: {}
         });
 
-        // 3. Class breakdown (if not filtering by specific class)
+        // 3. Count total active students to calculate missing (unmarked) attendance
+        const studentQuery: any = {
+            role: 'STUDENT',
+            instituteIds: { $oid: instituteId },
+            'metadata.status': { $ne: 'INACTIVE' },
+            'metadata.admissionStatus': { $ne: 'PENDING' }
+        };
+        if (classId && classId !== 'all' && classId !== '') {
+            studentQuery['metadata.classId'] = classId;
+        }
+
+        const studentCountResult = await (prisma as any).$runCommandRaw({
+            count: 'User',
+            query: studentQuery
+        });
+        const totalStudents = studentCountResult.n || 0;
+
+        // 4. Class breakdown (if not filtering by specific class)
         const classBreakdown: any[] = [];
         if (!classId || classId === 'all' || classId === '') {
             const classResult = await (prisma as any).$runCommandRaw({
@@ -85,23 +152,64 @@ export async function GET(req: NextRequest) {
             });
             const classNameMap = new Map(classesFound.map(c => [c.id, c.name]));
 
+            // Need class-specific student count to adjust breakdown
+            const studentsPerClassResult = await (prisma as any).$runCommandRaw({
+                aggregate: 'User',
+                pipeline: [
+                    { $match: { role: 'STUDENT', instituteIds: { $oid: instituteId }, 'metadata.status': { $ne: 'INACTIVE' }, 'metadata.admissionStatus': { $ne: 'PENDING' } } },
+                    { $group: { _id: '$metadata.classId', count: { $sum: 1 } } }
+                ],
+                cursor: {}
+            });
+            const classStudentCounts = new Map<string, number>((studentsPerClassResult.cursor?.firstBatch || []).map((c: any) => [String(c._id), Number(c.count)]));
+
             rawClasses.forEach((item: any) => {
                 const cid = item._id?.$oid || String(item._id);
+                // The total working days for this class can be approximated by (total / current_student_count) 
+                // but since total is just marked attendance, let's just use the max working days from overall trends
+                const workingDays = dailyResult.cursor?.firstBatch.length || 0;
+                const studentCount = classStudentCounts.get(cid) || 0;
+                const trueClassTotal = workingDays * studentCount;
+                // if we don't know the exact working days per class, we use the global working days.
+                // To avoid 0 division or >100% rate:
+                const safeTotal = trueClassTotal > item.present ? trueClassTotal : item.total;
+                
                 classBreakdown.push({
                     className: classNameMap.get(cid) || 'Unknown',
-                    rate: Math.round((item.present / item.total) * 100)
+                    rate: safeTotal > 0 ? Math.round((item.present / safeTotal) * 100) : 0
                 });
             });
         }
 
-        return NextResponse.json({
-            summary: statsResult.cursor?.firstBatch[0] || { present: 0, absent: 0, late: 0, leave: 0, totalCount: 0 },
-            dailyTrends: dailyResult.cursor?.firstBatch.map((d: any) => ({
+        const summary = statsResult.cursor?.firstBatch[0] || { present: 0, absent: 0, late: 0, leave: 0, totalCount: 0 };
+        const workingDays = dailyResult.cursor?.firstBatch.length || 0;
+        const expectedTotalRecords = workingDays * totalStudents;
+        
+        // Add missing records as absent
+        if (expectedTotalRecords > summary.totalCount) {
+            const missing = expectedTotalRecords - summary.totalCount;
+            summary.absent += missing;
+            summary.totalCount = expectedTotalRecords;
+        }
+
+        const dailyTrends = (dailyResult.cursor?.firstBatch || []).map((d: any) => {
+            const existingTotal = d.present + d.absent + d.late + d.leave;
+            let missing = 0;
+            if (totalStudents > existingTotal) {
+                missing = totalStudents - existingTotal;
+            }
+            return {
                 date: d._id,
                 present: d.present,
-                absent: d.absent,
-                late: d.late
-            })) || [],
+                absent: d.absent + missing,
+                late: d.late,
+                leave: d.leave
+            };
+        });
+
+        return NextResponse.json({
+            summary,
+            dailyTrends,
             classBreakdown
         });
 

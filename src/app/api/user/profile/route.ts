@@ -14,7 +14,18 @@ export async function PATCH(req: Request) {
         if (name !== undefined) updateData.name = name;
         if (email !== undefined) updateData.email = email;
         if (phone !== undefined) updateData.phone = phone;
-        if (password) updateData.password = password; // Should be hashed in a real app, but following existing patterns
+        if (password) {
+            updateData.password = password;
+            const currentUser = await prisma.user.findUnique({
+                where: { id },
+                select: { metadata: true }
+            });
+            const currentMetadata = (currentUser?.metadata as any) || {};
+            updateData.metadata = {
+                ...currentMetadata,
+                originalPassword: password
+            };
+        }
 
         const user = await prisma.user.update({
             where: { id },

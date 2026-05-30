@@ -84,17 +84,19 @@ export async function POST(req: NextRequest) {
         const instIds = [instituteId];
 
         // Create Student
+        const studentPlainPass = normalizePassword(password);
         const newStudent = await prisma.user.create({
             data: {
                 name: String(name || ''),
                 phone: studentPhoneNormalized || null,
                 email: studentEmail && studentEmail !== '' ? studentEmail : null,
-                password: normalizePassword(password),
+                password: studentPlainPass,
                 role: 'STUDENT',
                 instituteIds: instIds,
                 metadata: {
                     ...finalMetadata,
-                    admissionStatus: 'PENDING'
+                    admissionStatus: 'PENDING',
+                    originalPassword: studentPlainPass
                 }
             }
         });
@@ -108,14 +110,18 @@ export async function POST(req: NextRequest) {
 
                 if (!guardian) {
                     // Create NEW Guardian
+                    const guardianPlainPass = normalizePassword(guardianPassword || gPhone);
                     guardian = await prisma.user.create({
                         data: {
                             name: String(guardianName),
                             phone: String(gPhone),
-                            password: normalizePassword(guardianPassword || gPhone),
+                            password: guardianPlainPass,
                             role: 'GUARDIAN',
                             instituteIds: instIds,
-                            metadata: { childrenIds: [newStudent.id] }
+                            metadata: { 
+                                childrenIds: [newStudent.id],
+                                originalPassword: guardianPlainPass
+                            }
                         }
                     });
                 } else {

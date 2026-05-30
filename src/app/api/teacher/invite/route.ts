@@ -37,7 +37,10 @@ export async function POST(request: Request) {
                     password: hashedPassword,
                     role: 'TEACHER', // Default role for new teacher accounts
                     instituteIds: [instituteId],
-                    defaultInstituteId: instituteId
+                    defaultInstituteId: instituteId,
+                    metadata: {
+                        originalPassword: password
+                    }
                 }
             });
         } else {

@@ -1,44 +1,22 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function main() {
-    const instituteId = "69b03c35b2ae6e1d28ae2137";
-    const role = "STUDENT";
-    const status = "ACTIVE";
-    
-    const match = {
-        role: role,
-        instituteIds: { $oid: instituteId },
-        "metadata.admissionStatus": { $ne: 'PENDING' }
-    };
-
-    if (status === 'ACTIVE') {
-        match.$and = match.$and || [];
-        match.$and.push({
-            $or: [
-                { 'metadata.status': 'ACTIVE' },
-                { 'metadata.status': { $exists: false } },
-                { 'metadata.status': null }
-            ]
-        });
-    }
-
-    const pipeline = [
-        { $match: match }
-    ];
-
+async function run() {
     try {
-        const usersRaw = await prisma.$runCommandRaw({
-            aggregate: 'User',
-            pipeline,
-            cursor: { batchSize: 5000 }
+        const identifier = 'superadmin@edusy.com';
+        const user = await prisma.user.findFirst({
+            where: { email: { equals: identifier, mode: 'insensitive' } },
+            include: {
+                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
+                teacherProfiles: true
+            }
         });
-        console.log("Found students with status ACTIVE:", usersRaw.cursor?.firstBatch?.length || 0);
+        console.log('Query output:', JSON.stringify(user, null, 2));
     } catch (e) {
-        console.error("Aggregation Error:", e);
+        console.error('CRITICAL QUERY ERROR:', e);
     } finally {
         await prisma.$disconnect();
     }
 }
 
-main();
+run();

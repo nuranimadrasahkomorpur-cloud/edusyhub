@@ -30,10 +30,11 @@ interface EnrolledStudent {
     id: string;
     name: string;
     classId: string;
-    faceDescriptor: number[];
+    faceDescriptor: any;
     photo?: string;
     stats?: {
         totalDays: number;
+        totalSchoolDays: number;
         presentDays: number;
         percentage: number;
     };
@@ -85,8 +86,13 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
     const [attendanceRecords, setAttendanceRecords] = useState<Record<string, { deviceId: string, timestamp: Date, status: string }>>({});
     const [ambiguousMatches, setAmbiguousMatches] = useState<EnrolledStudent[]>([]);
     const [isProcessingLocked, setIsProcessingLocked] = useState(false);
+    const [matchingState, setMatchingState] = useState<{
+        status: 'IDLE' | 'MATCHING' | 'MATCHED' | 'ALREADY_DONE';
+        studentName?: string;
+    }>({ status: 'IDLE' });
     const ignoredFaces = useRef<{ [descriptorHash: string]: number }>({});
     const consensusTracker = useRef<{ [studentId: string]: { frames: number, angles: Set<number> } }>({});
+    const alreadyWarningCooldown = useRef<{ [key: string]: number }>({});
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -822,6 +828,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                     if (ctx) {
                         ctx.clearRect(0, 0, displaySize.width, displaySize.height);
                         const seenInFrame = new Set<string>();
+                        let hasMatchingCandidate = false;
 
                         resizedDetections.forEach(detection => {
                             if (locallyLocked || isProcessingLocked) return;
@@ -901,9 +908,45 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
 
                             if (student && candidate) {
                                 seenInFrame.add(student.id);
+                                hasMatchingCandidate = true;
+
+                                // Check if already marked present
+                                if (markedStudents.has(student.id)) {
+                                    const lastWarningTime = alreadyWarningCooldown.current[student.id] || 0;
+                                    if (now - lastWarningTime > 15000) { // 15 seconds cooldown for duplicate warnings
+                                        alreadyWarningCooldown.current[student.id] = now;
+                                        playSound('already');
+                                        setMatchingState({ status: 'ALREADY_DONE', studentName: student.name });
+                                        setIsProcessingLocked(true);
+                                        locallyLocked = true;
+                                        
+                                        // Add to recent matches as already marked
+                                        const existingRecord = attendanceRecords[student.id];
+                                        const newMatch = {
+                                            id: student.id,
+                                            name: student.name,
+                                            time: existingRecord ? new Date(existingRecord.timestamp).toLocaleTimeString('bn-BD') : new Date().toLocaleTimeString('bn-BD'),
+                                            photo: student.photo,
+                                            isAlreadyMarked: true,
+                                            status: existingRecord ? existingRecord.status as any : 'PRESENT',
+                                            timestamp: Date.now()
+                                        };
+                                        setRecentMatches(prev => [newMatch, ...prev.filter(m => m.id !== student.id)].slice(0, 3));
+                                        setTimeout(() => {
+                                            setRecentMatches(prev => prev.filter(m => m.timestamp !== newMatch.timestamp));
+                                        }, 5000);
+
+                                        setTimeout(() => {
+                                            setMatchingState({ status: 'IDLE' });
+                                            setIsProcessingLocked(false);
+                                        }, 1800);
+                                    }
+                                    return;
+                                }
 
                                 if (!consensusTracker.current[student.id]) {
                                     consensusTracker.current[student.id] = { frames: 0, angles: new Set() };
+                                    setMatchingState({ status: 'MATCHING' });
                                 }
                                 
                                 consensusTracker.current[student.id].frames += 1;
@@ -916,9 +959,22 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                 if (tracker.frames >= 3 && tracker.angles.size >= requiredAngles) {
                                     markAttendance(student.id, student.name, student.classId);
                                     delete consensusTracker.current[student.id];
+                                    
+                                    setMatchingState({ status: 'MATCHED', studentName: student.name });
+                                    setIsProcessingLocked(true);
+                                    locallyLocked = true;
+
+                                    setTimeout(() => {
+                                        setMatchingState({ status: 'IDLE' });
+                                        setIsProcessingLocked(false);
+                                    }, 1800);
                                 }
                             }
                         });
+
+                        if (!hasMatchingCandidate && !isProcessingLocked) {
+                            setMatchingState(prev => prev.status === 'MATCHING' ? { status: 'IDLE' } : prev);
+                        }
 
                         // Reset counts for students not seen in this frame
                         Object.keys(consensusTracker.current).forEach(id => {
@@ -930,6 +986,9 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                 } else if (canvasRef.current) {
                     const ctx = canvasRef.current.getContext('2d');
                     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                }
+                if (!isProcessingLocked && detections.length === 0) {
+                    setMatchingState(prev => prev.status === 'MATCHING' ? { status: 'IDLE' } : prev);
                 }
             } catch (error) {
                 console.error('Frame processing error:', error);
@@ -1030,6 +1089,92 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                     <motion.div key="scanner-initializing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white">
                                         <Loader2 size={48} className="animate-spin text-[#045c84] mb-6" />
                                         <p className="text-sm font-black italic tracking-widest text-[#045c84] uppercase">Initalizing Hardware...</p>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* Matching Scanline Overlay */}
+                            {matchingState.status === 'MATCHING' && (
+                                <motion.div
+                                    className="absolute left-0 right-0 h-1 bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8),0_0_30px_rgba(34,211,238,0.6)] z-10"
+                                    animate={{ top: ['0%', '100%', '0%'] }}
+                                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                />
+                            )}
+
+                            {/* Success / Already Done Overlays */}
+                            <AnimatePresence>
+                                {matchingState.status === 'MATCHED' && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="absolute inset-0 z-30 bg-emerald-600/90 backdrop-blur-md flex flex-col items-center justify-center text-white text-center p-6"
+                                    >
+                                        <motion.div
+                                            initial={{ scale: 0.5, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                                            className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-2xl mb-4 border-4 border-white/20"
+                                        >
+                                            <Check size={48} className="text-emerald-600 stroke-[4]" />
+                                        </motion.div>
+                                        <motion.h3 
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.1 }}
+                                            className="text-xl sm:text-2xl font-black italic uppercase tracking-tight text-white mb-1"
+                                        >
+                                            হাজিরা সফল!
+                                        </motion.h3>
+                                        <motion.p
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.2 }}
+                                            className="text-lg sm:text-xl font-bold text-white/90 truncate max-w-[280px]"
+                                        >
+                                            {matchingState.studentName}
+                                        </motion.p>
+                                        <p className="text-[11px] sm:text-xs font-bold text-white/60 uppercase tracking-widest mt-1">
+                                            উপস্থিতি নিশ্চিত করা হয়েছে
+                                        </p>
+                                    </motion.div>
+                                )}
+
+                                {matchingState.status === 'ALREADY_DONE' && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="absolute inset-0 z-30 bg-amber-500/95 backdrop-blur-md flex flex-col items-center justify-center text-white text-center p-6"
+                                    >
+                                        <motion.div
+                                            initial={{ scale: 0.5, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                                            className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-2xl mb-4 border-4 border-white/20"
+                                        >
+                                            <CheckCircle2 size={48} className="text-amber-500 stroke-[3]" />
+                                        </motion.div>
+                                        <motion.h3 
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.1 }}
+                                            className="text-xl sm:text-2xl font-black italic uppercase tracking-tight text-white mb-1"
+                                        >
+                                            ইতিমধ্যে উপস্থিত!
+                                        </motion.h3>
+                                        <motion.p
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.2 }}
+                                            className="text-lg sm:text-xl font-bold text-white/90 truncate max-w-[280px]"
+                                        >
+                                            {matchingState.studentName}
+                                        </motion.p>
+                                        <p className="text-[11px] sm:text-xs font-bold text-white/70 uppercase tracking-widest mt-1">
+                                            ইতিমধ্যে উপস্থিতি নেওয়া হয়েছে
+                                        </p>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -1261,10 +1406,10 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                                                         )}
                                                                     </div>
                                                                     {s.stats && (
-                                                                        <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[7px] font-black text-white px-0.5 ${s.stats.percentage >= 80 ? 'bg-emerald-500' :
+                                                                        <div className={`absolute -bottom-1 -right-1 min-w-[34px] h-4 rounded-full border-2 border-white flex items-center justify-center text-[7px] font-black text-white px-0.5 ${s.stats.percentage >= 80 ? 'bg-emerald-500' :
                                                                             s.stats.percentage >= 50 ? 'bg-amber-500' : 'bg-rose-500'
                                                                             }`}>
-                                                                            {s.stats.percentage}%
+                                                                            {s.stats.presentDays}/{s.stats.totalSchoolDays || s.stats.totalDays}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -1317,10 +1462,10 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                                                 )}
                                                             </div>
                                                             {s.stats && (
-                                                                <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[7px] font-black text-white px-0.5 ${s.stats.percentage >= 80 ? 'bg-emerald-500' :
+                                                                <div className={`absolute -bottom-1 -right-1 min-w-[34px] h-4 rounded-full border-2 border-white flex items-center justify-center text-[7px] font-black text-white px-0.5 ${s.stats.percentage >= 80 ? 'bg-emerald-500' :
                                                                     s.stats.percentage >= 50 ? 'bg-amber-500' : 'bg-rose-500'
                                                                     }`}>
-                                                                    {s.stats.percentage}%
+                                                                    {s.stats.presentDays}/{s.stats.totalSchoolDays || s.stats.totalDays}
                                                                 </div>
                                                             )}
                                                         </div>

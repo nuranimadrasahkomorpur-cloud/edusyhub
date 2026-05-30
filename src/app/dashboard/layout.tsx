@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     Users,
     BookOpen,
@@ -46,6 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const { openAssignmentModal } = useUI();
     const { user, activeRole, logout, isLoading } = useSession();
     const pathname = usePathname();
+    const router = useRouter();
 
     useEffect(() => {
         const handleOpenProfile = () => setIsProfileModalOpen(true);
@@ -53,30 +54,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return () => window.removeEventListener('open-user-profile', handleOpenProfile);
     }, []);
 
-    if (isLoading) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="relative">
-                        <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                        <GraduationCap className="absolute inset-0 m-auto text-primary animate-pulse" size={24} />
-                    </div>
-                    <p className="text-slate-500 font-black text-xs uppercase tracking-[0.3em] animate-pulse">EDUSY লোড হচ্ছে...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Client-side auth guard: if the session loaded but no user found, redirect to login
-    if (!user) {
-        if (typeof window !== 'undefined') {
-            window.location.replace('/entrance?redirect=' + encodeURIComponent(window.location.pathname));
-        }
-        return null;
-    }
-
-
-    // ...
     const menuItems = [
         // ওভারভিউ
         { name: 'ড্যাশবোর্ড', icon: LayoutDashboard, href: '/dashboard', section: 'ওভারভিউ' },
@@ -138,9 +115,124 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return true;
     });
 
+    const isAllowed = useMemo(() => {
+        if (!activeRole || !pathname) return false;
 
+        // Base dashboard route is always allowed, it has its own redirect logic
+        if (pathname === '/dashboard') return true;
 
+        // Check if the exact pathname or its parent path matches an item in filteredMenuItems
+        const hasMenuMatch = filteredMenuItems.some(item => {
+            if (item.href === '/dashboard') return false; // already handled
+            return pathname === item.href || pathname.startsWith(item.href + '/');
+        });
 
+        if (hasMenuMatch) return true;
+
+        // Custom pages that might not be directly in the filtered menu items list but are allowed for specific roles
+        if (activeRole === 'STUDENT') {
+            const allowedExtra = [
+                '/dashboard/student',
+                '/dashboard/settings',
+                '/dashboard/calendar'
+            ];
+            return allowedExtra.some(p => pathname === p || pathname.startsWith(p + '/'));
+        }
+
+        if (activeRole === 'GUARDIAN') {
+            const allowedExtra = [
+                '/dashboard/guardian',
+                '/dashboard/settings',
+                '/dashboard/calendar'
+            ];
+            return allowedExtra.some(p => pathname === p || pathname.startsWith(p + '/'));
+        }
+
+        if (activeRole === 'TEACHER') {
+            const allowedExtra = [
+                '/dashboard/teacher',
+                '/dashboard/settings',
+                '/dashboard/calendar',
+                '/dashboard/attendance/summary'
+            ];
+            return allowedExtra.some(p => pathname === p || pathname.startsWith(p + '/'));
+        }
+
+        if (activeRole === 'ADMIN' || activeRole === 'ACCOUNTANT' || activeRole === 'DEMO') {
+            const forbiddenPaths = [
+                '/dashboard/student',
+                '/dashboard/guardian',
+                '/dashboard/teacher',
+                '/dashboard/admin/institutes',
+                '/dashboard/admin/settings/branding'
+            ];
+            
+            const isForbidden = forbiddenPaths.some(p => pathname === p || pathname.startsWith(p + '/'));
+            if (isForbidden) return false;
+
+            return true;
+        }
+
+        if (activeRole === 'SUPER_ADMIN') {
+            const superAdminExtra = [
+                '/dashboard/settings'
+            ];
+            return superAdminExtra.some(p => pathname === p || pathname.startsWith(p + '/'));
+        }
+
+        return false;
+    }, [activeRole, pathname, filteredMenuItems]);
+
+    // Redirect unauthorized users to their correct homepage
+    useEffect(() => {
+        if (!isLoading && activeRole && !isAllowed) {
+            let redirectPath = '/dashboard';
+            if (activeRole === 'STUDENT') {
+                redirectPath = '/dashboard/student';
+            } else if (activeRole === 'GUARDIAN') {
+                redirectPath = '/dashboard/guardian';
+            } else if (activeRole === 'TEACHER') {
+                redirectPath = '/dashboard/teacher';
+            }
+            router.replace(redirectPath);
+        }
+    }, [isLoading, activeRole, isAllowed, router]);
+
+    if (isLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="relative">
+                        <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                        <GraduationCap className="absolute inset-0 m-auto text-primary animate-pulse" size={24} />
+                    </div>
+                    <p className="text-slate-500 font-black text-xs uppercase tracking-[0.3em] animate-pulse">EDUSY লোড হচ্ছে...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Client-side auth guard: if the session loaded but no user found, redirect to login
+    if (!user) {
+        if (typeof window !== 'undefined') {
+            window.location.replace('/entrance?redirect=' + encodeURIComponent(window.location.pathname));
+        }
+        return null;
+    }
+
+    if (!isAllowed) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-slate-50 font-sans">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="relative">
+                        <div className="w-16 h-16 border-4 border-rose-100 border-t-rose-600 rounded-full animate-spin"></div>
+                        <ShieldCheck className="absolute inset-0 m-auto text-rose-600 animate-pulse" size={24} />
+                    </div>
+                    <p className="text-slate-600 font-bold text-xs uppercase tracking-[0.3em] font-bengali">অ্যাক্সেস সুরক্ষিত হচ্ছে...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-screen bg-slate-50 font-sans">

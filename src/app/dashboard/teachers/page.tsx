@@ -151,7 +151,8 @@ export default function TeachersPage() {
         return matchesSearch && matchesClass;
     });
 
-    const canManageTeachers = (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN') && (activeInstitute?.isOwner !== false || user?.role === 'SUPER_ADMIN');
+    const canManageTeachers = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN';
+    const isOwner = user?.role === 'SUPER_ADMIN' || (activeInstitute?.adminIds || []).includes(user?.id) || activeInstitute?.isOwner === true;
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-fade-in-up font-bengali min-h-screen pb-20">
@@ -256,7 +257,8 @@ export default function TeachersPage() {
                 classes={classes}
                 allBooks={books}
                 onSave={handleUpdatePermissions}
-                isReadOnly={!canManageTeachers}
+                isReadOnly={!isOwner}
+                canToggleAdminPower={isOwner}
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

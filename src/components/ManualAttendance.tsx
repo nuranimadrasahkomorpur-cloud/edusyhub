@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Check,
     X,
@@ -20,12 +20,18 @@ import {
     MessageSquare,
     Edit3,
     UserCircle,
-    Clock8
+    Clock8,
+    LayoutGrid,
+    Table2,
+    ChevronUp,
+    ChevronsUpDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from './SessionProvider';
 import { useUI } from './UIProvider';
 import dynamic from 'next/dynamic';
+import Modal from './Modal';
+import AttendanceSummary from './AttendanceSummary';
 
 const StudentProfileModal = dynamic(() => import('./StudentProfileModal'), { ssr: false });
 
@@ -41,6 +47,7 @@ interface Student {
     updatedAt?: string;
     stats?: {
         totalDays: number;
+        totalSchoolDays: number;
         presentDays: number;
         lateDays: number;
         absentDays: number;
@@ -52,9 +59,30 @@ interface Student {
 }
 
 export default function ManualAttendance({ classId, selectedDate }: { classId: string, selectedDate: string }) {
-    const { activeInstitute, activeRole } = useSession();
+    const { activeInstitute, activeRole, user } = useSession();
     const isAdmin = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN';
     const isTeacher = activeRole === 'TEACHER';
+
+    // Determine if the current teacher has attendance permission for this specific class
+    const hasAttendancePerm = useMemo(() => {
+        if (isAdmin) return true;
+        if (!isTeacher || !user?.teacherProfiles || !activeInstitute?.id || !classId || classId === 'all') return isAdmin;
+        const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute.id);
+        if (!profile) return false;
+        if (profile.isAdmin === true) return true;
+        const classPerm = profile.permissions?.classWise?.[classId];
+        if (!classPerm) return false;
+        if (typeof classPerm === 'object' && Array.isArray(classPerm.permissions)) {
+            return classPerm.permissions.includes('canTakeAttendance');
+        }
+        if (Array.isArray(classPerm)) return classPerm.includes('canTakeAttendance');
+        if (typeof classPerm === 'object') return classPerm.canTakeAttendance === true;
+        return false;
+    }, [isAdmin, isTeacher, user, activeInstitute?.id, classId]);
+
+    // Teachers without the permission see a read-only view
+    const isReadOnlyAttendance = isTeacher && !hasAttendancePerm;
+
     const ui = useUI();
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
@@ -66,10 +94,88 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     const [activeActionId, setActiveActionId] = useState<string | null>(null);
     const [selectedStudentForModal, setSelectedStudentForModal] = useState<Student | null>(null);
     const [modalTab, setModalTab] = useState<'fees' | 'attendance' | 'assignments' | 'login' | 'face'>('fees');
+    const [viewMode, setViewMode] = useState<'CARD' | 'REGISTER'>('CARD');
+    const [registerData, setRegisterData] = useState<Record<string, Record<string, string>>>({});
+    const [registerLoading, setRegisterLoading] = useState(false);
+    const [showColumnPicker, setShowColumnPicker] = useState(false);
+    const [visibleDays, setVisibleDays] = useState<number[]>([]);
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+    const [showSummaryModal, setShowSummaryModal] = useState(false);
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     const showToast = (message: string, type: 'SUCCESS' | 'ERROR' | 'INFO' = 'SUCCESS') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 4000);
+    };
+
+    // Derive month string e.g. "2026-05" from selectedDate
+    const monthStr = selectedDate ? selectedDate.substring(0, 7) : '';
+    // Number of days in the selected month
+    const daysInMonth = selectedDate ? new Date(parseInt(selectedDate.substring(0,4)), parseInt(selectedDate.substring(5,7)), 0).getDate() : 31;
+    // Array of day numbers [1..daysInMonth]
+    const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+    useEffect(() => {
+        setVisibleDays(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+    }, [daysInMonth]);
+
+    const fetchRegisterData = async () => {
+        if (!activeInstitute?.id || !monthStr) return;
+
+        const isAdminUser = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (() => {
+            const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
+            return profile?.isAdmin === true;
+        })();
+
+        if (activeRole === 'TEACHER' && !isAdminUser) {
+            if (!classId || classId === 'all') {
+                setRegisterData({});
+                return;
+            }
+            const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
+            const classPermissions = profile?.permissions?.classWise?.[classId];
+            let hasPerm = false;
+            if (classPermissions) {
+                if (typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {
+                    hasPerm = classPermissions.permissions.includes('canTakeAttendance');
+                } else if (Array.isArray(classPermissions)) {
+                    hasPerm = classPermissions.includes('canTakeAttendance');
+                } else if (typeof classPermissions === 'object') {
+                    hasPerm = classPermissions.canTakeAttendance === true;
+                }
+            }
+            if (!hasPerm) {
+                setRegisterData({});
+                return;
+            }
+        }
+
+        setRegisterLoading(true);
+        try {
+            const fetchClassId = classId || 'all';
+            const res = await fetch(`/api/attendance/list?instituteId=${activeInstitute.id}&classId=${fetchClassId}&month=${monthStr}`);
+            if (res.ok) {
+                const records: any[] = await res.json();
+                // Build map: studentId -> { dateString -> status }
+                const map: Record<string, Record<string, string>> = {};
+                records.forEach(r => {
+                    if (!map[r.studentId]) map[r.studentId] = {};
+                    map[r.studentId][r.dateString] = r.status;
+                });
+                setRegisterData(map);
+            }
+        } catch (err) {
+            console.error('Error fetching register data:', err);
+        } finally {
+            setRegisterLoading(false);
+        }
     };
 
     const storageKey = `attendance_draft_${activeInstitute?.id}_${selectedDate}`;
@@ -113,6 +219,37 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
     const fetchStudents = async () => {
         if (!activeInstitute?.id) return;
+
+        const isAdminUser = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (() => {
+            const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
+            return profile?.isAdmin === true;
+        })();
+
+        if (activeRole === 'TEACHER' && !isAdminUser) {
+            if (!classId || classId === 'all') {
+                setStudents([]);
+                setLoading(false);
+                return;
+            }
+            const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
+            const classPermissions = profile?.permissions?.classWise?.[classId];
+            let hasPerm = false;
+            if (classPermissions) {
+                if (typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {
+                    hasPerm = classPermissions.permissions.includes('canTakeAttendance');
+                } else if (Array.isArray(classPermissions)) {
+                    hasPerm = classPermissions.includes('canTakeAttendance');
+                } else if (typeof classPermissions === 'object') {
+                    hasPerm = classPermissions.canTakeAttendance === true;
+                }
+            }
+            if (!hasPerm) {
+                setStudents([]);
+                setLoading(false);
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             // Fetch students, attendance, and stats in parallel
@@ -181,6 +318,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     };
 
     const updateStatus = (id: string, status: Student['attendance']) => {
+        if (isReadOnlyAttendance) return;
         setStudents(prev => prev.map(s => s.id === id ? {
             ...s,
             attendance: status,
@@ -189,6 +327,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     };
 
     const bulkUpdate = (status: Student['attendance'] | 'RESET') => {
+        if (isReadOnlyAttendance) return;
         const now = new Date().toISOString();
         setStudents(prev => prev.map(s => {
             // Prevent teachers from modifying already pending leaves via bulk actions
@@ -211,7 +350,90 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         }));
     };
 
+    const handleNameIdSort = () => {
+        setSortConfig(current => {
+            if (!current || (current.key !== 'name' && current.key !== 'id')) return { key: 'name', direction: 'asc' };
+            if (current.key === 'name' && current.direction === 'asc') return { key: 'name', direction: 'desc' };
+            if (current.key === 'name' && current.direction === 'desc') return { key: 'id', direction: 'asc' };
+            if (current.key === 'id' && current.direction === 'asc') return { key: 'id', direction: 'desc' };
+            return null; // id desc -> reset
+        });
+    };
+
+    const handleQuickCellUpdate = async (studentId: string, dateString: string, currentStatus: string | undefined, classIdFromStudent: string | undefined) => {
+        if (!activeInstitute?.id) return;
+        if (isReadOnlyAttendance) return;
+        
+        // Determine next status: (none/undefined) -> PRESENT -> ABSENT -> LATE -> LEAVE -> NONE -> PRESENT...
+        const statuses = ['PRESENT', 'ABSENT', 'LATE', 'LEAVE', 'NONE'];
+        let nextStatusIndex = 0;
+        if (currentStatus) {
+            // Treat LEAVE_PENDING as LEAVE for the cycle
+            const normalizedStatus = currentStatus === 'LEAVE_PENDING' ? 'LEAVE' : currentStatus;
+            const idx = statuses.indexOf(normalizedStatus);
+            if (idx !== -1) {
+                nextStatusIndex = (idx + 1) % statuses.length;
+            }
+        }
+        
+        const nextStatus = statuses[nextStatusIndex];
+        
+        // Optimistic UI update in register view
+        setRegisterData(prev => {
+            const next = { ...prev };
+            if (!next[studentId]) next[studentId] = {};
+            if (nextStatus === 'NONE') {
+                delete next[studentId][dateString];
+            } else {
+                next[studentId] = {
+                    ...next[studentId],
+                    [dateString]: nextStatus
+                };
+            }
+            return next;
+        });
+
+        // If it's the currently selected date, also update the main students list
+        if (dateString === selectedDate) {
+            setStudents(prev => prev.map(s => {
+                if (s.id !== studentId) return s;
+                return {
+                    ...s,
+                    attendance: nextStatus === 'NONE' ? 'ABSENT' : nextStatus as any,
+                    initialAttendance: nextStatus === 'NONE' ? 'ABSENT' : nextStatus as any // auto-saved
+                };
+            }));
+        }
+
+        // Save immediately in the background
+        try {
+            if (nextStatus === 'NONE') {
+                await fetch('/api/attendance/unmark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId, dateString })
+                });
+            } else {
+                await fetch('/api/attendance/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        studentId,
+                        instituteId: activeInstitute.id,
+                        classId: classIdFromStudent || classId || 'all',
+                        dateString,
+                        status: nextStatus,
+                        method: 'MANUAL'
+                    })
+                });
+            }
+        } catch (error) {
+            console.error('Failed to quick save cell:', error);
+        }
+    };
+
     const handleSave = async () => {
+        if (isReadOnlyAttendance) return;
         const changedStudents = students.filter(s => s.attendance !== s.initialAttendance);
         if (changedStudents.length === 0) return;
 
@@ -297,18 +519,94 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         }
     };
 
-    const filteredStudents = students.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.rollNumber?.includes(searchQuery);
+    const sortedAllStudents = [...students].sort((a, b) => a.name.localeCompare(b.name));
+    const studentsWithRoll = sortedAllStudents.map((s, idx) => ({ ...s, assignedRoll: idx + 1 }));
+
+    // Calculate total active class days for the month
+    const activeClassDays = useMemo(() => {
+        const days = new Set<string>();
+        Object.values(registerData).forEach(studentData => {
+            Object.keys(studentData).forEach(date => {
+                if (studentData[date] && date.startsWith(monthStr)) {
+                    days.add(date);
+                }
+            });
+        });
+        return days.size;
+    }, [registerData, monthStr]);
+
+    // Pre-calculate present count for sorting
+    const studentsWithStats = studentsWithRoll.map(student => {
+        const sData = registerData[student.id] || {};
+        let presentCount = 0;
+        let totalCount = 0;
+        monthDays.forEach(day => {
+            const dayStr = `${monthStr}-${String(day).padStart(2, '0')}`;
+            const status = sData[dayStr];
+            if (status) totalCount++;
+            if (status === 'PRESENT' || status === 'LATE') presentCount++;
+        });
+        return { ...student, presentCount, totalCount, sData };
+    });
+
+    let filteredStudents = studentsWithStats.filter(s => {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = s.name.toLowerCase().includes(query) || 
+                              s.assignedRoll.toString() === query ||
+                              s.metadata?.studentId === query;
         const matchesStatus = statusFilter === 'ALL' || s.attendance === statusFilter;
         return matchesSearch && matchesStatus;
     });
+
+    if (sortConfig) {
+        filteredStudents.sort((a, b) => {
+            let valA: any = 0;
+            let valB: any = 0;
+
+            if (sortConfig.key === 'roll') {
+                valA = a.assignedRoll;
+                valB = b.assignedRoll;
+            } else if (sortConfig.key === 'name') {
+                return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+            } else if (sortConfig.key === 'id') {
+                valA = parseInt(a.metadata?.studentId || '0', 10);
+                valB = parseInt(b.metadata?.studentId || '0', 10);
+                if (isNaN(valA)) valA = a.metadata?.studentId || '';
+                if (isNaN(valB)) valB = b.metadata?.studentId || '';
+            } else if (sortConfig.key === 'totalP') {
+                valA = a.presentCount;
+                valB = b.presentCount;
+            } else if (sortConfig.key === 'percentage') {
+                valA = activeClassDays > 0 ? a.presentCount / activeClassDays : -1;
+                valB = activeClassDays > 0 ? b.presentCount / activeClassDays : -1;
+            } else if (sortConfig.key.startsWith('date_')) {
+                const dateStr = sortConfig.key.replace('date_', '');
+                const statusWeight = (status: string | undefined) => {
+                    if (status === 'PRESENT') return 4;
+                    if (status === 'LATE') return 3;
+                    if (status === 'LEAVE' || status === 'LEAVE_PENDING') return 2;
+                    if (status === 'ABSENT') return 1;
+                    return 0; // NONE
+                };
+                valA = statusWeight(a.sData[dateStr]);
+                valB = statusWeight(b.sData[dateStr]);
+            }
+
+            if (typeof valA === 'string' && typeof valB === 'string') {
+                return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
 
     const hasChanges = students.some(s => s.attendance !== s.initialAttendance);
 
     return (
         <div className="space-y-6">
             {/* Redesigned Toolbar */}
-            <div className="flex flex-col gap-3 bg-white p-3 rounded-[24px] border border-slate-200 shadow-sm relative z-20">
+            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-20">
                 <div className="flex items-center gap-3">
                     {/* Expanding Search Bar */}
                     <motion.div
@@ -331,22 +629,105 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                         />
                     </motion.div>
 
-                    {/* Save Button */}
-                    <button
-                        onClick={handleSave}
-                        disabled={saving || loading || !hasChanges}
-                        className={`px-8 py-4 rounded-[22px] font-black text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-xl active:scale-95 shrink-0 ${hasChanges
-                            ? 'bg-[#045c84] text-white shadow-[#045c84]/20 hover:bg-[#034a6b]'
-                            : 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed opacity-70'
-                            }`}
-                    >
-                        {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-                        <span className={searchFocused ? 'hidden sm:inline' : 'inline'}>{hasChanges ? 'হাজিরা সেভ' : 'সেভড'}</span>
-                    </button>
+                    {/* View Mode Toggle */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center bg-slate-100 rounded-[18px] p-1">
+                            <button
+                                onClick={() => setViewMode('CARD')}
+                                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] text-[11px] font-black uppercase tracking-wider transition-all ${
+                                    viewMode === 'CARD'
+                                        ? 'bg-white text-[#045c84] shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                <LayoutGrid size={14} />
+                                <span className="hidden sm:inline">কার্ড</span>
+                            </button>
+                            <button
+                                onClick={() => { setViewMode('REGISTER'); fetchRegisterData(); }}
+                                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] text-[11px] font-black uppercase tracking-wider transition-all ${
+                                    viewMode === 'REGISTER'
+                                        ? 'bg-white text-[#045c84] shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                <Table2 size={14} />
+                                <span className="hidden sm:inline">রেজিস্টার</span>
+                            </button>
+                        </div>
+
+                        {viewMode === 'REGISTER' && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowColumnPicker(!showColumnPicker)}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wider transition-all"
+                                >
+                                    <Table2 size={14} />
+                                    <span className="hidden sm:inline">কলাম</span>
+                                    <ChevronDown size={14} />
+                                </button>
+                                {showColumnPicker && (
+                                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2">
+                                        <div className="flex items-center justify-between px-2 py-1 border-b border-slate-100 mb-2">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">কলাম নির্বাচন</span>
+                                            <button 
+                                                onClick={() => setVisibleDays(visibleDays.length === daysInMonth ? [] : monthDays)}
+                                                className="text-[10px] font-bold text-[#045c84] hover:underline"
+                                            >
+                                                {visibleDays.length === daysInMonth ? 'সব লুকান' : 'সব নির্বাচন'}
+                                            </button>
+                                        </div>
+                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                            {monthDays.map(day => (
+                                                <label key={day} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer text-xs font-bold text-slate-600">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={visibleDays.includes(day)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setVisibleDays([...visibleDays, day].sort((a,b)=>a-b));
+                                                            else setVisibleDays(visibleDays.filter(d => d !== day));
+                                                        }}
+                                                        className="rounded border-slate-300 text-[#045c84] focus:ring-[#045c84]"
+                                                    />
+                                                    তারিখ {day}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Save Button — hidden when teacher lacks canTakeAttendance */}
+                    {isReadOnlyAttendance ? (
+                        <div className="flex items-center gap-2 px-5 py-3 rounded-[22px] bg-slate-100 text-slate-400 shrink-0 border border-slate-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <span className="text-[12px] font-black uppercase tracking-widest">শুধু দেখুন</span>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleSave}
+                            disabled={saving || loading || !hasChanges}
+                            className={`px-8 py-4 rounded-[22px] font-black text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-xl active:scale-95 shrink-0 ${hasChanges
+                                ? 'bg-[#045c84] text-white shadow-[#045c84]/20 hover:bg-[#034a6b]'
+                                : 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed opacity-70'
+                                }`}
+                        >
+                            {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                            <span className={searchFocused ? 'hidden sm:inline' : 'inline'}>{hasChanges ? 'হাজিরা সেভ' : 'সেভড'}</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Interactive Status Tabs - Always in one scrollable row */}
                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+                    {isReadOnlyAttendance && (
+                        <div className="flex items-center gap-2 px-4 py-2.5 rounded-[18px] bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <span className="text-[11px] font-black uppercase tracking-widest whitespace-nowrap">এই ক্লাসে হাজিরা দেওয়ার অনুমতি নেই</span>
+                        </div>
+                    )}
                     {[
                         { id: 'ALL', label: 'সব', count: students.length, color: 'slate', activeBg: 'bg-slate-800', activeText: 'text-white' },
                         { id: 'PRESENT', label: 'উপস্থিত', count: students.filter(s => s.attendance === 'PRESENT').length, color: 'emerald', activeBg: 'bg-emerald-500', activeText: 'text-white' },
@@ -371,7 +752,8 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                 </div>
             </div>
 
-            {/* Bulk Actions (Quick Set) */}
+            {/* Bulk Actions — hide in register mode */}
+            {viewMode === 'CARD' && !isReadOnlyAttendance && (
             <div className="flex flex-wrap items-center justify-between gap-3 px-2">
                 <div className="flex items-center gap-2">
                     <button onClick={() => bulkUpdate('PRESENT')} className="px-5 py-2.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-[11px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all">উপস্থিত</button>
@@ -406,8 +788,217 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                     )}
                 </div>
             </div>
+            )}
 
-            {/* Student List - Card Grid */}
+            {/* ===== REGISTER VIEW ===== */}
+            {viewMode === 'REGISTER' && (
+                <div className="bg-white rounded-[20px] border border-slate-200 shadow-sm overflow-hidden">
+                    {/* Legend */}
+                    <div className="flex items-center gap-4 px-5 py-3 border-b border-slate-100 bg-slate-50/70">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">কিংবদন্তি:</span>
+                        {[
+                            { label: 'P – উপস্থিত', color: 'bg-emerald-500' },
+                            { label: 'A – অনুপস্থিত', color: 'bg-rose-500' },
+                            { label: 'L – বিলম্ব', color: 'bg-amber-500' },
+                            { label: 'H – ছুটি', color: 'bg-blue-500' },
+                            { label: '– – নেই', color: 'bg-slate-300' },
+                        ].map(item => (
+                            <span key={item.label} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                                <span className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
+                                {item.label}
+                            </span>
+                        ))}
+                        <div className="ml-auto flex items-center gap-3">
+                            <button
+                                onClick={() => setShowSummaryModal(true)}
+                                className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm hover:bg-indigo-100 transition-colors flex items-center gap-1.5"
+                            >
+                                <CalendarIcon size={12} />
+                                <span>সামারি রিপোর্ট</span>
+                            </button>
+                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm">
+                                মোট কর্মদিবস: {activeClassDays} দিন
+                            </span>
+                            {registerLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
+                        </div>
+                    </div>
+
+                    {/* Scrollable Table */}
+                    <div className="overflow-auto max-h-[65vh] custom-scrollbar rounded-b-[20px]" data-lenis-prevent="true">
+                        <table className="w-full text-[11px] border-collapse relative" style={{ minWidth: `${220 + daysInMonth * 36}px` }}>
+                            <thead>
+                                <tr className="bg-[#045c84] text-white select-none">
+                                    <th 
+                                        className="sticky top-0 left-0 z-30 bg-[#045c84] text-center px-3 py-3 font-black text-[10px] uppercase tracking-widest w-10 border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
+                                        onClick={() => handleSort('roll')}
+                                    >
+                                        <div className="flex items-center justify-center gap-1">
+                                            রোল
+                                            {sortConfig?.key === 'roll' ? (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />) : <ChevronsUpDown size={10} className="opacity-30" />}
+                                        </div>
+                                    </th>
+                                    <th 
+                                        className="sticky top-0 left-10 z-30 bg-[#045c84] text-left px-3 py-3 font-black text-[10px] uppercase tracking-widest min-w-[150px] border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
+                                        onClick={handleNameIdSort}
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            শিক্ষার্থীর নাম
+                                            {(sortConfig?.key === 'name' || sortConfig?.key === 'id') ? (
+                                                <div className="flex items-center gap-0.5 text-amber-200">
+                                                    <span className="text-[8px] leading-none">{sortConfig.key === 'name' ? 'নাম' : 'আইডি'}</span>
+                                                    {sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                                                </div>
+                                            ) : (
+                                                <ChevronsUpDown size={10} className="opacity-30" />
+                                            )}
+                                        </div>
+                                    </th>
+                                    {monthDays.map(day => {
+                                        if (!visibleDays.includes(day)) return null;
+                                        const dayStr = `${monthStr}-${String(day).padStart(2, '0')}`;
+                                        const isToday = dayStr === selectedDate;
+                                        const dayName = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'][new Date(dayStr).getDay()];
+                                        
+                                        return (
+                                            <th
+                                                key={day}
+                                                onClick={() => handleSort(`date_${dayStr}`)}
+                                                className={`sticky top-0 z-20 py-2 font-black w-10 text-center border-r border-white/10 cursor-pointer hover:bg-[#034a6a] ${
+                                                    isToday ? 'bg-amber-400 text-slate-900 hover:bg-amber-500' : 'bg-[#045c84]'
+                                                }`}
+                                            >
+                                                <div className="flex flex-col items-center justify-center leading-[1.2]">
+                                                    <div className="flex items-center gap-0.5">
+                                                        <span className="text-[11px]">{day}</span>
+                                                        {sortConfig?.key === `date_${dayStr}` && (
+                                                            sortConfig.direction === 'asc' ? <ChevronUp size={8} /> : <ChevronDown size={8} />
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[9px] opacity-80 font-semibold tracking-tighter">{dayName}</span>
+                                                </div>
+                                            </th>
+                                        );
+                                    })}
+                                    <th 
+                                        className="sticky top-0 z-20 bg-[#045c84] text-center px-2 py-3 font-black text-[10px] uppercase tracking-widest w-16 border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
+                                        onClick={() => handleSort('totalP')}
+                                    >
+                                        <div className="flex items-center justify-center gap-1">
+                                            মোট P
+                                            {sortConfig?.key === 'totalP' ? (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />) : <ChevronsUpDown size={10} className="opacity-30" />}
+                                        </div>
+                                    </th>
+                                    <th 
+                                        className="sticky top-0 z-20 bg-[#045c84] text-center px-2 py-3 font-black text-[10px] uppercase tracking-widest w-16 cursor-pointer hover:bg-[#034a6a]"
+                                        onClick={() => handleSort('percentage')}
+                                    >
+                                        <div className="flex items-center justify-center gap-1">
+                                            %
+                                            {sortConfig?.key === 'percentage' ? (sortConfig.direction === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />) : <ChevronsUpDown size={10} className="opacity-30" />}
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredStudents.map((student, idx) => {
+                                        const { sData, presentCount, totalCount } = student;
+
+                                        return (
+                                            <tr
+                                                key={student.id}
+                                                className={`border-b border-slate-100 transition-colors ${
+                                                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                                                } hover:bg-blue-50/40`}
+                                            >
+                                                {/* SL / Roll */}
+                                                <td className={`sticky left-0 z-10 px-3 py-2 font-black text-slate-400 text-center border-r border-slate-100 ${
+                                                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                                                }`}>{student.assignedRoll}</td>
+                                                {/* Name & ID */}
+                                                <td className={`sticky left-10 z-10 px-3 py-2 font-bold text-slate-700 border-r border-slate-100 ${
+                                                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                                                }`}>
+                                                    <span className="block truncate max-w-[150px]">{student.name}</span>
+                                                    <span className="block text-[9px] text-slate-400 font-medium">ID: {student.metadata?.studentId || 'N/A'}</span>
+                                                </td>
+                                                {/* Day cells */}
+                                                {monthDays.map(day => {
+                                                    if (!visibleDays.includes(day)) return null;
+                                                    
+                                                    const dayStr = `${monthStr}-${String(day).padStart(2, '0')}`;
+                                                    const status = sData[dayStr];
+
+                                                    const isToday = dayStr === selectedDate;
+                                                    const cellLabel = status === 'PRESENT' ? 'P'
+                                                        : status === 'ABSENT' ? 'A'
+                                                        : status === 'LATE' ? 'L'
+                                                        : status === 'LEAVE' || status === 'LEAVE_PENDING' ? 'H'
+                                                        : '-';
+                                                    const cellColor = status === 'PRESENT' ? 'bg-emerald-100 text-emerald-700'
+                                                        : status === 'ABSENT' ? 'bg-rose-100 text-rose-600'
+                                                        : status === 'LATE' ? 'bg-amber-100 text-amber-700'
+                                                        : status === 'LEAVE' || status === 'LEAVE_PENDING' ? 'bg-blue-100 text-blue-600'
+                                                        : 'text-slate-300';
+
+                                                    return (
+                                                        <td
+                                                            key={day}
+                                                            id={`cell-${idx}-${visibleDays.indexOf(day)}`}
+                                                            tabIndex={0}
+                                                            onClick={() => handleQuickCellUpdate(student.id, dayStr, status, student.classId)}
+                                                            onKeyDown={(e) => {
+                                                                const dayIdx = visibleDays.indexOf(day);
+                                                                if (e.key === 'ArrowUp') {
+                                                                    document.getElementById(`cell-${idx - 1}-${dayIdx}`)?.focus();
+                                                                    e.preventDefault();
+                                                                } else if (e.key === 'ArrowDown') {
+                                                                    document.getElementById(`cell-${idx + 1}-${dayIdx}`)?.focus();
+                                                                    e.preventDefault();
+                                                                } else if (e.key === 'ArrowLeft') {
+                                                                    document.getElementById(`cell-${idx}-${dayIdx - 1}`)?.focus();
+                                                                    e.preventDefault();
+                                                                } else if (e.key === 'ArrowRight') {
+                                                                    document.getElementById(`cell-${idx}-${dayIdx + 1}`)?.focus();
+                                                                    e.preventDefault();
+                                                                } else if (e.key === 'Enter' || e.key === ' ') {
+                                                                    handleQuickCellUpdate(student.id, dayStr, status, student.classId);
+                                                                    e.preventDefault();
+                                                                }
+                                                            }}
+                                                            className={`py-2 text-center border-r border-slate-100 font-black text-[10px] cursor-pointer hover:bg-blue-100/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#045c84] focus:bg-blue-50 transition-colors ${
+                                                                isToday ? 'ring-1 ring-inset ring-amber-300 bg-amber-50/60' : ''
+                                                            }`}
+                                                        >
+                                                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-sm ${cellColor}`}>
+                                                                {cellLabel}
+                                                            </span>
+                                                        </td>
+                                                    );
+                                                })}
+                                                {/* Summary */}
+                                                <td className="px-2 py-2 text-center font-black text-emerald-600 border-l border-slate-100">
+                                                    {presentCount}/{activeClassDays}
+                                                </td>
+                                                <td className="px-2 py-2 text-center font-black">
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                                                        activeClassDays > 0 && (presentCount/activeClassDays) >= 0.8 ? 'bg-emerald-100 text-emerald-700' :
+                                                        activeClassDays > 0 && (presentCount/activeClassDays) >= 0.5 ? 'bg-amber-100 text-amber-700' :
+                                                        activeClassDays > 0 ? 'bg-rose-100 text-rose-600' : 'text-slate-300'
+                                                    }`}>
+                                                        {activeClassDays > 0 ? `${Math.round((presentCount/activeClassDays)*100)}%` : '—'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== CARD VIEW ===== */}
+            {viewMode === 'CARD' && (
             <div className="min-h-[400px]">
                 <AnimatePresence mode="wait">
                     {loading ? (
@@ -455,8 +1046,8 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                 const attendanceTime = student.updatedAt ? new Date(student.updatedAt).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }) : null;
 
                                 // Attendance Stats for segment border
-                                const stats = student.stats || { presentDays: 0, lateDays: 0, absentDays: 0, totalDays: 0 };
-                                const total = stats.totalDays || 0;
+                                const stats = student.stats || { presentDays: 0, lateDays: 0, absentDays: 0, totalDays: 0, totalSchoolDays: 0 };
+                                const total = stats.totalSchoolDays || stats.totalDays || 0;
                                 const presentPct = total > 0 ? (stats.presentDays / total) * 100 : 0;
                                 const absentPct = total > 0 ? (stats.absentDays / total) * 100 : 0;
 
@@ -464,7 +1055,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                     <motion.div
                                         key={student.id}
                                         layout
-                                        className="bg-white rounded-[20px] p-2 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between gap-3 relative overflow-hidden group"
+                                        className="bg-white rounded-[20px] p-2 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between gap-3 relative group"
                                     >
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="relative shrink-0">
@@ -478,13 +1069,6 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                         <Users size={20} />
                                                     )}
                                                 </div>
-                                                {student.stats && (
-                                                    <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-black text-white shadow-md ${student.stats.percentage >= 80 ? 'bg-emerald-500' :
-                                                        student.stats.percentage >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                                                        }`}>
-                                                        {student.stats.percentage}%
-                                                    </div>
-                                                )}
                                             </div>
                                             <div className="flex flex-col min-w-0">
                                                 <div className="flex items-center gap-1.5">
@@ -551,7 +1135,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                         )}
                                                     </div>
                                                     {status !== 'ABSENT' && attendanceTime && (
-                                                        <div className="flex items-center gap-1 mt-0">
+                                                        <div className="flex items-center gap-1 mt-0.5">
                                                             <Clock size={9} className="text-slate-300" />
                                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">{attendanceTime}</span>
                                                         </div>
@@ -561,8 +1145,16 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
 
                                         <div className="flex items-center gap-3 shrink-0">
-                                            <div className="flex flex-col items-end">
-                                                <span className={`text-[9px] font-black uppercase tracking-widest mb-1 text-${current.color}-600 opacity-70`}>{current.label}</span>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <span className={`text-[9px] font-black uppercase tracking-widest text-${current.color}-600 opacity-70`}>{current.label}</span>
+                                                {student.stats && (
+                                                    <span className={`whitespace-nowrap text-[10px] font-black px-2 py-0.5 rounded-md leading-tight ${
+                                                        student.stats.percentage >= 80 ? 'bg-emerald-50 text-emerald-600' :
+                                                        student.stats.percentage >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-500'
+                                                    }`}>
+                                                        {student.stats.presentDays}/{student.stats.totalSchoolDays || student.stats.totalDays} দিন
+                                                    </span>
+                                                )}
                                                 {isAdmin && status === 'LEAVE_PENDING' ? (
                                                     <div className="flex items-center gap-2">
                                                         <button 
@@ -598,7 +1190,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
 
                                         {/* Segmented Bottom Border */}
-                                        <div className="absolute bottom-0 left-0 right-0 h-1 flex">
+                                        <div className="absolute bottom-0 left-0 right-0 h-1 flex rounded-b-[20px] overflow-hidden">
                                             <div
                                                 className="h-full bg-emerald-500 transition-all duration-500"
                                                 style={{ width: `${presentPct}%` }}
@@ -629,6 +1221,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                     />
                 )}
             </div >
+            )}
 
             {/* Glassmorphism Toast */}
             <AnimatePresence>
@@ -669,6 +1262,22 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                     )
                 }
             </AnimatePresence >
+
+            {/* Summary Modal */}
+            <Modal
+                isOpen={showSummaryModal}
+                onClose={() => setShowSummaryModal(false)}
+                title="হাজিরা সামারি রিপোর্ট"
+                maxWidth="max-w-7xl"
+            >
+                <div className="bg-slate-50 min-h-[60vh]">
+                    <AttendanceSummary 
+                        initialClassId={classId === 'all' ? '' : classId}
+                        initialStartDate={monthStr ? `${monthStr}-01` : undefined}
+                        initialEndDate={monthStr ? `${monthStr}-${daysInMonth}` : undefined}
+                    />
+                </div>
+            </Modal>
         </div >
     );
 }

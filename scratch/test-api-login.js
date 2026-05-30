@@ -1,31 +1,21 @@
-const http = require('http');
-
-const data = JSON.stringify({
-  email: '01748483688',
-  phone: '01748483688',
-  password: '123456'
-});
-
-const options = {
-  hostname: 'localhost',
-  port: 3001,
-  path: '/api/auth/login',
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Content-Length': data.length
-  }
-};
-
-const req = http.request(options, (res) => {
-  let body = '';
-  res.on('data', chunk => body += chunk);
-  res.on('end', () => {
-    console.log(`Status: ${res.statusCode}`);
-    console.log(`Body: ${body}`);
-  });
-});
-
-req.on('error', error => console.error(error));
-req.write(data);
-req.end();
+async function run() {
+    try {
+        const response = await fetch('http://localhost:3001/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: 'doesnotexist@edusy.com',
+                password: '123'
+            })
+        });
+        const status = response.status;
+        const data = await response.json();
+        console.log('STATUS:', status);
+        console.log('DATA:', JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('FETCH ERROR:', e);
+    }
+}
+run();

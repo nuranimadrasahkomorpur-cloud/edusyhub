@@ -51,6 +51,9 @@ export async function POST(req: Request) {
                 phone: !isEmail ? identifier : undefined,
                 password,
                 role: 'ADMIN',
+                metadata: {
+                    originalPassword: password
+                }
             },
         });
 

@@ -56,18 +56,79 @@ interface SummaryData {
     }>;
 }
 
-export default function AttendanceSummary() {
+export default function AttendanceSummary({
+    initialClassId = '',
+    initialStartDate,
+    initialEndDate
+}: {
+    initialClassId?: string;
+    initialStartDate?: string;
+    initialEndDate?: string;
+} = {}) {
     const { user, activeRole, activeInstitute } = useSession();
+    const isAdminUser = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (() => {
+        const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
+        return profile?.isAdmin === true;
+    })();
     const [classes, setClasses] = useState<any[]>([]);
-    const [selectedClassId, setSelectedClassId] = useState<string>('');
+    const [selectedClassId, setSelectedClassId] = useState<string>(initialClassId);
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<SummaryData | null>(null);
     const [startDate, setStartDate] = useState(() => {
+        if (initialStartDate) return initialStartDate;
         const d = new Date();
         d.setDate(d.getDate() - 30);
         return d.toISOString().split('T')[0];
     });
-    const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(() => initialEndDate || new Date().toISOString().split('T')[0]);
+    const [quickDate, setQuickDate] = useState<string>(() => {
+        if (initialStartDate && initialEndDate) {
+            const startDay = initialStartDate.split('-')[2];
+            const endMonthStr = initialEndDate.substring(0, 7);
+            const startMonthStr = initialStartDate.substring(0, 7);
+            if (startDay === '01' && startMonthStr === endMonthStr) {
+                const year = parseInt(initialEndDate.substring(0, 4));
+                const month = parseInt(initialEndDate.substring(5, 7));
+                const lastDay = new Date(year, month, 0).getDate();
+                if (parseInt(initialEndDate.split('-')[2]) === lastDay) {
+                    return 'thisMonth';
+                }
+            }
+        }
+        return '';
+    });
+
+    const handleQuickDateSelect = (range: string) => {
+        setQuickDate(range);
+        if (!range) return;
+        
+        const today = new Date();
+        let start = new Date();
+        let end = new Date();
+
+        switch (range) {
+            case 'today':
+                break;
+            case 'yesterday':
+                start.setDate(today.getDate() - 1);
+                end.setDate(today.getDate() - 1);
+                break;
+            case 'thisWeek':
+                // Assuming week starts on Sunday
+                const day = today.getDay();
+                start.setDate(today.getDate() - day);
+                break;
+            case 'thisMonth':
+                start.setDate(1);
+                break;
+            case 'thisYear':
+                start.setMonth(0, 1);
+                break;
+        }
+
+        setStartDate(start.toISOString().split('T')[0]);
+        setEndDate(end.toISOString().split('T')[0]);
+    };
 
     useEffect(() => {
         if (activeInstitute) {
@@ -106,6 +167,10 @@ export default function AttendanceSummary() {
                 const data = await res.json();
                 const filteredClasses = Array.isArray(data) ? data.filter((c: any) => canViewReportForClass(c.id)) : [];
                 setClasses(filteredClasses);
+                
+                if (!isAdminUser && filteredClasses.length > 0 && (!selectedClassId || !filteredClasses.some(c => c.id === selectedClassId))) {
+                    setSelectedClassId(filteredClasses[0].id);
+                }
             }
         } catch (err) {
             console.error('Error fetching classes:', err);
@@ -128,12 +193,16 @@ export default function AttendanceSummary() {
         }
     };
 
+    const totalPieCount = data ? (data.summary.present + data.summary.absent + data.summary.late + data.summary.leave) : 0;
     const pieData = data ? [
         { name: 'উপস্থিত', value: data.summary.present, color: '#10b981' },
         { name: 'অনুপস্থিত', value: data.summary.absent, color: '#f43f5e' },
         { name: 'দেরি', value: data.summary.late, color: '#f59e0b' },
         { name: 'ছুটি', value: data.summary.leave, color: '#3b82f6' },
-    ].filter(d => d.value > 0) : [];
+    ].filter(d => d.value > 0).map(item => {
+        const pct = totalPieCount > 0 ? Math.round((item.value / totalPieCount) * 100) : 0;
+        return { ...item, percentage: pct };
+    }) : [];
 
     const isRange = startDate !== endDate;
     const stats = [
@@ -172,25 +241,41 @@ export default function AttendanceSummary() {
                         <input
                             type="date"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
+                            onChange={(e) => { setStartDate(e.target.value); setQuickDate(''); }}
                             className="bg-transparent border-none outline-none text-sm font-black text-slate-600 px-4 py-1.5 cursor-pointer"
                         />
                         <span className="text-slate-300 font-bold px-1 self-center">থেকে</span>
                         <input
                             type="date"
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
+                            onChange={(e) => { setEndDate(e.target.value); setQuickDate(''); }}
                             className="bg-transparent border-none outline-none text-sm font-black text-slate-600 px-4 py-1.5 cursor-pointer"
                         />
+                    </div>
+
+                    <div className="relative group min-w-[140px]">
+                        <select
+                            value={quickDate}
+                            onChange={(e) => handleQuickDateSelect(e.target.value)}
+                            className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 ring-[#045c84]/20 transition-all cursor-pointer h-[42px]"
+                        >
+                            <option value="">কাস্টম তারিখ</option>
+                            <option value="today">আজ</option>
+                            <option value="yesterday">গতকাল</option>
+                            <option value="thisWeek">এই সপ্তাহ</option>
+                            <option value="thisMonth">এই মাস</option>
+                            <option value="thisYear">এই বছর</option>
+                        </select>
+                        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
 
                     <div className="relative group min-w-[180px]">
                         <select
                             value={selectedClassId}
                             onChange={(e) => setSelectedClassId(e.target.value)}
-                            className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 ring-[#045c84]/20 transition-all cursor-pointer"
+                            className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 ring-[#045c84]/20 transition-all cursor-pointer h-[42px]"
                         >
-                            <option value="">সব ক্লাস</option>
+                            {isAdminUser && <option value="">সব ক্লাস</option>}
                             {classes.map(c => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
@@ -328,7 +413,9 @@ export default function AttendanceSummary() {
                         {pieData.map((item, idx) => (
                             <div key={idx} className="flex items-center gap-2">
                                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                                <span className="text-[11px] font-bold text-slate-500 uppercase">{item.name}</span>
+                                <span className="text-[11px] font-bold text-slate-500 uppercase">
+                                    {item.name} {item.percentage}%
+                                </span>
                             </div>
                         ))}
                     </div>

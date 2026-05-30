@@ -23,7 +23,7 @@ export async function POST(req: Request) {
                 user = await prisma.user.findFirst({
                     where: { email: { equals: identifier, mode: 'insensitive' } },
                     include: {
-                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
+                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
                         teacherProfiles: true
                     }
                 });
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
                         ]
                     },
                     include: {
-                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
+                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
                         teacherProfiles: true
                     }
                 });
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
                         user = await prisma.user.findUnique({
                             where: { id },
                             include: {
-                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
+                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
                                 teacherProfiles: true
                             }
                         });
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
                         user = await prisma.user.findUnique({
                             where: { id },
                             include: {
-                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true } },
+                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
                                 teacherProfiles: true
                             }
                         });
@@ -114,13 +114,35 @@ export async function POST(req: Request) {
 
         if (!user) {
             console.log('❌ [LOGIN FAIL] ID not found in DB:', identifier);
-            // DEBUG: Log first 2 users to see data format (REMOVE IN PROD)
-            const sampleUsers = await prisma.user.findMany({ take: 2 });
-            console.log('📊 [DATA SAMPLE] Format check:', JSON.stringify(sampleUsers, null, 2));
+            
+            // Build rich diagnostic info for the developer
+            let totalUsers = 0;
+            let sampleUsers: any[] = [];
+            let superadminExists = false;
+            let dbErrorMsg = '';
+            
+            try {
+                totalUsers = await prisma.user.count();
+                sampleUsers = await prisma.user.findMany({ take: 2, select: { id: true, email: true, role: true } });
+                const testUser = await prisma.user.findFirst({
+                    where: { email: { equals: 'superadmin@edusy.com', mode: 'insensitive' } }
+                });
+                superadminExists = !!testUser;
+            } catch (err: any) {
+                console.error('Diagnostic DB query failed:', err);
+                dbErrorMsg = err.message;
+            }
+
+            const dbUrl = process.env.DATABASE_URL || '';
+            const maskedDbUrl = dbUrl ? dbUrl.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@') : 'Not defined';
+
+            const debugHint = dbErrorMsg 
+                ? `DB Error: ${dbErrorMsg} (URI: ${maskedDbUrl})`
+                : `Connected DB: ${maskedDbUrl} | Total Users: ${totalUsers} | 'superadmin@edusy.com' exists: ${superadminExists} | Sample: ${JSON.stringify(sampleUsers)}`;
 
             return NextResponse.json({
                 message: 'আপনার প্রদত্ত আইডি বা ইমেইল পাওয়া যায়নি।',
-                debugHint: 'Check if phone starts with 0 or 88'
+                debugHint
             }, { status: 401 });
         }
 
@@ -159,16 +181,31 @@ export async function POST(req: Request) {
             }
         }
 
-        // --- STEP 5: Validate Password (Robust comparison) ---
+        // --- STEP 5: Validate Password (Robust comparison supporting plain text and bcrypt) ---
         const storedPassword = String(user.password || '').trim();
         const storedPhone = String(user.phone || '').trim();
         const storedStudentId = String((user.metadata as any)?.studentId || '').trim();
         const inputPassword = password;
 
-        const isPasswordValid =
-            storedPassword === inputPassword ||
-            (user.role === 'STUDENT' && storedStudentId === inputPassword) ||
-            (storedPhone === inputPassword);
+        let isPasswordValid = false;
+        if (storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$')) {
+            try {
+                const bcrypt = require('bcryptjs');
+                isPasswordValid = await bcrypt.compare(inputPassword, storedPassword);
+            } catch (bcryptErr) {
+                console.error('Bcrypt comparison failed, falling back to plaintext check:', bcryptErr);
+                isPasswordValid = storedPassword === inputPassword;
+            }
+        } else {
+            isPasswordValid = storedPassword === inputPassword;
+        }
+
+        // Fallbacks (Student ID or Phone comparison as password)
+        if (!isPasswordValid) {
+            isPasswordValid =
+                (user.role === 'STUDENT' && storedStudentId === inputPassword) ||
+                (storedPhone === inputPassword);
+        }
 
         if (!isPasswordValid) {
             console.log('❌ [LOGIN FAIL] Password mismatch for:', identifier);

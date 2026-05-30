@@ -84,14 +84,17 @@ function AssignmentsPageContent() {
 
             // Fetch Classes & Books (needed for creation and filtering)
             const classesRes = await fetch(`/api/admin/classes?instituteId=${activeInstitute.id}`);
-            const classesData = await classesRes.json();
+            const classesDataRaw = await classesRes.json();
+            const classesData = Array.isArray(classesDataRaw) ? classesDataRaw : [];
 
             const booksRes = await fetch(`/api/admin/books?instituteId=${activeInstitute.id}`);
-            const booksData = await booksRes.json();
+            const booksDataRaw = await booksRes.json();
+            const booksData = Array.isArray(booksDataRaw) ? booksDataRaw : [];
 
             if (activeRole === 'TEACHER' && user?.id) {
                 const teachersRes = await fetch(`/api/teacher?instituteId=${activeInstitute.id}`);
-                const teachersData = await teachersRes.json();
+                const teachersDataRaw = await teachersRes.json();
+                const teachersData = Array.isArray(teachersDataRaw) ? teachersDataRaw : [];
                 const profile = teachersData.find((t: any) => t.userId === user.id);
                 setTeacherProfile(profile);
 
@@ -119,9 +122,14 @@ function AssignmentsPageContent() {
                 if (childrenIds.length > 0) {
                     const childrenRes = await fetch(`/api/admin/users?ids=${childrenIds.join(',')}`);
                     const childrenData = await childrenRes.json();
-                    const classIds = childrenData.map((c: any) => c.metadata?.classId).filter(Boolean);
-                    const filteredClasses = classesData.filter((c: any) => classIds.includes(c.id));
-                    setClasses(filteredClasses);
+                    if (Array.isArray(childrenData)) {
+                        const classIds = childrenData.map((c: any) => c.metadata?.classId).filter(Boolean);
+                        const filteredClasses = classesData.filter((c: any) => classIds.includes(c.id));
+                        setClasses(filteredClasses);
+                    } else {
+                        console.error('Expected childrenData to be array, got:', childrenData);
+                        setClasses([]);
+                    }
                     // For guardians, we default to null (All) to show everything initially
                     setSelectedClassId(null);
                 }

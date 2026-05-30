@@ -150,6 +150,7 @@ export default function StudentManagementPage() {
     const [isImportSummaryOpen, setIsImportSummaryOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [isProcessingFace, setIsProcessingFace] = useState(false);
+    const [processingFieldId, setProcessingFieldId] = useState<string | null>(null);
     const [isFaceModelLoaded, setIsFaceModelLoaded] = useState(false);
 
     // Login Credentials Modal States
@@ -480,7 +481,7 @@ export default function StudentManagementPage() {
     }, [debouncedSearch, activeInstitute?.id, selectedClassId, selectedGroupId, activeTab, statusFilter]);
 
     // Strict Owner/SuperAdmin check
-    const isOwner = activeRole === 'SUPER_ADMIN' || (activeInstitute?.adminIds || []).includes(currentUser?.id);
+    const isOwner = activeRole === 'SUPER_ADMIN' || (activeInstitute?.adminIds || []).includes(currentUser?.id) || activeInstitute?.isOwner === true;
 
     // Permission Helpers (Moved to top area)
     const canManageClass = (classId: string) => {
@@ -599,9 +600,9 @@ export default function StudentManagementPage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Auto-extract face if it's a student photo
-        if (fieldId === 'studentPhoto' && isFaceModelLoaded) {
-            extractFaceDescriptor(file);
+        // Auto-extract face if it's a student photo (middle, left, or right)
+        if ((fieldId === 'studentPhoto' || fieldId === 'studentPhotoLeft' || fieldId === 'studentPhotoRight') && isFaceModelLoaded) {
+            extractFaceDescriptor(file, fieldId);
         }
 
         const uploadData = new FormData();
@@ -648,8 +649,9 @@ export default function StudentManagementPage() {
         }
     };
 
-    const extractFaceDescriptor = async (file: File) => {
+    const extractFaceDescriptor = async (file: File, fieldId: string) => {
         try {
+            setProcessingFieldId(fieldId);
             setIsProcessingFace(true);
             const img = await faceapi.bufferToImage(file);
             const detection = await faceapi
@@ -689,9 +691,12 @@ export default function StudentManagementPage() {
                     console.warn('Collision check failed, proceeding with baseline accuracy.');
                 }
 
+                const descKey = fieldId === 'studentPhoto' ? 'faceDescriptorMiddle' : 
+                               fieldId === 'studentPhotoLeft' ? 'faceDescriptorLeft' : 'faceDescriptorRight';
+
                 setFormData((prev: any) => ({
                     ...prev,
-                    faceDescriptor: descriptor
+                    [descKey]: descriptor
                 }));
                 setToast({ message: 'ফেস আইডি সফলভাবে গ্রহণ করা হয়েছে!', type: 'success' });
             } else {
@@ -701,6 +706,7 @@ export default function StudentManagementPage() {
             console.error('Face extraction error:', error);
         } finally {
             setIsProcessingFace(false);
+            setProcessingFieldId(null);
         }
     };
 
@@ -763,6 +769,31 @@ export default function StudentManagementPage() {
                 return;
             }
 
+            // Build the final faceDescriptor payload
+            let finalFaceDescriptor = formData.faceDescriptor || [];
+            if (formData.faceDescriptorMiddle || formData.faceDescriptorLeft || formData.faceDescriptorRight) {
+                const descs: number[][] = [];
+                if (formData.faceDescriptorMiddle) descs.push(formData.faceDescriptorMiddle);
+                else if (formData.faceDescriptor) {
+                    if (Array.isArray(formData.faceDescriptor[0])) {
+                        descs.push(formData.faceDescriptor[0]);
+                    } else if (formData.faceDescriptor.length > 0) {
+                        descs.push(formData.faceDescriptor);
+                    }
+                }
+                
+                if (formData.faceDescriptorLeft) descs.push(formData.faceDescriptorLeft);
+                else if (formData.faceDescriptor && Array.isArray(formData.faceDescriptor[0]) && formData.faceDescriptor[1]) {
+                    descs.push(formData.faceDescriptor[1]);
+                }
+                
+                if (formData.faceDescriptorRight) descs.push(formData.faceDescriptorRight);
+                else if (formData.faceDescriptor && Array.isArray(formData.faceDescriptor[0]) && formData.faceDescriptor[2]) {
+                    descs.push(formData.faceDescriptor[2]);
+                }
+                finalFaceDescriptor = descs;
+            }
+
             const payload = {
                 ...formData,
                 id: editingStudent?.id, // include ID for PATCH
@@ -771,11 +802,17 @@ export default function StudentManagementPage() {
                 password: finalPassword,
                 phone: finalPhone || null,
                 role: 'STUDENT',
+                faceDescriptor: finalFaceDescriptor,
                 metadata: editingStudent?.metadata?.admissionStatus === 'PENDING'
                     ? { ...cleanedMetadata, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Admission)', reason: 'প্রবেশাধিকার (Admission)' }] }
                     : (editingStudent ? cleanedMetadata : { ...cleanedMetadata, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Creation)', reason: 'প্রবেশাধিকার (Admission)' }] }),
                 instituteIds: editingStudent ? undefined : [activeInstitute.id] // only for POST
             };
+
+            // Clean temporary keys from payload to prevent DB clutter
+            delete (payload as any).faceDescriptorMiddle;
+            delete (payload as any).faceDescriptorLeft;
+            delete (payload as any).faceDescriptorRight;
 
             const url = '/api/admin/users';
             const method = editingStudent ? 'PATCH' : 'POST';
@@ -1703,6 +1740,7 @@ export default function StudentManagementPage() {
                                             name: s.name || '',
                                             email: s.email || '',
                                             password: s.password || '',
+                                            faceDescriptor: s.faceDescriptor || [],
                                             metadata: s.metadata || {}
                                         });
                                         setIsAddModalOpen(true);
@@ -2426,55 +2464,168 @@ export default function StudentManagementPage() {
                                                         </div>
                                                     </div>
                                                 ) : field.type === 'attachment' ? (
-                                                    <div className="relative group/attachment">
-                                                        <div className={`relative w-[120px] h-[180px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${fieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
-                                                            <input
-                                                                type="file"
-                                                                className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                                                                onChange={(e) => handleFileUpload(e, field!.id)}
-                                                                required={isRequired && !fieldValue && !isOptionalLogin}
-                                                            />
-
-                                                            {fieldValue ? (
-                                                                <div className="absolute inset-0 w-full h-full">
-                                                                    <img
-                                                                        src={fieldValue}
-                                                                        alt="Preview"
-                                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover/attachment:scale-110"
-                                                                        onError={(e) => {
-                                                                            (e.target as any).style.display = 'none';
-                                                                        }}
-                                                                    />
-                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
-                                                                        <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-2">
-                                                                            <CloudUpload size={20} />
+                                                    field.id === 'studentPhoto' ? (
+                                                        <div className="space-y-4 w-full">
+                                                            <div className="grid grid-cols-3 gap-4">
+                                                                {/* Left Face Photo Box */}
+                                                                {(() => {
+                                                                    const subFieldId = 'studentPhotoLeft';
+                                                                    const subFieldValue = formData.metadata[subFieldId];
+                                                                    const isProcessing = processingFieldId === subFieldId;
+                                                                    return (
+                                                                        <div className="relative group/attachment flex flex-col items-center gap-1.5 w-full">
+                                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">বাম পাশ (Left)</span>
+                                                                            <div className={`relative w-full aspect-[2/3] max-w-[120px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${subFieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
+                                                                                <input
+                                                                                    type="file"
+                                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                                                                                    onChange={(e) => handleFileUpload(e, subFieldId)}
+                                                                                />
+                                                                                {subFieldValue ? (
+                                                                                    <div className="absolute inset-0 w-full h-full">
+                                                                                        <img src={subFieldValue} alt="Left Profile" className="w-full h-full object-cover group-hover/attachment:scale-105 transition-transform" />
+                                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
+                                                                                            <CloudUpload size={16} className="text-white mb-1" />
+                                                                                            <span className="text-white text-[8px] font-black uppercase tracking-wider text-center">পরিবর্তন</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-slate-50/50">
+                                                                                        <CloudUpload size={18} className="text-slate-400 group-hover/attachment:text-[#045c84] transition-colors" />
+                                                                                    </div>
+                                                                                )}
+                                                                                {isProcessing && (
+                                                                                    <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-1">
+                                                                                        <div className="w-5 h-5 rounded-full border border-[#045c84] border-t-transparent animate-spin" />
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
-                                                                        <span className="text-white text-[10px] font-black uppercase tracking-widest text-center px-4">ছবি পরিবর্তন করুন</span>
-                                                                    </div>
-                                                                    <div className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-white/90 backdrop-blur-md shadow-lg flex items-center justify-center text-green-600">
-                                                                        <CheckCircle2 size={16} />
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center bg-slate-50/50">
-                                                                    <div className="w-12 h-12 rounded-[16px] bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 group-hover/attachment:text-[#045c84] group-hover/attachment:scale-110 transition-all duration-500">
-                                                                        <CloudUpload size={24} />
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <p className="text-[10px] font-black text-slate-700 leading-tight">{field.label}</p>
-                                                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest italic font-black">Photo Box</p>
-                                                                    </div>
-                                                                </div>
-                                                            )}
+                                                                    );
+                                                                })()}
 
-                                                            {isProcessingFace && field.id === 'studentPhoto' && (
-                                                                <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2 animate-pulse">
-                                                                    <div className="w-8 h-8 rounded-full border-2 border-[#045c84] border-t-transparent animate-spin" />
-                                                                    <span className="text-[10px] font-black text-[#045c84] uppercase tracking-widest text-center px-4">Processing Face ID...</span>
-                                                                </div>
-                                                            )}
+                                                                {/* Middle Face Photo Box (Required) */}
+                                                                {(() => {
+                                                                    const subFieldId = 'studentPhoto';
+                                                                    const subFieldValue = formData.metadata[subFieldId];
+                                                                    const isProcessing = processingFieldId === subFieldId;
+                                                                    return (
+                                                                        <div className="relative group/attachment flex flex-col items-center gap-1.5 w-full">
+                                                                            <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-0.5">
+                                                                                সামনে (Middle) <span className="text-red-500 font-bold">*</span>
+                                                                            </span>
+                                                                            <div className={`relative w-full aspect-[2/3] max-w-[120px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${subFieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
+                                                                                <input
+                                                                                    type="file"
+                                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                                                                                    onChange={(e) => handleFileUpload(e, subFieldId)}
+                                                                                    required={isRequired && !subFieldValue && !isOptionalLogin}
+                                                                                />
+                                                                                {subFieldValue ? (
+                                                                                    <div className="absolute inset-0 w-full h-full">
+                                                                                        <img src={subFieldValue} alt="Front Profile" className="w-full h-full object-cover group-hover/attachment:scale-105 transition-transform" />
+                                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
+                                                                                            <CloudUpload size={16} className="text-white mb-1" />
+                                                                                            <span className="text-white text-[8px] font-black uppercase tracking-wider text-center">পরিবর্তন</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-slate-50/50">
+                                                                                        <CloudUpload size={18} className="text-[#045c84] group-hover/attachment:scale-105 transition-all" />
+                                                                                    </div>
+                                                                                )}
+                                                                                {isProcessing && (
+                                                                                    <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-1">
+                                                                                        <div className="w-5 h-5 rounded-full border border-[#045c84] border-t-transparent animate-spin" />
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })()}
+
+                                                                {/* Right Face Photo Box */}
+                                                                {(() => {
+                                                                    const subFieldId = 'studentPhotoRight';
+                                                                    const subFieldValue = formData.metadata[subFieldId];
+                                                                    const isProcessing = processingFieldId === subFieldId;
+                                                                    return (
+                                                                        <div className="relative group/attachment flex flex-col items-center gap-1.5 w-full">
+                                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">ডান পাশ (Right)</span>
+                                                                            <div className={`relative w-full aspect-[2/3] max-w-[120px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${subFieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
+                                                                                <input
+                                                                                    type="file"
+                                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                                                                                    onChange={(e) => handleFileUpload(e, subFieldId)}
+                                                                                />
+                                                                                {subFieldValue ? (
+                                                                                    <div className="absolute inset-0 w-full h-full">
+                                                                                        <img src={subFieldValue} alt="Right Profile" className="w-full h-full object-cover group-hover/attachment:scale-105 transition-transform" />
+                                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
+                                                                                            <CloudUpload size={16} className="text-white mb-1" />
+                                                                                            <span className="text-white text-[8px] font-black uppercase tracking-wider text-center">পরিবর্তন</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-slate-50/50">
+                                                                                        <CloudUpload size={18} className="text-slate-400 group-hover/attachment:text-[#045c84] transition-colors" />
+                                                                                    </div>
+                                                                                )}
+                                                                                {isProcessing && (
+                                                                                    <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-1">
+                                                                                        <div className="w-5 h-5 rounded-full border border-[#045c84] border-t-transparent animate-spin" />
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    ) : (
+                                                        <div className="relative group/attachment">
+                                                            <div className={`relative w-[120px] h-[180px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${fieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
+                                                                <input
+                                                                    type="file"
+                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                                                                    onChange={(e) => handleFileUpload(e, field!.id)}
+                                                                    required={isRequired && !fieldValue && !isOptionalLogin}
+                                                                />
+
+                                                                {fieldValue ? (
+                                                                    <div className="absolute inset-0 w-full h-full">
+                                                                        <img
+                                                                            src={fieldValue}
+                                                                            alt="Preview"
+                                                                            className="w-full h-full object-cover transition-transform duration-700 group-hover/attachment:scale-110"
+                                                                            onError={(e) => {
+                                                                                (e.target as any).style.display = 'none';
+                                                                            }}
+                                                                        />
+                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
+                                                                            <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-2">
+                                                                                <CloudUpload size={20} />
+                                                                            </div>
+                                                                            <span className="text-white text-[10px] font-black uppercase tracking-widest text-center px-4">ছবি পরিবর্তন করুন</span>
+                                                                        </div>
+                                                                        <div className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-white/90 backdrop-blur-md shadow-lg flex items-center justify-center text-green-600">
+                                                                            <CheckCircle2 size={16} />
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center bg-slate-50/50">
+                                                                        <div className="w-12 h-12 rounded-[16px] bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 group-hover/attachment:text-[#045c84] group-hover/attachment:scale-110 transition-all duration-500">
+                                                                            <CloudUpload size={24} />
+                                                                        </div>
+                                                                        <div className="space-y-1">
+                                                                            <p className="text-[10px] font-black text-slate-700 leading-tight">{field.label}</p>
+                                                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest italic font-black">Photo Box</p>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )
                                                 ) : field.type === 'class-lookup' ? (
                                                     <div className="relative">
                                                         <select
@@ -2960,6 +3111,7 @@ export default function StudentManagementPage() {
                         name: s.name || '',
                         email: s.email || '',
                         password: s.password || '',
+                        faceDescriptor: s.faceDescriptor || [],
                         metadata: updatedMetadata
                     });
                     if (s.metadata?.classId) fetchGroups(s.metadata.classId);
@@ -3372,6 +3524,7 @@ export default function StudentManagementPage() {
                 allBooks={books}
                 onSave={handleUpdateTeacherPermissions}
                 isReadOnly={!isOwner}
+                canToggleAdminPower={isOwner}
             />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

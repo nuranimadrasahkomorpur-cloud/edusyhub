@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { Check, Shield, BookOpen, CreditCard, Calendar, FileText, UserCheck, AlertCircle, ChevronDown, ChevronRight, Layers, GraduationCap, Settings2, Search, Info } from 'lucide-react';
+import { Check, Shield, BookOpen, CreditCard, Calendar, FileText, UserCheck, AlertCircle, ChevronDown, ChevronRight, Layers, GraduationCap, Settings2, Search, Info, Lock } from 'lucide-react';
 
 interface Class {
     id: string;
@@ -38,6 +38,8 @@ interface TeacherPermissionModalProps {
     allBooks: Book[];
     onSave: (teacherId: string, updates: any) => Promise<void>;
     isReadOnly?: boolean;
+    /** Only the true owner of the current institute can see & toggle admin power */
+    canToggleAdminPower?: boolean;
 }
 
 const PERMISSION_CONFIG = [
@@ -58,7 +60,8 @@ export default function TeacherPermissionModal({
     classes,
     allBooks = [],
     onSave,
-    isReadOnly = false
+    isReadOnly = false,
+    canToggleAdminPower = false
 }: TeacherPermissionModalProps) {
     const [classWiseData, setClassWiseData] = useState<Record<string, any>>({});
     const [isAdmin, setIsAdmin] = useState(false);
@@ -248,28 +251,48 @@ export default function TeacherPermissionModal({
                             <p className="text-[10px] sm:text-[11px] font-bold text-slate-600 uppercase tracking-widest mt-0.5 sm:mt-1">{teacher.designation || 'শিক্ষক'} • {teacher.user.phone || teacher.user.email}</p>
                         </div>
                     </div>
-                    <label className={`sm:ml-auto flex items-center gap-2.5 group p-2.5 rounded-2xl transition-all ${isAdmin ? 'bg-red-50 border border-red-100' : 'bg-slate-50 border border-slate-100'} ${isReadOnly ? 'cursor-default' : 'cursor-pointer hover:bg-slate-100'}`}>
-                        <div className={`w-11 h-6 rounded-full p-1 transition-colors ${isAdmin ? 'bg-red-500' : 'bg-slate-300'}`}>
-                            <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${isAdmin ? 'translate-x-[1.25rem]' : ''}`} />
+                    {canToggleAdminPower ? (
+                        <label className={`sm:ml-auto flex items-center gap-2.5 group p-2.5 rounded-2xl transition-all ${isAdmin ? 'bg-red-50 border border-red-100' : 'bg-slate-50 border border-slate-100'} ${isReadOnly ? 'cursor-default' : 'cursor-pointer hover:bg-slate-100'}`}>
+                            <div className={`w-11 h-6 rounded-full p-1 transition-colors ${isAdmin ? 'bg-red-500' : 'bg-slate-300'}`}>
+                                <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${isAdmin ? 'translate-x-[1.25rem]' : ''}`} />
+                            </div>
+                            <input
+                                type="checkbox"
+                                className="hidden"
+                                checked={isAdmin}
+                                onChange={(e) => {
+                                    if (isReadOnly) return;
+                                    setIsAdmin(e.target.checked);
+                                }}
+                                disabled={isReadOnly}
+                            />
+                            <div className="flex flex-col">
+                                <span className={`text-[11px] font-bold uppercase tracking-widest leading-none ${isAdmin ? 'text-red-600' : 'text-slate-700'}`}>অ্যাডমিন পাওয়ার</span>
+                                <span className="text-[9px] text-slate-500 font-medium mt-0.5">রোল ও পারমিশন কন্ট্রোল</span>
+                            </div>
+                        </label>
+                    ) : isAdmin ? (
+                        /* Non-owners see a locked badge if admin is already active */
+                        <div className="sm:ml-auto flex items-center gap-2 px-3 py-2 rounded-2xl bg-red-50 border border-red-100">
+                            <Shield size={14} className="text-red-500 shrink-0" />
+                            <div className="flex flex-col">
+                                <span className="text-[11px] font-bold uppercase tracking-widest leading-none text-red-600">অ্যাডমিন সক্রিয়</span>
+                                <span className="text-[9px] text-slate-500 font-medium mt-0.5">শুধু মালিক পরিবর্তন করতে পারবেন</span>
+                            </div>
                         </div>
-                        <input
-                            type="checkbox"
-                            className="hidden"
-                            checked={isAdmin}
-                            onChange={(e) => {
-                                if (isReadOnly) return;
-                                setIsAdmin(e.target.checked);
-                            }}
-                            disabled={isReadOnly}
-                        />
-                        <div className="flex flex-col">
-                            <span className={`text-[11px] font-bold uppercase tracking-widest leading-none ${isAdmin ? 'text-red-600' : 'text-slate-700'}`}>অ্যাডমিন পাওয়ার</span>
-                            <span className="text-[9px] text-slate-500 font-medium mt-0.5">রোল ও পারমিশন কন্ট্রোল</span>
+                    ) : isReadOnly ? (
+                        /* Show lock badge when read-only */
+                        <div className="sm:ml-auto flex items-center gap-2 px-3 py-2 rounded-2xl bg-slate-50 border border-slate-200">
+                            <Lock size={14} className="text-slate-400 shrink-0" />
+                            <div className="flex flex-col">
+                                <span className="text-[11px] font-bold uppercase tracking-widest leading-none text-slate-600">লকড প্যানেল</span>
+                                <span className="text-[9px] text-slate-500 font-medium mt-0.5">শুধু মালিক পরিবর্তন করতে পারবেন</span>
+                            </div>
                         </div>
-                    </label>
+                    ) : null}
                 </div>
 
-                {isAdmin && (
+                {isAdmin && canToggleAdminPower && (
                     <div className="bg-red-50/40 border border-red-100/60 rounded-3xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -296,6 +319,15 @@ export default function TeacherPermissionModal({
                 )}
 
                 <div className="flex flex-col md:flex-row gap-6 md:gap-8 min-h-[500px] h-auto md:h-[600px] relative">
+                    {isReadOnly && (
+                        <div className="absolute inset-0 z-50 bg-white/40 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-2xl border border-slate-100">
+                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md mb-4 border border-slate-100">
+                                <Lock size={28} className="text-slate-400" />
+                            </div>
+                            <h3 className="text-slate-800 font-bold text-lg">প্যানেলটি লক করা আছে</h3>
+                            <p className="text-slate-500 text-[11px] font-bold tracking-wider uppercase mt-1">শুধুমাত্র প্রতিষ্ঠানের মালিক এটি এডিট করতে পারবেন</p>
+                        </div>
+                    )}
                     {/* Sidebar: Class List */}
                     <div className="md:w-64 shrink-0 flex flex-col space-y-2.5 h-auto md:h-full border-r border-slate-50 md:pr-4 m-[5px]">
                         <div className="flex items-center justify-between px-1">
@@ -474,11 +506,15 @@ export default function TeacherPermissionModal({
                                                                         </span>
                                                                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5 block">এডিট ও ভিউ এক্সেস</span>
                                                                     </div>
-                                                                    {isPermActive && (
+                                                                    {isPermActive ? (
                                                                         <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center animate-in zoom-in-50">
                                                                             <Check size={14} strokeWidth={4} />
                                                                         </div>
-                                                                    )}
+                                                                    ) : isReadOnly ? (
+                                                                        <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                                                                            <Lock size={12} strokeWidth={2.5} />
+                                                                        </div>
+                                                                    ) : null}
                                                                 </label>
                                                             );
                                                         })}

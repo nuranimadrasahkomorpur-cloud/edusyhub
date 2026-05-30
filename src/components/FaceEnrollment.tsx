@@ -6,6 +6,28 @@ import { Camera, RefreshCw, CheckCircle2, XCircle, Loader2, Sparkles } from 'luc
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePerformance } from '../hooks/usePerformance';
 
+const getFaceOrientation = (landmarks: faceapi.FaceLandmarks68) => {
+    const jaw = landmarks.getJawOutline();
+    const nose = landmarks.getNose();
+    const noseTip = nose[3]; // Point 30
+    const leftCheek = jaw[0]; // Point 0
+    const rightCheek = jaw[16]; // Point 16
+    
+    const distLeft = Math.abs(noseTip.x - leftCheek.x);
+    const distRight = Math.abs(rightCheek.x - noseTip.x);
+    
+    if (distRight === 0) return 'UNKNOWN';
+    const ratio = distLeft / distRight;
+    
+    if (ratio >= 0.75 && ratio <= 1.35) {
+        return 'MIDDLE';
+    } else if (ratio < 0.75) {
+        return 'LEFT';
+    } else {
+        return 'RIGHT';
+    }
+};
+
 interface FaceEnrollmentProps {
     studentId: string;
     studentName: string;
@@ -19,6 +41,10 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const [status, setStatus] = useState<'IDLE' | 'LOADING_MODELS' | 'READY' | 'CAPTURING' | 'SAVING' | 'SUCCESS' | 'ERROR'>('IDLE');
+    const [currentStep, setCurrentStep] = useState<'MIDDLE' | 'LEFT' | 'RIGHT' | 'DONE'>('MIDDLE');
+    const [capturedMiddle, setCapturedMiddle] = useState<number[] | null>(null);
+    const [capturedLeft, setCapturedLeft] = useState<number[] | null>(null);
+    const [capturedRight, setCapturedRight] = useState<number[] | null>(null);
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState(0);
@@ -216,70 +242,13 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
         await processImage(profilePhoto);
     };
 
-    const handleEnroll = async () => {
-        if (!videoRef.current) return;
-
+    const saveFaceDescriptors = async (descriptors: number[][]) => {
         try {
-            setStatus('CAPTURING');
-            setProgress(10);
-
-            const capturedDescriptors: number[][] = [];
-            const targetCount = 3;
-            const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-            for (let i = 0; i < 15; i++) {
-                if (capturedDescriptors.length >= targetCount) break;
-                
-                const detections = await faceapi
-                    .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
-
-                if (detections && detections.detection.score >= 0.90) {
-                    // Check duplicate only on the first frame to save time
-                    if (capturedDescriptors.length === 0) {
-                        try {
-                            const checkRes = await fetch(`/api/admin/students/check-duplicate-face`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ descriptor: Array.from(detections.descriptor) })
-                            });
-                            
-                            if (checkRes.ok) {
-                                const checkData = await checkRes.json();
-                                if (checkData.isDuplicate && checkData.studentId !== studentId) {
-                                    setError(`এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে।`);
-                                    setStatus('ERROR');
-                                    return;
-                                }
-                            }
-                        } catch (err) {
-                            console.warn('Collision check failed, proceeding with baseline accuracy.');
-                        }
-                    }
-                    
-                    capturedDescriptors.push(Array.from(detections.descriptor));
-                    setProgress(10 + (capturedDescriptors.length * 25));
-                }
-                
-                // Wait before taking next picture to allow user to turn head slightly
-                await delay(600);
-            }
-
-            if (capturedDescriptors.length === 0) {
-                setError('আপনার মুখ স্পষ্টভাবে বোঝা যাচ্ছে না। পর্যাপ্ত আলোতে আবার চেষ্টা করুন।');
-                setStatus('READY');
-                return;
-            }
-
-            setProgress(90);
             setStatus('SAVING');
-
-            // Save to database
             const response = await fetch(`/api/students/${studentId}/face`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ descriptor: capturedDescriptors }), // SENDING ARRAY OF ARRAYS
+                body: JSON.stringify({ descriptor: descriptors }),
             });
 
             if (!response.ok) throw new Error('Failed to save face data');
@@ -293,11 +262,113 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
             }, 2000);
 
         } catch (err: any) {
-            console.error('Enrollment error:', err);
+            console.error('Enrollment save error:', err);
             setError('ফেস ডেটা সেভ করতে সমস্যা হয়েছে।');
             setStatus('READY');
         }
     };
+
+    const handleSaveCurrent = () => {
+        const descs: number[][] = [];
+        if (capturedMiddle) descs.push(capturedMiddle);
+        if (capturedLeft) descs.push(capturedLeft);
+        if (capturedRight) descs.push(capturedRight);
+        
+        if (descs.length === 0) {
+            setError('কমপক্ষে সোজা মুখের ফেস আইডি প্রয়োজন।');
+            return;
+        }
+        saveFaceDescriptors(descs);
+    };
+
+    const handleEnroll = () => {
+        setError(null);
+        setCapturedMiddle(null);
+        setCapturedLeft(null);
+        setCapturedRight(null);
+        setCurrentStep('MIDDLE');
+        setStatus('CAPTURING');
+        setProgress(10);
+    };
+
+    // Live scanner effect for sequential face enrollment
+    useEffect(() => {
+        let active = true;
+        let timerId: any = null;
+
+        const scanFrame = async () => {
+            if (!active || status !== 'CAPTURING' || !videoRef.current) {
+                return;
+            }
+
+            try {
+                const detections = await faceapi
+                    .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+
+                if (detections && detections.detection.score >= 0.88) {
+                    const orientation = getFaceOrientation(detections.landmarks);
+                    
+                    if (currentStep === 'MIDDLE' && orientation === 'MIDDLE') {
+                        // Check duplicate on middle face
+                        try {
+                            const checkRes = await fetch(`/api/admin/students/check-duplicate-face`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ descriptor: Array.from(detections.descriptor) })
+                            });
+                            if (checkRes.ok) {
+                                const checkData = await checkRes.json();
+                                if (checkData.isDuplicate && checkData.studentId !== studentId) {
+                                    setError(`এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে।`);
+                                    setStatus('READY');
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            console.warn('Duplicate check failed');
+                        }
+
+                        setCapturedMiddle(Array.from(detections.descriptor));
+                        setCurrentStep('LEFT');
+                        setProgress(35);
+                    } else if (currentStep === 'LEFT' && orientation === 'LEFT') {
+                        setCapturedLeft(Array.from(detections.descriptor));
+                        setCurrentStep('RIGHT');
+                        setProgress(70);
+                    } else if (currentStep === 'RIGHT' && orientation === 'RIGHT') {
+                        setCapturedRight(Array.from(detections.descriptor));
+                        setCurrentStep('DONE');
+                        setProgress(90);
+                        
+                        // Auto-save when all three are successfully captured
+                        const descs = [
+                            capturedMiddle || Array.from(detections.descriptor),
+                            capturedLeft || Array.from(detections.descriptor),
+                            Array.from(detections.descriptor)
+                        ];
+                        await saveFaceDescriptors(descs);
+                    }
+                }
+            } catch (err) {
+                console.error("Frame scan error:", err);
+            }
+
+            if (active && status === 'CAPTURING' && currentStep !== 'DONE') {
+                timerId = setTimeout(scanFrame, 200);
+            }
+        };
+
+        if (status === 'CAPTURING' && currentStep !== 'DONE') {
+            timerId = setTimeout(scanFrame, 200);
+        }
+
+        return () => {
+            active = false;
+            if (timerId) clearTimeout(timerId);
+        };
+    }, [status, currentStep, capturedMiddle, capturedLeft, capturedRight]);
 
     return (
         <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -400,13 +471,40 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
                         )}
                     </AnimatePresence>
 
+                    {/* Three checkmarks overlay */}
+                    {status === 'CAPTURING' && (
+                        <div className="absolute top-16 left-0 right-0 flex justify-center gap-6 z-20">
+                            <div className="flex flex-col items-center gap-1">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border font-bold text-xs ${capturedMiddle ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg' : currentStep === 'MIDDLE' ? 'bg-[#045c84] border-white text-white animate-pulse' : 'bg-black/40 border-white/20 text-white/40'}`}>
+                                    {capturedMiddle ? <CheckCircle2 size={16} /> : '১'}
+                                </div>
+                                <span className="text-[8px] font-black uppercase tracking-wider text-white/90 bg-black/35 px-1.5 py-0.5 rounded">সামনে</span>
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border font-bold text-xs ${capturedLeft ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg' : currentStep === 'LEFT' ? 'bg-[#045c84] border-white text-white animate-pulse' : 'bg-black/40 border-white/20 text-white/40'}`}>
+                                    {capturedLeft ? <CheckCircle2 size={16} /> : '২'}
+                                </div>
+                                <span className="text-[8px] font-black uppercase tracking-wider text-white/90 bg-black/35 px-1.5 py-0.5 rounded">বাম</span>
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border font-bold text-xs ${capturedRight ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg' : currentStep === 'RIGHT' ? 'bg-[#045c84] border-white text-white animate-pulse' : 'bg-black/40 border-white/20 text-white/40'}`}>
+                                    {capturedRight ? <CheckCircle2 size={16} /> : '৩'}
+                                </div>
+                                <span className="text-[8px] font-black uppercase tracking-wider text-white/90 bg-black/35 px-1.5 py-0.5 rounded">ডান</span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Progress Bar & Text */}
                     {(status === 'CAPTURING' || status === 'SAVING') && (
-                        <div className="absolute bottom-0 left-0 right-0">
+                        <div className="absolute bottom-0 left-0 right-0 z-20">
                             {status === 'CAPTURING' && (
                                 <div className="text-center pb-3 text-white">
                                     <p className="text-[12px] font-black uppercase tracking-widest bg-black/40 inline-block px-4 py-1.5 rounded-full backdrop-blur-md">
-                                        মাথা হালকা ডানে এবং বামে ঘোরান...
+                                        {currentStep === 'MIDDLE' && 'সামনে সোজা তাকান...'}
+                                        {currentStep === 'LEFT' && 'মাথা হালকা বামে ঘোরান...'}
+                                        {currentStep === 'RIGHT' && 'মাথা হালকা ডানে ঘোরান...'}
+                                        {currentStep === 'DONE' && 'সম্পূর্ণ হচ্ছে...'}
                                     </p>
                                 </div>
                             )}
@@ -442,15 +540,25 @@ export default function FaceEnrollment({ studentId, studentName, profilePhoto, o
                     <div className="space-y-3">
                         <div className="flex items-center gap-3">
                             <button
-                                disabled={!modelsLoaded || isUsingPhoto || status === 'SAVING' || status === 'CAPTURING'}
-                                onClick={handleEnroll}
-                                className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-2xl text-[14px] font-black transition-all ${modelsLoaded && !isUsingPhoto && status !== 'SAVING' && status !== 'CAPTURING'
-                                    ? 'bg-[#045c84] text-white shadow-lg shadow-[#045c84]/20 hover:scale-[1.02] active:scale-[0.98]'
-                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                    }`}
+                                onClick={status === 'CAPTURING' ? handleSaveCurrent : handleEnroll}
+                                disabled={
+                                    !modelsLoaded || 
+                                    isUsingPhoto || 
+                                    status === 'SAVING' || 
+                                    (status === 'CAPTURING' && !capturedMiddle)
+                                }
+                                className={`flex-1 flex items-center justify-center gap-2 h-14 rounded-2xl text-[14px] font-black transition-all ${
+                                    modelsLoaded && !isUsingPhoto && status !== 'SAVING' && (status !== 'CAPTURING' || capturedMiddle)
+                                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100 hover:scale-[1.02] active:scale-[0.98]'
+                                    : status === 'CAPTURING'
+                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    : 'bg-[#045c84] text-white shadow-lg shadow-[#045c84]/20 hover:scale-[1.02] active:scale-[0.98]'
+                                }`}
                             >
-                                {status === 'CAPTURING' || status === 'SAVING' ? (
+                                {status === 'SAVING' ? (
                                     <Loader2 size={18} className="animate-spin" />
+                                ) : status === 'CAPTURING' ? (
+                                    <span>সংরক্ষণ করুন (সেভ)</span>
                                 ) : (
                                     <>
                                         <Camera size={18} />

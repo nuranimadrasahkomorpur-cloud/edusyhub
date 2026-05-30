@@ -9,7 +9,9 @@ import {
     Phone,
     Lock,
     Loader2,
-    Save
+    Save,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 
 interface ProfileModalProps {
@@ -20,6 +22,7 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ isOpen, onClose, user }: ProfileModalProps) {
     const [updating, setUpdating] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [editForm, setEditForm] = useState({
         name: '',
         email: '',
@@ -35,7 +38,7 @@ export default function ProfileModal({ isOpen, onClose, user }: ProfileModalProp
                     name: user.name || '',
                     email: user.email || '',
                     phone: user.phone || '',
-                    password: ''
+                    password: user.metadata?.originalPassword || ''
                 });
             }
         } else {
@@ -139,12 +142,19 @@ export default function ProfileModal({ isOpen, onClose, user }: ProfileModalProp
                             <div className="relative">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                 <input
-                                    type="password"
-                                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:border-[#045c84] focus:ring-4 focus:ring-[#045c84]/5 transition-all outline-none font-bold text-slate-800"
+                                    type={showPassword ? 'text' : 'password'}
+                                    className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:border-[#045c84] focus:ring-4 focus:ring-[#045c84]/5 transition-all outline-none font-bold text-slate-800"
                                     placeholder="নতুন পাসওয়ার্ড দিন"
                                     value={editForm.password}
                                     onChange={e => setEditForm({ ...editForm, password: e.target.value })}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
                     </div>

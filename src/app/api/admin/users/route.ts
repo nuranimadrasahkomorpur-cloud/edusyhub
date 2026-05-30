@@ -47,7 +47,7 @@ export async function GET(req: Request) {
                 name: user.name || '',
                 email: user.email || '',
                 phone: user.phone || '',
-                password: user.password || '',
+                password: (user.metadata as any)?.originalPassword || user.password || '',
                 role: user.role || 'USER',
                 createdAt: user.createdAt,
                 institute: user.institutes?.[0] ? { name: (user.institutes[0] as any).name } : null,
@@ -100,8 +100,46 @@ export async function GET(req: Request) {
             }
         }
 
-        // Filter by metadata.classId or metadata.groupId
-        if (classId && classId !== 'all') match['metadata.classId'] = classId;
+        // Filter by metadata.classId with teacher assignment check
+        if (activeRole === 'TEACHER') {
+            const targetInstituteId = instituteId || (session.user as any).defaultInstituteId || (instituteIds && instituteIds[0]);
+            if (!targetInstituteId) {
+                return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+            }
+
+            const profile = await prisma.teacherProfile.findUnique({
+                where: {
+                    userId_instituteId: {
+                        userId: userId,
+                        instituteId: targetInstituteId
+                    }
+                }
+            });
+
+            if (!profile || profile.status !== 'ACTIVE') {
+                return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+            }
+
+            if (!profile.isAdmin) {
+                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                if (assignedClassIds.length === 0) {
+                    return NextResponse.json([]); // Return empty list, no classes assigned
+                }
+
+                if (classId && classId !== 'all') {
+                    if (!assignedClassIds.includes(classId)) {
+                        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+                    }
+                    match['metadata.classId'] = classId;
+                } else {
+                    match['metadata.classId'] = { $in: assignedClassIds };
+                }
+            } else {
+                if (classId && classId !== 'all') match['metadata.classId'] = classId;
+            }
+        } else {
+            if (classId && classId !== 'all') match['metadata.classId'] = classId;
+        }
         if (groupId) match['metadata.groupId'] = groupId;
 
         if (admissionStatus) {
@@ -177,7 +215,7 @@ export async function GET(req: Request) {
             name: user.name || '',
             email: user.email || '',
             phone: user.phone || '',
-            password: user.password || '',
+            password: user.metadata?.originalPassword || user.password || '',
             role: user.role || 'USER',
             createdAt: user.createdAt?.$date || user.createdAt,
             updatedAt: user.updatedAt?.$date || user.updatedAt,
@@ -234,13 +272,7 @@ export async function POST(req: Request) {
         if (role === 'STUDENT' && instituteIds?.[0]) {
             const instituteId = instituteIds[0];
             if (!finalMetadata.studentId) {
-                // Priority: Specific Student Phone -> Generated ID
-                // Explicitly avoid using guardianPhone as studentId
-                if (finalMetadata.studentPhone) {
-                    finalMetadata.studentId = finalMetadata.studentPhone;
-                } else {
-                    finalMetadata.studentId = await getNextStudentId(instituteId);
-                }
+                finalMetadata.studentId = await getNextStudentId(instituteId);
             }
             if (!finalMetadata.rollNumber && finalMetadata.classId) {
                 finalMetadata.rollNumber = await getNextRollNumber(instituteId, finalMetadata.classId);
@@ -280,6 +312,9 @@ export async function POST(req: Request) {
 
         // Convert instituteIds to ObjectIds for MongoDB
         const instIds = (instituteIds || []).map((id: string) => ({ $oid: id }));
+
+        // Store original password in metadata for superadmin visibility
+        finalMetadata.originalPassword = password;
 
         const userDoc: any = {
             name: name || '',
@@ -466,10 +501,18 @@ export async function PATCH(req: Request) {
 
         const set: any = {};
         if (email) set.email = email;
-        if (password) set.password = password;
+        if (password) {
+            set.password = password;
+            set['metadata.originalPassword'] = password;
+        }
         if (role) set.role = role;
         if (name) set.name = name;
-        if (metadata) set.metadata = metadata;
+        if (metadata) {
+            set.metadata = {
+                ...metadata,
+                originalPassword: password || metadata.originalPassword
+            };
+        }
         if (phone) set.phone = phone;
         if (faceDescriptor && Array.isArray(faceDescriptor)) set.faceDescriptor = faceDescriptor;
 
