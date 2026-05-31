@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 import { sendNotification } from '@/utils/notification-utils';
 import { getServerSession } from '@/utils/auth-utils';
+import { getCleanId } from '@/utils/digit-utils';
 import fs from 'fs';
 import path from 'path';
 
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 
             if (!profile.isAdmin) {
                 let finalClassId = classId;
-                if (!finalClassId) {
+                if (!finalClassId || finalClassId === 'all' || finalClassId === '') {
                     const student = await prisma.user.findUnique({
                         where: { id: studentId },
                         select: { metadata: true }
@@ -95,12 +96,13 @@ export async function POST(req: NextRequest) {
                     return NextResponse.json({ error: 'Class ID not found' }, { status: 400 });
                 }
 
-                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
-                if (!assignedClassIds.includes(finalClassId.toString())) {
+                const targetClassId = getCleanId(finalClassId);
+                const assignedClassIds = (profile.assignedClassIds || []).map(id => getCleanId(id));
+                if (!assignedClassIds.includes(targetClassId)) {
                     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
                 }
 
-                const classPermissions = (profile.permissions as any)?.classWise?.[finalClassId];
+                const classPermissions = (profile.permissions as any)?.classWise?.[targetClassId];
                 let hasPerm = false;
                 if (classPermissions) {
                     if (typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {

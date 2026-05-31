@@ -7,6 +7,7 @@ import { useSession } from './SessionProvider';
 import { useUI } from './UIProvider';
 import dynamic from 'next/dynamic';
 import PrintLayout from './PrintLayout';
+import { getCleanId } from '@/utils/digit-utils';
 
 const FaceEnrollment = dynamic(() => import('./FaceEnrollment'), { ssr: false });
 
@@ -177,7 +178,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
             if (profile.isAdmin) return true;
             if (!profile.permissions?.classWise) return false;
 
-            const classId = student.metadata.classId;
+            const classId = getCleanId(student.metadata.classId);
             const classPermissions = profile.permissions.classWise[classId];
             if (!classPermissions) return false;
 

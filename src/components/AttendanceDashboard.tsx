@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useSession } from './SessionProvider';
 import dynamic from 'next/dynamic';
+import { getCleanId } from '@/utils/digit-utils';
 
 const FRSAttendanceScanner = dynamic<{ classId?: string, selectedDate?: string }>(() => import('@/components/FRSAttendanceScanner'), { ssr: false });
 const ManualAttendance = dynamic<{ classId: string; selectedDate: string }>(() => import('@/components/ManualAttendance'), { ssr: false });
@@ -51,7 +52,8 @@ export default function AttendanceDashboard() {
     })();
 
     const canTakeAttendanceForClass = (classId: string) => {
-        if (!classId) {
+        const targetClassId = getCleanId(classId);
+        if (!targetClassId) {
             return isAdminUser;
         }
         if (isOwner) return true;
@@ -61,7 +63,7 @@ export default function AttendanceDashboard() {
             if (profile.isAdmin) return true;
             if (!profile.permissions?.classWise) return false;
 
-            const classPermissions = profile.permissions.classWise[classId];
+            const classPermissions = profile.permissions.classWise[targetClassId];
             if (!classPermissions) return false;
 
             // New structure check
@@ -84,7 +86,8 @@ export default function AttendanceDashboard() {
     };
 
     const isClassAssignedToTeacher = (classId: string) => {
-        if (!classId) return isAdminUser;
+        const targetClassId = getCleanId(classId);
+        if (!targetClassId) return isAdminUser;
         if (isOwner) return true;
         if (user?.teacherProfiles) {
             const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
@@ -92,8 +95,9 @@ export default function AttendanceDashboard() {
             if (profile.isAdmin) return true;
             
             // Check if class is in assignedClassIds or has class-wise permission config
-            const isAssigned = (profile.assignedClassIds || []).includes(classId);
-            const hasClassWiseConfig = !!profile.permissions?.classWise?.[classId];
+            const assignedClassIds = (profile.assignedClassIds || []).map((id: any) => getCleanId(id));
+            const isAssigned = assignedClassIds.includes(targetClassId);
+            const hasClassWiseConfig = !!profile.permissions?.classWise?.[targetClassId];
             return isAssigned || hasClassWiseConfig;
         }
         return false;

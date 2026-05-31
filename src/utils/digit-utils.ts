@@ -56,3 +56,19 @@ export function normalizePassword(input: string): string {
     
     return String(input).trim().replace(/[০-৯]/g, (digit) => bengaliToEnglish[digit]);
 }
+
+/**
+ * Normalizes any ObjectId representation or wrapped string ID (e.g. from Json field) to a plain string.
+ */
+export function getCleanId(id: any): string {
+    if (!id) return '';
+    if (typeof id === 'string') return id;
+    if (typeof id === 'object') {
+        if (id.$oid) return id.$oid;
+        if (id.toString) {
+            const str = id.toString();
+            if (str !== '[object Object]') return str;
+        }
+    }
+    return String(id);
+}

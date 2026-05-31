@@ -130,17 +130,53 @@ export async function GET(req: Request) {
                     if (!assignedClassIds.includes(classId)) {
                         return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
                     }
-                    match['metadata.classId'] = classId;
+                    match.$and = match.$and || [];
+                    match.$and.push({
+                        $or: [
+                            { 'metadata.classId': classId },
+                            { 'metadata.classId': { $oid: classId } }
+                        ]
+                    });
                 } else {
-                    match['metadata.classId'] = { $in: assignedClassIds };
+                    match.$and = match.$and || [];
+                    match.$and.push({
+                        $or: [
+                            { 'metadata.classId': { $in: assignedClassIds } },
+                            { 'metadata.classId': { $in: assignedClassIds.map(id => ({ $oid: id })) } }
+                        ]
+                    });
                 }
             } else {
-                if (classId && classId !== 'all') match['metadata.classId'] = classId;
+                if (classId && classId !== 'all') {
+                    match.$and = match.$and || [];
+                    match.$and.push({
+                        $or: [
+                            { 'metadata.classId': classId },
+                            { 'metadata.classId': { $oid: classId } }
+                        ]
+                    });
+                }
             }
         } else {
-            if (classId && classId !== 'all') match['metadata.classId'] = classId;
+            if (classId && classId !== 'all') {
+                match.$and = match.$and || [];
+                match.$and.push({
+                    $or: [
+                        { 'metadata.classId': classId },
+                        { 'metadata.classId': { $oid: classId } }
+                    ]
+                });
+            }
         }
-        if (groupId) match['metadata.groupId'] = groupId;
+        if (groupId) {
+            match.$and = match.$and || [];
+            match.$and.push({
+                $or: [
+                    { 'metadata.groupId': groupId },
+                    { 'metadata.groupId': { $oid: groupId } }
+                ]
+            });
+        }
 
         if (admissionStatus) {
             match['metadata.admissionStatus'] = admissionStatus;

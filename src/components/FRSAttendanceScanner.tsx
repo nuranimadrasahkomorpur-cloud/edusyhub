@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from './SessionProvider';
 import { usePerformance } from '../hooks/usePerformance';
 import { Lock } from 'lucide-react';
+import { getCleanId } from '@/utils/digit-utils';
 
 interface EnrolledStudent {
     id: string;
@@ -57,9 +58,9 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
         const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute.id);
         if (!profile || profile.status !== 'ACTIVE') return false;
         if (profile.isAdmin === true) return true;
-        const classId = propClassId;
-        if (!classId || classId === 'all') return profile.isAdmin === true;
-        const classPerm = profile.permissions?.classWise?.[classId];
+        const targetClassId = getCleanId(propClassId);
+        if (!targetClassId || targetClassId === 'all') return profile.isAdmin === true;
+        const classPerm = profile.permissions?.classWise?.[targetClassId];
         if (!classPerm) return false;
         if (typeof classPerm === 'object' && Array.isArray(classPerm.permissions)) return classPerm.permissions.includes('canTakeAttendance');
         if (Array.isArray(classPerm)) return classPerm.includes('canTakeAttendance');

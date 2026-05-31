@@ -19,6 +19,7 @@ import {
     ChevronDown
 } from 'lucide-react';
 import { useSession } from './SessionProvider';
+import { getCleanId } from '@/utils/digit-utils';
 import {
     LineChart,
     Line,
@@ -138,7 +139,8 @@ export default function AttendanceSummary({
     }, [activeInstitute, selectedClassId, startDate, endDate]);
 
     const canViewReportForClass = (classId: string) => {
-        if (!classId) return true; // Keep 'All Classes' option, but it will be filtered in the breakdown if we implemented filtering there.
+        const targetClassId = getCleanId(classId);
+        if (!targetClassId) return true; // Keep 'All Classes' option, but it will be filtered in the breakdown if we implemented filtering there.
         // For simplicity, if they can take attendance, they can see reports.
         if (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN') return true;
         if (activeRole === 'TEACHER' && user?.teacherProfiles) {
@@ -147,7 +149,7 @@ export default function AttendanceSummary({
             if (profile.isAdmin) return true;
             if (!profile.permissions?.classWise) return false;
 
-            const classPermissions = profile.permissions.classWise[classId];
+            const classPermissions = profile.permissions.classWise[targetClassId];
             if (!classPermissions) return false;
 
             if (classPermissions && typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {

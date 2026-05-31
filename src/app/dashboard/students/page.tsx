@@ -59,6 +59,7 @@ import PdfReaderModal from '@/components/PdfReaderModal';
 import TeacherPermissionModal from '@/components/TeacherPermissionModal';
 import SubjectGradingModal from '@/components/SubjectGradingModal';
 import { useUI } from '@/components/UIProvider';
+import { getCleanId } from '@/utils/digit-utils';
 
 export default function StudentManagementPage() {
     const { user: currentUser, activeRole, activeInstitute, isLoading } = useSession();
@@ -493,6 +494,7 @@ export default function StudentManagementPage() {
 
     // Permission Helpers (Moved to top area)
     const canManageClass = (classId: string) => {
+        const targetClassId = getCleanId(classId);
         if (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN') return true;
         if (activeRole === 'TEACHER' && currentUser?.teacherProfiles) {
             const profile = currentUser.teacherProfiles.find((p: any) => p.instituteId === activeInstitute?.id);
@@ -500,7 +502,7 @@ export default function StudentManagementPage() {
             if (profile.isAdmin) return true;
             if (!profile.permissions?.classWise) return false;
 
-            const classPermissions = profile.permissions.classWise[classId];
+            const classPermissions = profile.permissions.classWise[targetClassId];
             if (!classPermissions) return false;
 
             if (classPermissions && typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {
@@ -523,7 +525,8 @@ export default function StudentManagementPage() {
             if (!profile.permissions?.classWise) return [];
 
             return classes.filter(c => {
-                const classPermissions = profile.permissions.classWise[c.id];
+                const targetClassId = getCleanId(c.id);
+                const classPermissions = profile.permissions.classWise[targetClassId];
                 // If there's ANY entry for this class, the teacher is assigned to it and should see it
                 return classPermissions !== undefined && classPermissions !== null;
             });

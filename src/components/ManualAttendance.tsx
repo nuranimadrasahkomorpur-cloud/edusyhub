@@ -33,6 +33,7 @@ import { useUI } from './UIProvider';
 import dynamic from 'next/dynamic';
 import Modal from './Modal';
 import AttendanceSummary from './AttendanceSummary';
+import { getCleanId } from '@/utils/digit-utils';
 
 const StudentProfileModal = dynamic(() => import('./StudentProfileModal'), { ssr: false });
 
@@ -79,11 +80,12 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         if (!profile || profile.status !== 'ACTIVE') return false;
         if (profile.isAdmin === true) return true;
         
-        if (!classId || classId === 'all') {
+        const targetClassId = getCleanId(classId);
+        if (!targetClassId || targetClassId === 'all') {
             return profile.isAdmin === true;
         }
         
-        const classPerm = profile.permissions?.classWise?.[classId];
+        const classPerm = profile.permissions?.classWise?.[targetClassId];
         if (!classPerm) return false;
         if (typeof classPerm === 'object' && Array.isArray(classPerm.permissions)) {
             return classPerm.permissions.includes('canTakeAttendance');
@@ -156,13 +158,14 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
             return profile?.isAdmin === true;
         })();
 
+        const targetClassId = getCleanId(classId);
         if (activeRole === 'TEACHER' && !isAdminUser) {
-            if (!classId || classId === 'all') {
+            if (!targetClassId || targetClassId === 'all') {
                 setRegisterData({});
                 return;
             }
             const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
-            const classPermissions = profile?.permissions?.classWise?.[classId];
+            const classPermissions = profile?.permissions?.classWise?.[targetClassId];
             let hasPerm = false;
             if (classPermissions) {
                 if (typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {
@@ -274,14 +277,15 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
             return profile?.isAdmin === true;
         })();
 
+        const targetClassId = getCleanId(classId);
         if (activeRole === 'TEACHER' && !isAdminUser) {
-            if (!classId || classId === 'all') {
+            if (!targetClassId || targetClassId === 'all') {
                 setStudents([]);
                 setLoading(false);
                 return;
             }
             const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
-            const classPermissions = profile?.permissions?.classWise?.[classId];
+            const classPermissions = profile?.permissions?.classWise?.[targetClassId];
             let hasPerm = false;
             if (classPermissions) {
                 if (typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {
@@ -336,7 +340,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                         initialAttendance: status,
                         updatedAt: existing?.updatedAt,
                         stats: statsMap.get(s.id),
-                        classId: s.metadata?.classId,
+                        classId: getCleanId(s.metadata?.classId),
                         className: s.metadata?.className,
                         metadata: s.metadata // Keep all for modal
                     };

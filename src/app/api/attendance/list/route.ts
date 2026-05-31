@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 import { getServerSession } from '@/utils/auth-utils';
+import { getCleanId } from '@/utils/digit-utils';
 import fs from 'fs';
 import path from 'path';
 
@@ -122,13 +123,13 @@ export async function GET(req: NextRequest) {
             }
 
             if (!profile.isAdmin) {
-                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                const assignedClassIds = (profile.assignedClassIds || []).map(id => getCleanId(id));
                 if (assignedClassIds.length === 0) {
                     return NextResponse.json([]); // Return empty list, no classes assigned
                 }
 
                 if (classId && classId !== 'all' && classId !== '') {
-                    if (!assignedClassIds.includes(classId)) {
+                    if (!assignedClassIds.includes(getCleanId(classId))) {
                         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
                     }
                     filter.classId = toOid(classId);
