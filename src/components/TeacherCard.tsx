@@ -30,7 +30,7 @@ export default function TeacherCard({
     const designation = teacher.designation || 'শিক্ষক';
     const phone = teacher.user?.phone || teacher.phone;
     const email = teacher.user?.email || teacher.email;
-    const isAdmin = teacher.isAdmin || teacher.role === 'ADMIN';
+    const isAdmin = teacher.isAdmin;
     const isCurrentUser = teacher.userId === currentUser?.id || teacher.id === currentUser?.id;
     const isPending = teacher.status === 'PENDING';
 

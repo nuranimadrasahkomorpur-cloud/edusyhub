@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 import { getServerSession } from '@/utils/auth-utils';
+import fs from 'fs';
+import path from 'path';
+
+function writeDebugLog(message: string, data: any) {
+    try {
+        const logDir = 'f:/Edusy User flow/Edusy app/scratch';
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
+        const logPath = path.join(logDir, 'db_debug.txt');
+        const logContent = `[${new Date().toISOString()}] ${message}\n${JSON.stringify(data, null, 2)}\n\n`;
+        fs.appendFileSync(logPath, logContent, 'utf-8');
+    } catch (e) {
+        console.error('Failed to write debug log:', e);
+    }
+}
 
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const classId = searchParams.get('classId');
-        const instituteId = searchParams.get('instituteId');
+        let instituteId = searchParams.get('instituteId');
         const dateString = searchParams.get('date');
         const month = searchParams.get('month'); // e.g. "2026-05" for full-month register view
 
@@ -14,7 +30,30 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Missing classId/instituteId or date/month' }, { status: 400 });
         }
 
+        if (!instituteId && classId && classId !== 'all' && classId !== '') {
+            const cls = await prisma.class.findUnique({
+                where: { id: classId },
+                select: { instituteId: true }
+            });
+            if (cls) {
+                instituteId = cls.instituteId;
+            }
+        }
+
+        if (!instituteId) {
+            return NextResponse.json({ error: 'Missing or invalid instituteId' }, { status: 400 });
+        }
+
         const session = await getServerSession();
+        
+        writeDebugLog('GET list request details', {
+            classId,
+            instituteId,
+            dateString,
+            month,
+            sessionUser: session?.user ? { id: session.user.id, email: session.user.email, role: session.user.role } : null
+        });
+
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -42,9 +81,29 @@ export async function GET(req: NextRequest) {
         }
 
         const { role: baseRole, teacherProfiles } = session.user as any;
-        const isTeacher = baseRole === 'TEACHER' || (teacherProfiles && (teacherProfiles || []).some((p: any) => p.instituteId === instituteId));
+        
+        let isOwner = false;
+        if (instituteId) {
+            const inst = await prisma.institute.findUnique({
+                where: { id: instituteId },
+                select: { adminIds: true }
+            });
+            writeDebugLog('GET list: Institute admin check', {
+                inst,
+                userId: session.user.id
+            });
+            if (inst && inst.adminIds) {
+                isOwner = inst.adminIds.some((id: any) => {
+                    if (!id) return false;
+                    const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+                    return idStr === session.user.id.toString();
+                });
+            }
+        }
 
-        if (isTeacher && instituteId) {
+        writeDebugLog('GET list: isOwner evaluation', { isOwner });
+
+        if (!isOwner) {
             const profile = await prisma.teacherProfile.findUnique({
                 where: {
                     userId_instituteId: {
@@ -52,6 +111,10 @@ export async function GET(req: NextRequest) {
                         instituteId: instituteId
                     }
                 }
+            });
+
+            writeDebugLog('GET list: Teacher Profile check for non-owner', {
+                profile: profile ? { id: profile.id, userId: profile.userId, instituteId: profile.instituteId, status: profile.status, isAdmin: profile.isAdmin } : null
             });
 
             if (!profile || profile.status !== 'ACTIVE') {

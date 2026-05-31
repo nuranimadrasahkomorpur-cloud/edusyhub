@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Check,
     X,
@@ -24,7 +24,8 @@ import {
     LayoutGrid,
     Table2,
     ChevronUp,
-    ChevronsUpDown
+    ChevronsUpDown,
+    Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from './SessionProvider';
@@ -60,16 +61,28 @@ interface Student {
 
 export default function ManualAttendance({ classId, selectedDate }: { classId: string, selectedDate: string }) {
     const { activeInstitute, activeRole, user } = useSession();
-    const isAdmin = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN';
-    const isTeacher = activeRole === 'TEACHER';
+    const isOwner = (activeInstitute?.adminIds || []).includes(user?.id) || activeInstitute?.isOwner === true;
+
+    const isAdmin = isOwner || (() => {
+        const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
+        return profile?.status === 'ACTIVE' && profile?.isAdmin === true;
+    })();
+
+    const isTeacher = activeRole === 'TEACHER' || !isOwner;
 
     // Determine if the current teacher has attendance permission for this specific class
     const hasAttendancePerm = useMemo(() => {
-        if (isAdmin) return true;
-        if (!isTeacher || !user?.teacherProfiles || !activeInstitute?.id || !classId || classId === 'all') return isAdmin;
+        if (isOwner) return true;
+        if (!user?.teacherProfiles || !activeInstitute?.id) return false;
+        
         const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute.id);
-        if (!profile) return false;
+        if (!profile || profile.status !== 'ACTIVE') return false;
         if (profile.isAdmin === true) return true;
+        
+        if (!classId || classId === 'all') {
+            return profile.isAdmin === true;
+        }
+        
         const classPerm = profile.permissions?.classWise?.[classId];
         if (!classPerm) return false;
         if (typeof classPerm === 'object' && Array.isArray(classPerm.permissions)) {
@@ -77,8 +90,9 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         }
         if (Array.isArray(classPerm)) return classPerm.includes('canTakeAttendance');
         if (typeof classPerm === 'object') return classPerm.canTakeAttendance === true;
+        if (typeof classPerm === 'string') return classPerm === 'canTakeAttendance';
         return false;
-    }, [isAdmin, isTeacher, user, activeInstitute?.id, classId]);
+    }, [isOwner, user, activeInstitute?.id, classId]);
 
     // Teachers without the permission see a read-only view
     const isReadOnlyAttendance = isTeacher && !hasAttendancePerm;
@@ -123,8 +137,16 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
     useEffect(() => {
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+        if (isMobile && selectedDate) {
+            const currentDay = parseInt(selectedDate.substring(8, 10), 10);
+            if (!isNaN(currentDay)) {
+                setVisibleDays([currentDay]);
+                return;
+            }
+        }
         setVisibleDays(Array.from({ length: daysInMonth }, (_, i) => i + 1));
-    }, [daysInMonth]);
+    }, [daysInMonth, selectedDate]);
 
     const fetchRegisterData = async () => {
         if (!activeInstitute?.id || !monthStr) return;
@@ -180,12 +202,39 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
     const storageKey = `attendance_draft_${activeInstitute?.id}_${selectedDate}`;
 
-    // Close dropdown on click outside
+    const columnPickerRef = useRef<HTMLDivElement>(null);
+    const filterScrollRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdowns on click outside
     useEffect(() => {
-        const handleClick = () => setActiveActionId(null);
+        const handleClick = (e: MouseEvent) => {
+            setActiveActionId(null);
+            
+            if (columnPickerRef.current && !columnPickerRef.current.contains(e.target as Node)) {
+                setShowColumnPicker(false);
+            }
+        };
         window.addEventListener('click', handleClick);
         return () => window.removeEventListener('click', handleClick);
     }, []);
+
+    // Center active status filter tab when it changes
+    useEffect(() => {
+        if (filterScrollRef.current) {
+            const container = filterScrollRef.current;
+            const activeBtn = container.querySelector(`[data-filter-id="${statusFilter}"]`) as HTMLElement;
+            if (activeBtn) {
+                const containerWidth = container.offsetWidth;
+                const btnOffset = activeBtn.offsetLeft;
+                const btnWidth = activeBtn.offsetWidth;
+
+                container.scrollTo({
+                    left: btnOffset - (containerWidth / 2) + (btnWidth / 2),
+                    behavior: 'smooth'
+                });
+            }
+        }
+    }, [statusFilter]);
 
     const openProfileModal = (student: Student, tab: typeof modalTab = 'attendance') => {
         setModalTab(tab);
@@ -317,37 +366,129 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         }
     };
 
-    const updateStatus = (id: string, status: Student['attendance']) => {
-        if (isReadOnlyAttendance) return;
+    const updateStatus = async (id: string, status: Student['attendance']) => {
+        if (isReadOnlyAttendance) {
+            showToast('আপনাকে এই ক্লাসের হাজিরা পরিবর্তন করার অনুমতি দেওয়া হয়নি।', 'ERROR');
+            return;
+        }
+
+        const now = new Date().toISOString();
+
+        // Optimistic UI updates
         setStudents(prev => prev.map(s => s.id === id ? {
             ...s,
             attendance: status,
-            updatedAt: status !== 'ABSENT' ? new Date().toISOString() : s.updatedAt
+            initialAttendance: status, // Auto-saved
+            updatedAt: status !== 'ABSENT' ? now : s.updatedAt
         } : s));
+
+        setRegisterData(prev => {
+            const next = { ...prev };
+            if (!next[id]) next[id] = {};
+            next[id][selectedDate] = status || 'ABSENT';
+            return next;
+        });
+
+        // Save immediately in the background
+        setSaving(true);
+        try {
+            const student = students.find(s => s.id === id);
+            const res = await fetch('/api/attendance/mark', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    studentId: id,
+                    instituteId: activeInstitute?.id,
+                    classId: student?.classId || classId || 'all',
+                    dateString: selectedDate,
+                    status: status || 'ABSENT',
+                    method: 'MANUAL'
+                })
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'হাজিরা সংরক্ষণ করতে ব্যর্থ হয়েছে।');
+            }
+        } catch (error: any) {
+            console.error('Failed to auto-save attendance status:', error);
+            showToast(error.message || 'হাজিরা সেভ করতে সমস্যা হয়েছে।', 'ERROR');
+            fetchStudents(); // Revert to database state
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const bulkUpdate = (status: Student['attendance'] | 'RESET') => {
-        if (isReadOnlyAttendance) return;
+    const bulkUpdate = async (status: Student['attendance'] | 'RESET') => {
+        if (isReadOnlyAttendance) {
+            showToast('আপনাকে এই ক্লাসের হাজিরা পরিবর্তন করার অনুমতি দেওয়া হয়নি।', 'ERROR');
+            return;
+        }
+
+        if (status === 'RESET') return;
+
         const now = new Date().toISOString();
+        const toUpdate: { id: string; status: Student['attendance']; classId?: string }[] = [];
+
         setStudents(prev => prev.map(s => {
-            // Prevent teachers from modifying already pending leaves via bulk actions
-            if (!isAdmin && s.initialAttendance === 'LEAVE_PENDING' && status !== 'RESET') {
+            if (!isAdmin && s.initialAttendance === 'LEAVE_PENDING') {
                 return s;
             }
 
-            let finalStatus = status === 'RESET' ? s.initialAttendance : status;
-            
-            // Redirect LEAVE to LEAVE_PENDING for teachers
+            let finalStatus = status;
             if (isTeacher && finalStatus === 'LEAVE') {
                 finalStatus = 'LEAVE_PENDING';
             }
 
+            toUpdate.push({ id: s.id, status: finalStatus, classId: s.classId });
+
             return {
                 ...s,
                 attendance: finalStatus,
-                updatedAt: (status !== 'RESET' && finalStatus !== 'ABSENT') ? now : s.updatedAt
+                initialAttendance: finalStatus, // mark as saved
+                updatedAt: finalStatus !== 'ABSENT' ? now : s.updatedAt
             };
         }));
+
+        setRegisterData(prev => {
+            const next = { ...prev };
+            toUpdate.forEach(item => {
+                if (!next[item.id]) next[item.id] = {};
+                next[item.id][selectedDate] = item.status || 'ABSENT';
+            });
+            return next;
+        });
+
+        // Save immediately in parallel
+        setSaving(true);
+        try {
+            const promises = toUpdate.map(async item => {
+                const res = await fetch('/api/attendance/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        studentId: item.id,
+                        instituteId: activeInstitute?.id,
+                        classId: item.classId || classId || 'all',
+                        dateString: selectedDate,
+                        status: item.status || 'ABSENT',
+                        method: 'MANUAL'
+                    })
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'হাজিরা সংরক্ষণ করতে ব্যর্থ হয়েছে।');
+                }
+            });
+            await Promise.all(promises);
+            showToast('হাজিরা সফলভাবে সংরক্ষিত হয়েছে।', 'SUCCESS');
+        } catch (error: any) {
+            console.error('Failed to auto-save bulk attendance:', error);
+            showToast(error.message || 'হাজিরা সেভ করতে সমস্যা হয়েছে।', 'ERROR');
+            fetchStudents(); // Revert to database state
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleNameIdSort = () => {
@@ -362,7 +503,10 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
     const handleQuickCellUpdate = async (studentId: string, dateString: string, currentStatus: string | undefined, classIdFromStudent: string | undefined) => {
         if (!activeInstitute?.id) return;
-        if (isReadOnlyAttendance) return;
+        if (isReadOnlyAttendance) {
+            showToast('আপনাকে এই ক্লাসের হাজিরা পরিবর্তন করার অনুমতি দেওয়া হয়নি।', 'ERROR');
+            return;
+        }
         
         // Determine next status: (none/undefined) -> PRESENT -> ABSENT -> LATE -> LEAVE -> NONE -> PRESENT...
         const statuses = ['PRESENT', 'ABSENT', 'LATE', 'LEAVE', 'NONE'];
@@ -408,13 +552,17 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         // Save immediately in the background
         try {
             if (nextStatus === 'NONE') {
-                await fetch('/api/attendance/unmark', {
+                const res = await fetch('/api/attendance/unmark', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ studentId, dateString })
+                    body: JSON.stringify({ studentId, dateString, instituteId: activeInstitute?.id })
                 });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'মুছে ফেলতে ব্যর্থ হয়েছে।');
+                }
             } else {
-                await fetch('/api/attendance/mark', {
+                const res = await fetch('/api/attendance/mark', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -426,9 +574,18 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                         method: 'MANUAL'
                     })
                 });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'হাজিরা সংরক্ষণ করতে ব্যর্থ হয়েছে।');
+                }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to quick save cell:', error);
+            showToast(error.message || 'হাজিরা সেভ করতে সমস্যা হয়েছে।', 'ERROR');
+            fetchRegisterData(); // Revert register state
+            if (dateString === selectedDate) {
+                fetchStudents(); // Revert card state if today
+            }
         }
     };
 
@@ -439,8 +596,8 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
         setSaving(true);
         try {
-            const promises = changedStudents.map(s =>
-                fetch('/api/attendance/mark', {
+            const promises = changedStudents.map(async s => {
+                const res = await fetch('/api/attendance/mark', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -451,8 +608,12 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                         status: s.attendance,
                         method: 'MANUAL'
                     })
-                })
-            );
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'হাজিরা সংরক্ষণ করতে ব্যর্থ হয়েছে।');
+                }
+            });
             await Promise.all(promises);
 
             // Sync initial state after successful save
@@ -471,9 +632,10 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
             // Show success toast
             showToast('হাজিরা সফলভাবে সংরক্ষিত হয়েছে।', 'SUCCESS');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error saving attendance:', err);
-            showToast('হাজিরা সেভ করতে সমস্যা হয়েছে।', 'ERROR');
+            showToast(err.message || 'হাজিরা সেভ করতে সমস্যা হয়েছে।', 'ERROR');
+            fetchStudents(); // Revert
         } finally {
             setSaving(false);
         }
@@ -489,16 +651,21 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
         setSaving(true);
         try {
-            const promises = savedStudents.map(s =>
-                fetch('/api/attendance/unmark', {
+            const promises = savedStudents.map(async s => {
+                const res = await fetch('/api/attendance/unmark', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         studentId: s.id,
-                        dateString: selectedDate
+                        dateString: selectedDate,
+                        instituteId: activeInstitute?.id
                     })
-                })
-            );
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'হাজিরা মুছতে ব্যর্থ হয়েছে।');
+                }
+            });
             await Promise.all(promises);
 
             // Reset state
@@ -509,18 +676,31 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                 updatedAt: undefined
             })));
 
+            setRegisterData(prev => {
+                const next = { ...prev };
+                savedStudents.forEach(s => {
+                    if (next[s.id]) {
+                        delete next[s.id][selectedDate];
+                    }
+                });
+                return next;
+            });
+
             localStorage.removeItem(storageKey);
             showToast('সমস্ত হাজিরা রেকর্ড মুছে ফেলা হয়েছে।', 'SUCCESS');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error clearing attendance:', err);
-            showToast('হাজিরা মুছতে সমস্যা হয়েছে।', 'ERROR');
+            showToast(err.message || 'হাজিরা মুছতে সমস্যা হয়েছে।', 'ERROR');
+            fetchStudents(); // Revert
         } finally {
             setSaving(false);
         }
     };
 
-    const sortedAllStudents = [...students].sort((a, b) => a.name.localeCompare(b.name));
-    const studentsWithRoll = sortedAllStudents.map((s, idx) => ({ ...s, assignedRoll: idx + 1 }));
+    const studentsWithRoll = useMemo(() => {
+        const sorted = [...students].sort((a, b) => a.name.localeCompare(b.name));
+        return sorted.map((s, idx) => ({ ...s, assignedRoll: idx + 1 }));
+    }, [students]);
 
     // Calculate total active class days for the month
     const activeClassDays = useMemo(() => {
@@ -536,77 +716,82 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     }, [registerData, monthStr]);
 
     // Pre-calculate present count for sorting
-    const studentsWithStats = studentsWithRoll.map(student => {
-        const sData = registerData[student.id] || {};
-        let presentCount = 0;
-        let totalCount = 0;
-        monthDays.forEach(day => {
-            const dayStr = `${monthStr}-${String(day).padStart(2, '0')}`;
-            const status = sData[dayStr];
-            if (status) totalCount++;
-            if (status === 'PRESENT' || status === 'LATE') presentCount++;
+    const studentsWithStats = useMemo(() => {
+        return studentsWithRoll.map(student => {
+            const sData = registerData[student.id] || {};
+            let presentCount = 0;
+            let totalCount = 0;
+            monthDays.forEach(day => {
+                const dayStr = `${monthStr}-${String(day).padStart(2, '0')}`;
+                const status = sData[dayStr];
+                if (status) totalCount++;
+                if (status === 'PRESENT' || status === 'LATE') presentCount++;
+            });
+            return { ...student, presentCount, totalCount, sData };
         });
-        return { ...student, presentCount, totalCount, sData };
-    });
+    }, [studentsWithRoll, registerData, monthStr, monthDays]);
 
-    let filteredStudents = studentsWithStats.filter(s => {
-        const query = searchQuery.toLowerCase();
-        const matchesSearch = s.name.toLowerCase().includes(query) || 
-                              s.assignedRoll.toString() === query ||
-                              s.metadata?.studentId === query;
-        const matchesStatus = statusFilter === 'ALL' || s.attendance === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
-
-    if (sortConfig) {
-        filteredStudents.sort((a, b) => {
-            let valA: any = 0;
-            let valB: any = 0;
-
-            if (sortConfig.key === 'roll') {
-                valA = a.assignedRoll;
-                valB = b.assignedRoll;
-            } else if (sortConfig.key === 'name') {
-                return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-            } else if (sortConfig.key === 'id') {
-                valA = parseInt(a.metadata?.studentId || '0', 10);
-                valB = parseInt(b.metadata?.studentId || '0', 10);
-                if (isNaN(valA)) valA = a.metadata?.studentId || '';
-                if (isNaN(valB)) valB = b.metadata?.studentId || '';
-            } else if (sortConfig.key === 'totalP') {
-                valA = a.presentCount;
-                valB = b.presentCount;
-            } else if (sortConfig.key === 'percentage') {
-                valA = activeClassDays > 0 ? a.presentCount / activeClassDays : -1;
-                valB = activeClassDays > 0 ? b.presentCount / activeClassDays : -1;
-            } else if (sortConfig.key.startsWith('date_')) {
-                const dateStr = sortConfig.key.replace('date_', '');
-                const statusWeight = (status: string | undefined) => {
-                    if (status === 'PRESENT') return 4;
-                    if (status === 'LATE') return 3;
-                    if (status === 'LEAVE' || status === 'LEAVE_PENDING') return 2;
-                    if (status === 'ABSENT') return 1;
-                    return 0; // NONE
-                };
-                valA = statusWeight(a.sData[dateStr]);
-                valB = statusWeight(b.sData[dateStr]);
-            }
-
-            if (typeof valA === 'string' && typeof valB === 'string') {
-                return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-            }
-            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-            return 0;
+    const filteredStudents = useMemo(() => {
+        let list = studentsWithStats.filter(s => {
+            const query = searchQuery.toLowerCase();
+            const matchesSearch = s.name.toLowerCase().includes(query) || 
+                                  s.assignedRoll.toString() === query ||
+                                  s.metadata?.studentId === query;
+            const matchesStatus = statusFilter === 'ALL' || s.attendance === statusFilter;
+            return matchesSearch && matchesStatus;
         });
-    }
+
+        if (sortConfig) {
+            list.sort((a, b) => {
+                let valA: any = 0;
+                let valB: any = 0;
+
+                if (sortConfig.key === 'roll') {
+                    valA = a.assignedRoll;
+                    valB = b.assignedRoll;
+                } else if (sortConfig.key === 'name') {
+                    return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+                } else if (sortConfig.key === 'id') {
+                    valA = parseInt(a.metadata?.studentId || '0', 10);
+                    valB = parseInt(b.metadata?.studentId || '0', 10);
+                    if (isNaN(valA)) valA = a.metadata?.studentId || '';
+                    if (isNaN(valB)) valB = b.metadata?.studentId || '';
+                } else if (sortConfig.key === 'totalP') {
+                    valA = a.presentCount;
+                    valB = b.presentCount;
+                } else if (sortConfig.key === 'percentage') {
+                    valA = activeClassDays > 0 ? a.presentCount / activeClassDays : -1;
+                    valB = activeClassDays > 0 ? b.presentCount / activeClassDays : -1;
+                } else if (sortConfig.key.startsWith('date_')) {
+                    const dateStr = sortConfig.key.replace('date_', '');
+                    const statusWeight = (status: string | undefined) => {
+                        if (status === 'PRESENT') return 4;
+                        if (status === 'LATE') return 3;
+                        if (status === 'LEAVE' || status === 'LEAVE_PENDING') return 2;
+                        if (status === 'ABSENT') return 1;
+                        return 0; // NONE
+                    };
+                    valA = statusWeight(a.sData[dateStr]);
+                    valB = statusWeight(b.sData[dateStr]);
+                }
+
+                if (typeof valA === 'string' && typeof valB === 'string') {
+                    return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return list;
+    }, [studentsWithStats, searchQuery, statusFilter, sortConfig, activeClassDays]);
 
     const hasChanges = students.some(s => s.attendance !== s.initialAttendance);
 
     return (
         <div className="space-y-6">
             {/* Redesigned Toolbar */}
-            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-20">
+            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-40">
                 <div className="flex items-center gap-3">
                     {/* Expanding Search Bar */}
                     <motion.div
@@ -620,12 +805,12 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                         />
                         <input
                             type="text"
-                            placeholder={searchFocused ? "নাম বা রোল দিয়ে খুঁজুন..." : ""}
+                            placeholder="নাম বা রোল দিয়ে খুঁজুন..."
                             value={searchQuery}
                             onFocus={() => setSearchFocused(true)}
                             onBlur={() => setSearchFocused(false)}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className={`bg-slate-50 border border-slate-100 rounded-[22px] pl-12 pr-4 py-4 text-base font-bold text-slate-700 outline-none focus:ring-4 ring-[#045c84]/5 transition-all w-full cursor-pointer focus:cursor-text ${!searchFocused && !searchQuery ? 'placeholder-transparent' : ''}`}
+                            className="bg-slate-50 border border-slate-100 rounded-[22px] pl-12 pr-4 py-4 text-base font-bold text-slate-700 outline-none focus:ring-4 ring-[#045c84]/5 transition-all w-full cursor-pointer focus:cursor-text"
                         />
                     </motion.div>
 
@@ -633,7 +818,10 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                     <div className="flex items-center gap-2 shrink-0">
                         <div className="flex items-center bg-slate-100 rounded-[18px] p-1">
                             <button
-                                onClick={() => setViewMode('CARD')}
+                                onClick={() => {
+                                    setViewMode('CARD');
+                                    setShowColumnPicker(false);
+                                }}
                                 className={`flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] text-[11px] font-black uppercase tracking-wider transition-all ${
                                     viewMode === 'CARD'
                                         ? 'bg-white text-[#045c84] shadow-sm'
@@ -643,31 +831,29 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                 <LayoutGrid size={14} />
                                 <span className="hidden sm:inline">কার্ড</span>
                             </button>
-                            <button
-                                onClick={() => { setViewMode('REGISTER'); fetchRegisterData(); }}
-                                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] text-[11px] font-black uppercase tracking-wider transition-all ${
-                                    viewMode === 'REGISTER'
-                                        ? 'bg-white text-[#045c84] shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-600'
-                                }`}
-                            >
-                                <Table2 size={14} />
-                                <span className="hidden sm:inline">রেজিস্টার</span>
-                            </button>
-                        </div>
-
-                        {viewMode === 'REGISTER' && (
-                            <div className="relative">
+                            
+                            <div className="relative" ref={columnPickerRef}>
                                 <button
-                                    onClick={() => setShowColumnPicker(!showColumnPicker)}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wider transition-all"
+                                    onClick={() => {
+                                        if (viewMode !== 'REGISTER') {
+                                            setViewMode('REGISTER');
+                                            fetchRegisterData();
+                                        } else {
+                                            setShowColumnPicker(!showColumnPicker);
+                                        }
+                                    }}
+                                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-[14px] text-[11px] font-black uppercase tracking-wider transition-all ${
+                                        viewMode === 'REGISTER'
+                                            ? 'bg-white text-[#045c84] shadow-sm'
+                                            : 'text-slate-400 hover:text-slate-600'
+                                    }`}
                                 >
                                     <Table2 size={14} />
-                                    <span className="hidden sm:inline">কলাম</span>
-                                    <ChevronDown size={14} />
+                                    <span className="hidden sm:inline">রেজিস্টার</span>
+                                    {viewMode === 'REGISTER' && <ChevronDown size={14} className={`transition-transform duration-200 ${showColumnPicker ? 'rotate-180' : ''}`} />}
                                 </button>
-                                {showColumnPicker && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2">
+                                {viewMode === 'REGISTER' && showColumnPicker && (
+                                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2" data-lenis-prevent="true">
                                         <div className="flex items-center justify-between px-2 py-1 border-b border-slate-100 mb-2">
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">কলাম নির্বাচন</span>
                                             <button 
@@ -677,7 +863,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 {visibleDays.length === daysInMonth ? 'সব লুকান' : 'সব নির্বাচন'}
                                             </button>
                                         </div>
-                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                        <div className="max-h-60 overflow-y-auto custom-scrollbar" data-lenis-prevent="true">
                                             {monthDays.map(day => (
                                                 <label key={day} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer text-xs font-bold text-slate-600">
                                                     <input 
@@ -696,38 +882,30 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     {/* Save Button — hidden when teacher lacks canTakeAttendance */}
-                    {isReadOnlyAttendance ? (
-                        <div className="flex items-center gap-2 px-5 py-3 rounded-[22px] bg-slate-100 text-slate-400 shrink-0 border border-slate-200">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            <span className="text-[12px] font-black uppercase tracking-widest">শুধু দেখুন</span>
-                        </div>
-                    ) : (
+                    {!isReadOnlyAttendance && (
                         <button
                             onClick={handleSave}
-                            disabled={saving || loading || !hasChanges}
-                            className={`px-8 py-4 rounded-[22px] font-black text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-xl active:scale-95 shrink-0 ${hasChanges
-                                ? 'bg-[#045c84] text-white shadow-[#045c84]/20 hover:bg-[#034a6b]'
-                                : 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed opacity-70'
+                            disabled={saving || loading}
+                            className={`px-8 py-4 rounded-[22px] font-black text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-xl active:scale-95 shrink-0 ${saving
+                                ? 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed opacity-70'
+                                : 'bg-[#045c84]/10 text-[#045c84] hover:bg-[#045c84]/20'
                                 }`}
                         >
-                            {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-                            <span className={searchFocused ? 'hidden sm:inline' : 'inline'}>{hasChanges ? 'হাজিরা সেভ' : 'সেভড'}</span>
+                            {saving ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
+                            <span className={searchFocused ? 'hidden sm:inline' : 'inline'}>{saving ? 'সেভ হচ্ছে...' : 'সেভড'}</span>
                         </button>
                     )}
                 </div>
 
                 {/* Interactive Status Tabs - Always in one scrollable row */}
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
-                    {isReadOnlyAttendance && (
-                        <div className="flex items-center gap-2 px-4 py-2.5 rounded-[18px] bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            <span className="text-[11px] font-black uppercase tracking-widest whitespace-nowrap">এই ক্লাসে হাজিরা দেওয়ার অনুমতি নেই</span>
-                        </div>
-                    )}
+                <div 
+                    ref={filterScrollRef}
+                    className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 relative"
+                >
                     {[
                         { id: 'ALL', label: 'সব', count: students.length, color: 'slate', activeBg: 'bg-slate-800', activeText: 'text-white' },
                         { id: 'PRESENT', label: 'উপস্থিত', count: students.filter(s => s.attendance === 'PRESENT').length, color: 'emerald', activeBg: 'bg-emerald-500', activeText: 'text-white' },
@@ -737,6 +915,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                     ].map((tab) => (
                         <button
                             key={tab.id}
+                            data-filter-id={tab.id}
                             onClick={() => setStatusFilter(tab.id as any)}
                             className={`flex items-center gap-3 px-6 py-3 rounded-[18px] text-[13px] font-black uppercase tracking-widest transition-all whitespace-nowrap border shrink-0 ${statusFilter === tab.id
                                 ? `${tab.activeBg} ${tab.activeText} border-transparent shadow-lg scale-105`
@@ -794,30 +973,55 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
             {viewMode === 'REGISTER' && (
                 <div className="bg-white rounded-[20px] border border-slate-200 shadow-sm overflow-hidden">
                     {/* Legend */}
-                    <div className="flex items-center gap-4 px-5 py-3 border-b border-slate-100 bg-slate-50/70">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">কিংবদন্তি:</span>
-                        {[
-                            { label: 'P – উপস্থিত', color: 'bg-emerald-500' },
-                            { label: 'A – অনুপস্থিত', color: 'bg-rose-500' },
-                            { label: 'L – বিলম্ব', color: 'bg-amber-500' },
-                            { label: 'H – ছুটি', color: 'bg-blue-500' },
-                            { label: '– – নেই', color: 'bg-slate-300' },
-                        ].map(item => (
-                            <span key={item.label} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                                <span className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
-                                {item.label}
-                            </span>
-                        ))}
-                        <div className="ml-auto flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-4 px-3 md:px-5 py-2 md:py-3 border-b border-slate-100 bg-slate-50/70">
+                        <div className="hidden md:flex items-center gap-4">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">কিংবদন্তি:</span>
+                            {[
+                                { label: 'P – উপস্থিত', color: 'bg-emerald-500' },
+                                { label: 'A – অনুপস্থিত', color: 'bg-rose-500' },
+                                { label: 'L – বিলম্ব', color: 'bg-amber-500' },
+                                { label: 'H – ছুটি', color: 'bg-blue-500' },
+                                { label: '– – নেই', color: 'bg-slate-300' },
+                            ].map(item => (
+                                <span key={item.label} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+                                    <span className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
+                                    {item.label}
+                                </span>
+                            ))}
+                        </div>
+                        
+                        <details className="md:hidden relative">
+                            <summary className="list-none flex items-center justify-center w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 shadow-sm cursor-pointer [&::-webkit-details-marker]:hidden">
+                                <Info size={14} />
+                            </summary>
+                            <div className="absolute top-full left-0 mt-2 w-36 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-3 flex flex-col gap-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">কিংবদন্তি:</span>
+                                {[
+                                    { label: 'P – উপস্থিত', color: 'bg-emerald-500' },
+                                    { label: 'A – অনুপস্থিত', color: 'bg-rose-500' },
+                                    { label: 'L – বিলম্ব', color: 'bg-amber-500' },
+                                    { label: 'H – ছুটি', color: 'bg-blue-500' },
+                                    { label: '– – নেই', color: 'bg-slate-300' },
+                                ].map(item => (
+                                    <span key={item.label} className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                                        <span className={`w-2.5 h-2.5 rounded-sm shrink-0 ${item.color}`} />
+                                        {item.label}
+                                    </span>
+                                ))}
+                            </div>
+                        </details>
+
+                        <div className="ml-auto flex items-center gap-2 md:gap-3">
                             <button
                                 onClick={() => setShowSummaryModal(true)}
-                                className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm hover:bg-indigo-100 transition-colors flex items-center gap-1.5"
+                                className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm hover:bg-indigo-100 transition-colors flex items-center gap-1.5 whitespace-nowrap"
                             >
                                 <CalendarIcon size={12} />
-                                <span>সামারি রিপোর্ট</span>
+                                <span className="hidden sm:inline md:hidden lg:inline">রিপোর্ট</span>
+                                <span className="inline sm:hidden md:inline lg:hidden">সামারি রিপোর্ট</span>
                             </button>
-                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm">
-                                মোট কর্মদিবস: {activeClassDays} দিন
+                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 md:px-3 py-1.5 rounded-lg text-[11px] font-black shadow-sm whitespace-nowrap">
+                                কর্মদিবস: {activeClassDays} দিন
                             </span>
                             {registerLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
                         </div>
@@ -825,7 +1029,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
                     {/* Scrollable Table */}
                     <div className="overflow-auto max-h-[65vh] custom-scrollbar rounded-b-[20px]" data-lenis-prevent="true">
-                        <table className="w-full text-[11px] border-collapse relative" style={{ minWidth: `${220 + daysInMonth * 36}px` }}>
+                        <table className="w-full text-[11px] border-collapse relative" style={{ minWidth: `${360 + visibleDays.length * 56}px` }}>
                             <thead>
                                 <tr className="bg-[#045c84] text-white select-none">
                                     <th 
@@ -863,7 +1067,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                             <th
                                                 key={day}
                                                 onClick={() => handleSort(`date_${dayStr}`)}
-                                                className={`sticky top-0 z-20 py-2 font-black w-10 text-center border-r border-white/10 cursor-pointer hover:bg-[#034a6a] ${
+                                                className={`sticky top-0 z-20 py-2 font-black min-w-[70px] sm:min-w-[44px] text-center border-r border-white/10 cursor-pointer hover:bg-[#034a6a] ${
                                                     isToday ? 'bg-amber-400 text-slate-900 hover:bg-amber-500' : 'bg-[#045c84]'
                                                 }`}
                                             >
@@ -944,9 +1148,9 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                         <td
                                                             key={day}
                                                             id={`cell-${idx}-${visibleDays.indexOf(day)}`}
-                                                            tabIndex={0}
-                                                            onClick={() => handleQuickCellUpdate(student.id, dayStr, status, student.classId)}
-                                                            onKeyDown={(e) => {
+                                                            tabIndex={isReadOnlyAttendance ? -1 : 0}
+                                                            onClick={isReadOnlyAttendance ? undefined : () => handleQuickCellUpdate(student.id, dayStr, status, student.classId)}
+                                                            onKeyDown={isReadOnlyAttendance ? undefined : (e) => {
                                                                 const dayIdx = visibleDays.indexOf(day);
                                                                 if (e.key === 'ArrowUp') {
                                                                     document.getElementById(`cell-${idx - 1}-${dayIdx}`)?.focus();
@@ -965,7 +1169,9 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                                     e.preventDefault();
                                                                 }
                                                             }}
-                                                            className={`py-2 text-center border-r border-slate-100 font-black text-[10px] cursor-pointer hover:bg-blue-100/50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#045c84] focus:bg-blue-50 transition-colors ${
+                                                            className={`py-2 text-center border-r border-slate-100 font-black text-[10px] ${
+                                                                isReadOnlyAttendance ? 'opacity-30 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-blue-100/50'
+                                                            } focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#045c84] focus:bg-blue-50 transition-colors ${
                                                                 isToday ? 'ring-1 ring-inset ring-amber-300 bg-amber-50/60' : ''
                                                             }`}
                                                         >
@@ -1054,7 +1260,6 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                 return (
                                     <motion.div
                                         key={student.id}
-                                        layout
                                         className="bg-white rounded-[20px] p-2 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between gap-3 relative group"
                                     >
                                         <div className="flex items-center gap-3 min-w-0">
@@ -1175,8 +1380,10 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 ) : (
                                                     <button
                                                         onClick={() => updateStatus(student.id, getStatusConfig(status).next as any)}
-                                                        disabled={!isAdmin && status === 'LEAVE_PENDING' && student.initialAttendance === 'LEAVE_PENDING'}
-                                                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${status === 'PRESENT' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/10 ring-4 ring-emerald-500/5' :
+                                                        disabled={isReadOnlyAttendance || (!isAdmin && status === 'LEAVE_PENDING' && student.initialAttendance === 'LEAVE_PENDING')}
+                                                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                                                            isReadOnlyAttendance ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''
+                                                        } ${status === 'PRESENT' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/10 ring-4 ring-emerald-500/5' :
                                                             status === 'ABSENT' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/10 ring-4 ring-rose-500/5' :
                                                                 status === 'LEAVE' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/10 ring-4 blue-500/5' :
                                                                     status === 'LEAVE_PENDING' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/10 ring-4 ring-amber-500/5 cursor-wait' :

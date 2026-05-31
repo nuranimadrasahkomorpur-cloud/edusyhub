@@ -59,6 +59,34 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             if (savedInstitute) {
                 setActiveInstitute(JSON.parse(savedInstitute));
             }
+
+            // Fetch fresh session details from server in the background
+            const refreshSession = async () => {
+                try {
+                    const res = await fetch('/api/auth/session');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.user) {
+                            setUser(data.user);
+                            localStorage.setItem('edusy_session', JSON.stringify(data.user));
+
+                            // Refresh active institute if it exists and details changed
+                            const currentActive = localStorage.getItem('edusy_active_institute');
+                            if (currentActive) {
+                                const parsedActive = JSON.parse(currentActive);
+                                const freshInst = data.user.institutes.find((i: any) => i.id === parsedActive.id);
+                                if (freshInst) {
+                                    setActiveInstitute(freshInst);
+                                    localStorage.setItem('edusy_active_institute', JSON.stringify(freshInst));
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to auto-refresh session:', err);
+                }
+            };
+            refreshSession();
         }
         setIsLoading(false);
     }, []);

@@ -1,13 +1,122 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 import { sendNotification } from '@/utils/notification-utils';
+import { getServerSession } from '@/utils/auth-utils';
+import fs from 'fs';
+import path from 'path';
+
+function writeDebugLog(message: string, data: any) {
+    try {
+        const logDir = 'f:/Edusy User flow/Edusy app/scratch';
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
+        const logPath = path.join(logDir, 'db_debug.txt');
+        const logContent = `[${new Date().toISOString()}] ${message}\n${JSON.stringify(data, null, 2)}\n\n`;
+        fs.appendFileSync(logPath, logContent, 'utf-8');
+    } catch (e) {
+        console.error('Failed to write debug log:', e);
+    }
+}
 
 export async function POST(req: NextRequest) {
     try {
         const { studentId, instituteId, classId, dateString, status, method, remarks } = await req.json();
 
         if (!studentId || !instituteId || !dateString) {
+            writeDebugLog('Missing required fields', { studentId, instituteId, dateString });
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        const session = await getServerSession();
+        writeDebugLog('Mark request details', {
+            studentId,
+            instituteId,
+            classId,
+            dateString,
+            status,
+            sessionUser: session?.user ? { id: session.user.id, email: session.user.email, role: session.user.role } : null
+        });
+
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        let isOwner = false;
+        if (instituteId) {
+            const inst = await prisma.institute.findUnique({
+                where: { id: instituteId },
+                select: { adminIds: true }
+            });
+            writeDebugLog('Institute admin check', {
+                inst,
+                userId: session.user.id
+            });
+            if (inst && inst.adminIds) {
+                isOwner = inst.adminIds.some((id: any) => {
+                    if (!id) return false;
+                    const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+                    return idStr === session.user.id.toString();
+                });
+            }
+        }
+
+        writeDebugLog('isOwner evaluation', { isOwner });
+
+        if (!isOwner) {
+            const profile = await prisma.teacherProfile.findUnique({
+                where: {
+                    userId_instituteId: {
+                        userId: session.user.id,
+                        instituteId: instituteId
+                    }
+                }
+            });
+
+            writeDebugLog('Teacher Profile check for non-owner', {
+                profile: profile ? { id: profile.id, userId: profile.userId, instituteId: profile.instituteId, status: profile.status, isAdmin: profile.isAdmin } : null
+            });
+
+            if (!profile || profile.status !== 'ACTIVE') {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+
+            if (!profile.isAdmin) {
+                let finalClassId = classId;
+                if (!finalClassId) {
+                    const student = await prisma.user.findUnique({
+                        where: { id: studentId },
+                        select: { metadata: true }
+                    });
+                    finalClassId = (student?.metadata as any)?.classId;
+                }
+
+                if (!finalClassId) {
+                    return NextResponse.json({ error: 'Class ID not found' }, { status: 400 });
+                }
+
+                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                if (!assignedClassIds.includes(finalClassId.toString())) {
+                    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                }
+
+                const classPermissions = (profile.permissions as any)?.classWise?.[finalClassId];
+                let hasPerm = false;
+                if (classPermissions) {
+                    if (typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {
+                        hasPerm = classPermissions.permissions.includes('canTakeAttendance');
+                    } else if (Array.isArray(classPermissions)) {
+                        hasPerm = classPermissions.includes('canTakeAttendance');
+                    } else if (typeof classPermissions === 'object') {
+                        hasPerm = classPermissions.canTakeAttendance === true;
+                    } else if (typeof classPermissions === 'string') {
+                        hasPerm = classPermissions === 'canTakeAttendance';
+                    }
+                }
+                if (!hasPerm) {
+                    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                }
+            }
         }
 
         // Create update object

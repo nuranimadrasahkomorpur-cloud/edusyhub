@@ -45,6 +45,23 @@ export const ScrollableTabs: React.FC<ScrollableTabsProps> = ({
         return () => window.removeEventListener('resize', checkScroll);
     }, [items]);
 
+    // Center active tab
+    useEffect(() => {
+        if (!scrollRef.current) return;
+        const container = scrollRef.current;
+        const activeBtn = container.querySelector(`[data-tab-id="${selectedId}"]`) as HTMLElement;
+        if (activeBtn) {
+            const containerWidth = container.offsetWidth;
+            const btnOffset = activeBtn.offsetLeft;
+            const btnWidth = activeBtn.offsetWidth;
+
+            container.scrollTo({
+                left: btnOffset - (containerWidth / 2) + (btnWidth / 2),
+                behavior: 'smooth'
+            });
+        }
+    }, [selectedId, items]);
+
     // Drag Logic
     const onMouseDown = (e: React.MouseEvent) => {
         if (!scrollRef.current) return;
@@ -105,7 +122,7 @@ export const ScrollableTabs: React.FC<ScrollableTabsProps> = ({
             {/* Scroll Container */}
             <div
                 ref={scrollRef}
-                className={`flex w-full items-center gap-2 overflow-x-auto scrollbar-hide py-2 px-1 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                className={`flex w-full items-center gap-2 overflow-x-auto scrollbar-hide no-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-2 px-1 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                 onMouseDown={onMouseDown}
                 onMouseLeave={onMouseLeave}
                 onMouseUp={onMouseUp}
@@ -122,7 +139,7 @@ export const ScrollableTabs: React.FC<ScrollableTabsProps> = ({
 
                     if (renderItem) {
                         return (
-                            <div key={item.id} onClick={() => !isDragging && onSelect(item.id)}>
+                            <div key={item.id} data-tab-id={item.id} onClick={() => !isDragging && onSelect(item.id)}>
                                 {renderItem(item, isSelected)}
                             </div>
                         )
@@ -136,6 +153,7 @@ export const ScrollableTabs: React.FC<ScrollableTabsProps> = ({
                     return (
                         <button
                             key={item.id}
+                            data-tab-id={item.id}
                             onClick={() => {
                                 if (!isDragging) onSelect(item.id);
                             }}

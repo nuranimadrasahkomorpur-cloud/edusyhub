@@ -442,6 +442,14 @@ export default function StudentManagementPage() {
                 const data = JSON.parse(text);
                 const list = Array.isArray(data) ? data : [];
                 setStudents(list);
+                
+                // Sync selectedStudent state with the updated record from the database
+                if (selectedStudent) {
+                    const updated = list.find((s: any) => s.id === selectedStudent.id);
+                    if (updated) {
+                        setSelectedStudent(updated);
+                    }
+                }
             } catch (e) {
                 console.error('Invalid JSON from fetchStudents:', text.substring(0, 100));
                 setStudents([]);
@@ -1207,11 +1215,11 @@ export default function StudentManagementPage() {
 
 
             {/* Utility Bar (Search, Action, Library, Public Link) */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <div className="flex items-center gap-2 sm:gap-3 w-full">
+                <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
-                        className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none text-slate-800 font-medium shadow-sm placeholder:text-slate-400"
+                        className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none text-slate-800 text-sm sm:text-base font-medium shadow-sm placeholder:text-slate-400"
                         placeholder="খুঁজুন..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -1219,34 +1227,50 @@ export default function StudentManagementPage() {
                 </div>
 
                 {activeTab === 'students' && (
-                    <div className="flex p-1 bg-slate-100/50 rounded-2xl border border-slate-200/50 backdrop-blur-sm self-center lg:self-auto shrink-0">
-                        {[
-                            { id: 'ACTIVE', label: 'সক্রিয়', count: students.filter(s => (s.metadata?.status || 'ACTIVE') === 'ACTIVE').length },
-                            { id: 'INACTIVE', label: 'নিষ্ক্রিয়', count: students.filter(s => s.metadata?.status === 'INACTIVE').length },
-                            { id: 'ALL', label: 'সকল', count: null }
-                        ].map((opt) => {
-                            const showCount = opt.id !== 'ALL' && (statusFilter === opt.id || statusFilter === 'ALL');
-                            return (
-                            <button
-                                key={opt.id}
-                                onClick={() => setStatusFilter(opt.id as any)}
-                                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                                    statusFilter === opt.id
-                                        ? 'bg-white text-[#045c84] shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-600'
-                                }`}
-                            >
-                                {opt.label}
-                                {showCount && (
-                                    <span className={`px-1.5 py-0.5 rounded-md text-[8px] ${
-                                        statusFilter === opt.id ? 'bg-[#045c84]/10 text-[#045c84]' : 'bg-slate-200 text-slate-500'
-                                    }`}>
-                                        {opt.count}
+                    <details className="relative shrink-0 group z-[200]">
+                        <summary className="list-none flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none">
+                            <span className="flex items-center gap-1.5">
+                                {statusFilter === 'ACTIVE' && <><span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:inline-block"></span> সক্রিয়</>}
+                                {statusFilter === 'INACTIVE' && <><span className="w-2 h-2 rounded-full bg-rose-500 hidden sm:inline-block"></span> নিষ্ক্রিয়</>}
+                                {statusFilter === 'ALL' && <><span className="w-2 h-2 rounded-full bg-slate-500 hidden sm:inline-block"></span> সকল</>}
+                            </span>
+                            <ChevronDown size={16} className="text-slate-400 group-open:rotate-180 transition-transform" />
+                        </summary>
+                        
+                        {/* Dropdown Menu */}
+                        <div className="absolute right-0 top-[calc(100%+0.5rem)] w-40 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-[210] flex flex-col gap-1">
+                            {[
+                                { id: 'ACTIVE', label: 'সক্রিয়', count: students.filter(s => (s.metadata?.status || 'ACTIVE') === 'ACTIVE').length, dot: 'bg-emerald-500' },
+                                { id: 'INACTIVE', label: 'নিষ্ক্রিয়', count: students.filter(s => s.metadata?.status === 'INACTIVE').length, dot: 'bg-rose-500' },
+                                { id: 'ALL', label: 'সকল', count: null, dot: 'bg-slate-500' }
+                            ].map((opt) => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => {
+                                        setStatusFilter(opt.id as any);
+                                        // Close dropdown by removing open attribute from closest details
+                                        const details = document.querySelector('details.group[open]') as HTMLDetailsElement;
+                                        if (details) details.removeAttribute('open');
+                                    }}
+                                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${
+                                        statusFilter === opt.id ? 'bg-[#045c84]/10 text-[#045c84]' : 'text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${opt.dot}`}></span>
+                                        {opt.label}
                                     </span>
-                                )}
-                            </button>
-                        )})}
-                    </div>
+                                    {opt.count !== null && (
+                                        <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${
+                                            statusFilter === opt.id ? 'bg-[#045c84]/20 text-[#045c84]' : 'bg-slate-100 text-slate-500'
+                                        }`}>
+                                            {opt.count}
+                                        </span>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </details>
                 )}
             </div>
 

@@ -105,7 +105,7 @@ export default function InstituteSwitcher() {
                 <div className="space-y-2">
                     {user.institutes.map((inst: any) => {
                         const isActive = activeInstitute?.id === inst.id;
-                        const isOwner = inst.isOwner !== false; // Default to true if not set
+                        const isOwner = inst.isOwner === true || (inst.adminIds || []).includes(user?.id);
 
                         return (
                             <div

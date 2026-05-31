@@ -24,10 +24,22 @@ export async function GET(req: NextRequest) {
             filter.dateString = { $gte: startDate, $lte: endDate };
         }
 
-        const { role: baseRole, teacherProfiles } = session.user as any;
-        const isTeacher = baseRole === 'TEACHER' || (teacherProfiles && (teacherProfiles || []).some((p: any) => p.instituteId === instituteId));
+        let isOwner = false;
+        if (instituteId) {
+            const inst = await prisma.institute.findUnique({
+                where: { id: instituteId },
+                select: { adminIds: true }
+            });
+            if (inst && inst.adminIds) {
+                isOwner = inst.adminIds.some((id: any) => {
+                    if (!id) return false;
+                    const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+                    return idStr === session.user.id.toString();
+                });
+            }
+        }
 
-        if (isTeacher) {
+        if (!isOwner) {
             const profile = await prisma.teacherProfile.findUnique({
                 where: {
                     userId_instituteId: {

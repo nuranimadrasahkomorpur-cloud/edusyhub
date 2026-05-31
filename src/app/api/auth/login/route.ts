@@ -227,7 +227,10 @@ export async function POST(req: Request) {
                 phone: user.phone,
                 metadata: user.metadata,
                 defaultInstituteId: user.defaultInstituteId,
-                institutes: user.institutes || [],
+                institutes: (user.institutes || []).map((inst: any) => ({
+                    ...inst,
+                    isOwner: (inst.adminIds || []).map((id: any) => id.toString()).includes(userId.toString())
+                })),
                 teacherProfiles: user.teacherProfiles || []
             }
         });

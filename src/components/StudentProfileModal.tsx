@@ -927,28 +927,31 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                             </div>
                         )}
 
-                        {activeTab === 'face' && isAdmin && (
-                            <div className="animate-fade-in space-y-6">
-                                <div className="bg-[#F0FDF4] p-8 rounded-[32px] text-center border-2 border-emerald-50 relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/30 rounded-full -mr-16 -mt-16 group-hover:scale-125 transition-transform" />
-                                    <div className="relative z-10 flex flex-col items-center gap-4">
-                                        <div className={`w-20 h-20 rounded-3xl flex items-center justify-center transition-all duration-500 ${student.metadata?.hasFaceId ? 'bg-emerald-500 text-white rotate-6' : 'bg-white text-slate-300 shadow-sm'}`}>
-                                            <ScanFace size={40} className={student.metadata?.hasFaceId ? 'animate-pulse' : ''} />
+                        {activeTab === 'face' && isAdmin && (() => {
+                            const hasFaceId = student.metadata?.hasFaceId || (student.faceDescriptor && student.faceDescriptor.length > 0);
+                            return (
+                                <div className="animate-fade-in space-y-6">
+                                    <div className="bg-[#F0FDF4] p-8 rounded-[32px] text-center border-2 border-emerald-50 relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/30 rounded-full -mr-16 -mt-16 group-hover:scale-125 transition-transform" />
+                                        <div className="relative z-10 flex flex-col items-center gap-4">
+                                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center transition-all duration-500 ${hasFaceId ? 'bg-emerald-500 text-white rotate-6' : 'bg-white text-slate-300 shadow-sm'}`}>
+                                                <ScanFace size={40} className={hasFaceId ? 'animate-pulse' : ''} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-xl font-black text-slate-800">ফেস আইডি স্ট্যাটাস</h4>
+                                                <p className={`text-[11px] font-bold mt-1 uppercase tracking-widest ${hasFaceId ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                                    {hasFaceId ? 'সফলভাবে নিবন্ধিত' : 'নিবন্ধিত নয়'}
+                                                </p>
+                                            </div>
+                                            <button onClick={() => setShowEnrollment(true)} className="mt-2 px-8 py-3 bg-white text-[#045c84] text-[11px] font-black rounded-2xl shadow-xl shadow-emerald-500/10 border-2 border-emerald-100/50 hover:bg-emerald-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
+                                                <Disc size={16} className="text-emerald-500" />
+                                                নতুন ডাটা যুক্ত করুন
+                                            </button>
                                         </div>
-                                        <div>
-                                            <h4 className="text-xl font-black text-slate-800">ফেস আইডি স্ট্যাটাস</h4>
-                                            <p className={`text-[11px] font-bold mt-1 uppercase tracking-widest ${student.metadata?.hasFaceId ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                                {student.metadata?.hasFaceId ? 'সফলভাবে নিবন্ধিত' : 'নিবন্ধিত নয়'}
-                                            </p>
-                                        </div>
-                                        <button onClick={() => setShowEnrollment(true)} className="mt-2 px-8 py-3 bg-white text-[#045c84] text-[11px] font-black rounded-2xl shadow-xl shadow-emerald-500/10 border-2 border-emerald-100/50 hover:bg-emerald-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
-                                            <Disc size={16} className="text-emerald-500" />
-                                            নতুন ডাটা যুক্ত করুন
-                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -1226,7 +1229,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
 
             {showEnrollment && (
                 <div className="fixed inset-0 z-[10000]">
-                    <FaceEnrollment studentId={student.id} studentName={student.name} profilePhoto={student.metadata?.studentPhoto} onClose={() => setShowEnrollment(false)} onSuccess={() => { setShowEnrollment(false); onUpdate?.(); }} />
+                    <FaceEnrollment studentId={student.id} studentName={student.name} onClose={() => setShowEnrollment(false)} onSuccess={() => { setShowEnrollment(false); onUpdate?.(); }} />
                 </div>
             )}
 

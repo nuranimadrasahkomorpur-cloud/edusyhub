@@ -25,6 +25,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from './SessionProvider';
 import { usePerformance } from '../hooks/usePerformance';
+import { Lock } from 'lucide-react';
 
 interface EnrolledStudent {
     id: string;
@@ -46,7 +47,26 @@ type AttendanceStatus = 'IDLE' | 'LOADING_MODELS' | 'LOADING_STUDENTS' | 'INITIA
 let modelsLoadingPromise: Promise<void> | null = null;
 
 export default function FRSAttendanceScanner({ classId: propClassId, selectedDate }: { classId?: string, selectedDate?: string }) {
-    const { activeInstitute } = useSession();
+    const { activeInstitute, user, activeRole } = useSession();
+
+    // Permission check — same logic as ManualAttendance
+    const hasAttendancePerm = useMemo(() => {
+        const isOwner = (activeInstitute?.adminIds || []).includes(user?.id) || activeInstitute?.isOwner === true;
+        if (isOwner) return true;
+        if (!user?.teacherProfiles || !activeInstitute?.id) return false;
+        const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute.id);
+        if (!profile || profile.status !== 'ACTIVE') return false;
+        if (profile.isAdmin === true) return true;
+        const classId = propClassId;
+        if (!classId || classId === 'all') return profile.isAdmin === true;
+        const classPerm = profile.permissions?.classWise?.[classId];
+        if (!classPerm) return false;
+        if (typeof classPerm === 'object' && Array.isArray(classPerm.permissions)) return classPerm.permissions.includes('canTakeAttendance');
+        if (Array.isArray(classPerm)) return classPerm.includes('canTakeAttendance');
+        if (typeof classPerm === 'object') return classPerm.canTakeAttendance === true;
+        return false;
+    }, [user, activeInstitute, propClassId]);
+
     const [classes, setClasses] = useState<any[]>([]);
     const [selectedClassId, setSelectedClassId] = useState<string>(propClassId || '');
     const [students, setStudents] = useState<EnrolledStudent[]>([]);
@@ -1405,13 +1425,6 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                                                             <Users size={16} />
                                                                         )}
                                                                     </div>
-                                                                    {s.stats && (
-                                                                        <div className={`absolute -bottom-1 -right-1 min-w-[34px] h-4 rounded-full border-2 border-white flex items-center justify-center text-[7px] font-black text-white px-0.5 ${s.stats.percentage >= 80 ? 'bg-emerald-500' :
-                                                                            s.stats.percentage >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                                                                            }`}>
-                                                                            {s.stats.presentDays}/{s.stats.totalSchoolDays || s.stats.totalDays}
-                                                                        </div>
-                                                                    )}
                                                                 </div>
                                                                 <div className="min-w-0">
                                                                     <p className="text-[13px] font-black text-slate-700 truncate leading-none mb-1 uppercase italic tracking-tight">{s.name}</p>
@@ -1461,13 +1474,6 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                                                     <Users size={16} />
                                                                 )}
                                                             </div>
-                                                            {s.stats && (
-                                                                <div className={`absolute -bottom-1 -right-1 min-w-[34px] h-4 rounded-full border-2 border-white flex items-center justify-center text-[7px] font-black text-white px-0.5 ${s.stats.percentage >= 80 ? 'bg-emerald-500' :
-                                                                    s.stats.percentage >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                                                                    }`}>
-                                                                    {s.stats.presentDays}/{s.stats.totalSchoolDays || s.stats.totalDays}
-                                                                </div>
-                                                            )}
                                                         </div>
                                                         <div className="min-w-0">
                                                             <p className="text-[13px] font-black text-slate-400 truncate leading-none mb-1 uppercase italic tracking-tight">{s.name}</p>

@@ -34,7 +34,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             select: { role: true }
         });
 
-        const isOwner = institute?.adminIds.includes(adminId);
+        const isOwner = institute?.adminIds ? institute.adminIds.some((id: any) => {
+            if (!id) return false;
+            const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+            return idStr === adminId.toString();
+        }) : false;
         const isSuperAdmin = requester?.role === 'SUPER_ADMIN';
 
         if (!institute || (!isOwner && !isSuperAdmin)) {
@@ -83,9 +87,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
                     }, {});
 
                     classIds.forEach((cId: string) => {
-                        const perms = permissions.classWise[cId];
-                        if (perms && perms.length > 0) {
-                            const permLabels = perms.map((p: string) => LABELS[p] || p).join(', ');
+                        const classConfig = permissions.classWise[cId];
+                        let permsArray: string[] = [];
+                        if (Array.isArray(classConfig)) {
+                            permsArray = classConfig;
+                        } else if (classConfig && typeof classConfig === 'object') {
+                            permsArray = classConfig.permissions || [];
+                        }
+
+                        if (permsArray.length > 0) {
+                            const permLabels = permsArray.map((p: string) => LABELS[p] || p).join(', ');
                             permissionDetails.push(`${classMap[cId] || 'Unknown Class'}: ${permLabels}`);
                         }
                     });

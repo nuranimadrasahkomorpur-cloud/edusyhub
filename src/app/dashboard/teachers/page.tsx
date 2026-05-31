@@ -151,8 +151,8 @@ export default function TeachersPage() {
         return matchesSearch && matchesClass;
     });
 
-    const canManageTeachers = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN';
-    const isOwner = user?.role === 'SUPER_ADMIN' || (activeInstitute?.adminIds || []).includes(user?.id) || activeInstitute?.isOwner === true;
+    const isOwner = (activeInstitute?.adminIds || []).includes(user?.id) || activeInstitute?.isOwner === true;
+    const canManageTeachers = isOwner;
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-fade-in-up font-bengali min-h-screen pb-20">

@@ -15,9 +15,6 @@ export async function POST(req: NextRequest) {
         // For thousands of students, a filtered linear scan is extremely fast in Node.js.
         const students = await prisma.user.findMany({
             where: {
-                faceDescriptor: {
-                    isEmpty: false
-                },
                 role: 'STUDENT'
             },
             select: {

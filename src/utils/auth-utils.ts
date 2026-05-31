@@ -24,8 +24,12 @@ export async function getServerSession() {
                 name: true,
                 teacherProfiles: {
                     select: {
+                        id: true,
                         instituteId: true,
-                        status: true
+                        status: true,
+                        isAdmin: true,
+                        permissions: true,
+                        assignedClassIds: true
                     }
                 }
             }

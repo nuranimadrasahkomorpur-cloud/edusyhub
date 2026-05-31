@@ -19,7 +19,12 @@ export async function POST(
             updates: [
                 {
                     q: { _id: { $oid: id } },
-                    u: { $set: { faceDescriptor: descriptor } }
+                    u: { 
+                        $set: { 
+                            faceDescriptor: descriptor,
+                            "metadata.hasFaceId": true
+                        } 
+                    }
                 }
             ]
         });

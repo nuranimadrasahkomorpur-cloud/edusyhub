@@ -27,12 +27,24 @@ export async function DELETE(
             return NextResponse.json({ error: 'Institute not found' }, { status: 404 });
         }
 
-        if (!institute.adminIds.includes(adminId)) {
+        const isAdmin = institute.adminIds.some((id: any) => {
+            if (!id) return false;
+            const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+            return idStr === adminId.toString();
+        });
+
+        if (!isAdmin) {
             return NextResponse.json({ error: 'Unauthorized - Only admins can remove teachers' }, { status: 403 });
         }
 
         // 2. Cannot remove another admin
-        if (institute.adminIds.includes(teacherId)) {
+        const isTeacherAdmin = institute.adminIds.some((id: any) => {
+            if (!id) return false;
+            const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+            return idStr === teacherId.toString();
+        });
+
+        if (isTeacherAdmin) {
             return NextResponse.json({ error: 'Cannot remove an admin using this endpoint' }, { status: 403 });
         }
 

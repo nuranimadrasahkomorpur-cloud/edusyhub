@@ -15,7 +15,8 @@ import {
     Calendar as CalendarIcon,
     LayoutGrid,
     Search,
-    Building2
+    Building2,
+    Lock
 } from 'lucide-react';
 import { useSession } from './SessionProvider';
 import dynamic from 'next/dynamic';
@@ -42,17 +43,19 @@ export default function AttendanceDashboard() {
         }
     }, [activeInstitute]);
 
-    const isAdminUser = activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (() => {
+    const isOwner = (activeInstitute?.adminIds || []).includes(user?.id) || activeInstitute?.isOwner === true;
+
+    const isAdminUser = isOwner || (() => {
         const profile = (user?.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
-        return profile?.isAdmin === true;
+        return profile?.status === 'ACTIVE' && profile?.isAdmin === true;
     })();
 
     const canTakeAttendanceForClass = (classId: string) => {
         if (!classId) {
             return isAdminUser;
         }
-        if (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN') return true;
-        if (activeRole === 'TEACHER' && user?.teacherProfiles) {
+        if (isOwner) return true;
+        if (user?.teacherProfiles) {
             const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
             if (!profile || profile.status !== 'ACTIVE') return false;
             if (profile.isAdmin) return true;
@@ -82,8 +85,8 @@ export default function AttendanceDashboard() {
 
     const isClassAssignedToTeacher = (classId: string) => {
         if (!classId) return isAdminUser;
-        if (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN') return true;
-        if (activeRole === 'TEACHER' && user?.teacherProfiles) {
+        if (isOwner) return true;
+        if (user?.teacherProfiles) {
             const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
             if (!profile || profile.status !== 'ACTIVE') return false;
             if (profile.isAdmin) return true;
@@ -101,13 +104,15 @@ export default function AttendanceDashboard() {
             const res = await fetch(`/api/admin/classes?instituteId=${activeInstitute?.id}`);
             if (res.ok) {
                 const data = await res.json();
-                const filteredClasses = Array.isArray(data) ? data.filter((c: any) => isClassAssignedToTeacher(c.id)) : [];
-                setClasses(filteredClasses);
+                const allClasses = Array.isArray(data) ? data : [];
+                setClasses(allClasses);
                 if (selectedClassId === null) {
                     if (isAdminUser) {
                         setSelectedClassId('');
-                    } else if (filteredClasses.length > 0) {
-                        setSelectedClassId(filteredClasses[0].id);
+                    } else if (allClasses.length > 0) {
+                        // Find first class that is permitted, fallback to first class in list
+                        const firstPermitted = allClasses.find((c: any) => canTakeAttendanceForClass(c.id));
+                        setSelectedClassId(firstPermitted ? firstPermitted.id : allClasses[0].id);
                     } else {
                         setSelectedClassId('');
                     }
@@ -136,10 +141,28 @@ export default function AttendanceDashboard() {
         }
     }, [hasPermissionForSelectedClass, activeMode]);
 
+    // Center active tab when it changes
+    useEffect(() => {
+        if (scrollRef.current) {
+            const container = scrollRef.current;
+            const activeBtn = container.querySelector(`[data-class-id="${selectedClassId || ''}"]`) as HTMLElement;
+            if (activeBtn) {
+                const containerWidth = container.offsetWidth;
+                const btnOffset = activeBtn.offsetLeft;
+                const btnWidth = activeBtn.offsetWidth;
+
+                container.scrollTo({
+                    left: btnOffset - (containerWidth / 2) + (btnWidth / 2),
+                    behavior: 'smooth'
+                });
+            }
+        }
+    }, [selectedClassId, classes]);
+
     return (
         <div className="min-h-screen bg-[#f8fafc] font-bengali">
             {/* Ultra-Compact Header */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 md:px-6 py-2 shadow-sm">
+            <div className="bg-white border-b border-slate-200 sticky top-0 z-50 px-4 md:px-6 py-2 shadow-sm">
                 <div className="max-w-[1640px] mx-auto flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-[#045c84] rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-900/10 shrink-0">
@@ -202,25 +225,20 @@ export default function AttendanceDashboard() {
                     {/* Class Tabs - Horizontal Scrolling */}
                     <div className="bg-white border-b border-slate-200 relative group overflow-hidden">
                         <div className="max-w-[1640px] mx-auto px-4 py-3 relative">
-                            <button
-                                onClick={() => scroll('left')}
-                                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white border border-slate-100 shadow-md flex items-center justify-center text-slate-400 hover:text-slate-900 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-
                             <div
                                 ref={scrollRef}
-                                className="flex items-center gap-3 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap"
+                                className="flex items-center gap-3 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap relative"
                             >
-                                {isAdminUser && (
+                                {user && (
                                     <button
+                                        data-class-id=""
                                         onClick={() => setSelectedClassId('')}
-                                        className={`px-8 py-3.5 rounded-2xl text-base transition-all duration-300 relative ${selectedClassId === ''
+                                        className={`px-8 py-3.5 rounded-2xl text-base transition-all duration-300 relative flex items-center gap-2 ${selectedClassId === ''
                                             ? 'bg-[#045c84]/10 text-[#045c84] font-black border-2 border-[#045c84]/40 shadow-lg shadow-[#045c84]/5'
                                             : 'bg-[#f1f5f9] text-slate-500 font-bold border-2 border-transparent hover:bg-slate-200 hover:text-slate-700'
                                             }`}
                                     >
+                                        {!isAdminUser && <Lock size={14} className="text-red-500 shrink-0" />}
                                         সব ক্লাস
                                         {selectedClassId === '' && (
                                             <motion.div
@@ -230,32 +248,31 @@ export default function AttendanceDashboard() {
                                         )}
                                     </button>
                                 )}
-                                {classes.map((cls) => (
-                                    <button
-                                        key={cls.id}
-                                        onClick={() => setSelectedClassId(cls.id)}
-                                        className={`px-8 py-3.5 rounded-2xl text-base transition-all duration-300 relative ${selectedClassId === cls.id
-                                            ? 'bg-[#045c84]/10 text-[#045c84] font-black border-2 border-[#045c84]/40 shadow-lg shadow-[#045c84]/5'
-                                            : 'bg-[#f1f5f9] text-slate-500 font-bold border-2 border-transparent hover:bg-slate-200 hover:text-slate-700'
+                                {classes.map((cls) => {
+                                    const hasPerm = canTakeAttendanceForClass(cls.id);
+                                    return (
+                                        <button
+                                            key={cls.id}
+                                            data-class-id={cls.id}
+                                            onClick={() => setSelectedClassId(cls.id)}
+                                            className={`px-8 py-3.5 rounded-2xl text-base transition-all duration-300 relative flex items-center gap-2 ${
+                                                selectedClassId === cls.id
+                                                    ? 'bg-[#045c84]/10 text-[#045c84] font-black border-2 border-[#045c84]/40 shadow-lg shadow-[#045c84]/5'
+                                                    : 'bg-[#f1f5f9] text-slate-500 font-bold border-2 border-transparent hover:bg-slate-200 hover:text-slate-700'
                                             }`}
-                                    >
-                                        {cls.name}
-                                        {selectedClassId === cls.id && (
-                                            <motion.div
-                                                layoutId="activeTab"
-                                                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#045c84] rounded-full"
-                                            />
-                                        )}
-                                    </button>
-                                ))}
+                                        >
+                                            {!hasPerm && <Lock size={14} className="text-red-500 shrink-0" />}
+                                            {cls.name}
+                                            {selectedClassId === cls.id && (
+                                                <motion.div
+                                                    layoutId="activeTab"
+                                                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[#045c84] rounded-full"
+                                                />
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
-
-                            <button
-                                onClick={() => scroll('right')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white border border-slate-100 shadow-md flex items-center justify-center text-slate-400 hover:text-slate-900 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                <ChevronRight size={20} />
-                            </button>
                         </div>
                     </div>
 

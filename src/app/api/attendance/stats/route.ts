@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/utils/db';
+import { getServerSession } from '@/utils/auth-utils';
 
 export async function GET(req: NextRequest) {
     try {
@@ -11,9 +12,65 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Missing instituteId' }, { status: 400 });
         }
 
+        const session = await getServerSession();
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const filter: any = { instituteId: { $oid: instituteId } };
-        if (classId && classId !== 'all' && classId !== '') {
-            filter.classId = { $oid: classId };
+
+        let isOwner = false;
+        if (instituteId) {
+            const inst = await prisma.institute.findUnique({
+                where: { id: instituteId },
+                select: { adminIds: true }
+            });
+            if (inst && inst.adminIds) {
+                isOwner = inst.adminIds.some((id: any) => {
+                    if (!id) return false;
+                    const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+                    return idStr === session.user.id.toString();
+                });
+            }
+        }
+
+        if (!isOwner) {
+            const profile = await prisma.teacherProfile.findUnique({
+                where: {
+                    userId_instituteId: {
+                        userId: session.user.id,
+                        instituteId: instituteId
+                    }
+                }
+            });
+
+            if (!profile || profile.status !== 'ACTIVE') {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+
+            if (!profile.isAdmin) {
+                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                if (assignedClassIds.length === 0) {
+                    return NextResponse.json([]); // Return empty stats list
+                }
+
+                if (classId && classId !== 'all' && classId !== '') {
+                    if (!assignedClassIds.includes(classId)) {
+                        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+                    }
+                    filter.classId = { $oid: classId };
+                } else {
+                    filter.classId = { $in: assignedClassIds.map(id => ({ $oid: id })) };
+                }
+            } else {
+                if (classId && classId !== 'all' && classId !== '') {
+                    filter.classId = { $oid: classId };
+                }
+            }
+        } else {
+            if (classId && classId !== 'all' && classId !== '') {
+                filter.classId = { $oid: classId };
+            }
         }
 
         // Run both aggregations in parallel:

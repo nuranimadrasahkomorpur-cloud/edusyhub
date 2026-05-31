@@ -34,7 +34,7 @@ model User {
   submissions     Submission[] @relation("StudentSubmissions")
   
   // Attendance & FRS
-  faceDescriptor  Float[] 
+  faceDescriptor  Json?
   attendances     Attendance[] @relation("StudentAttendance")
 }
 

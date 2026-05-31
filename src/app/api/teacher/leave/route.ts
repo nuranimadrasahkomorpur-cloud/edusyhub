@@ -20,7 +20,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'Institute not found' }, { status: 404 });
         }
 
-        if (institute.adminIds.includes(userId)) {
+        const isOwner = institute.adminIds.some((id: any) => {
+            if (!id) return false;
+            const idStr = typeof id === 'string' ? id : (id.$oid || id.toString());
+            return idStr === userId.toString();
+        });
+
+        if (isOwner) {
             return NextResponse.json({
                 message: 'Cannot leave an institute you own. Please delete the institute instead.'
             }, { status: 403 });
@@ -69,11 +75,12 @@ export async function POST(req: Request) {
 
             if (instituteData && userData) {
                 // Create notification for each admin
-                for (const adminId of instituteData.adminIds) {
+                for (const rawAdminId of (instituteData.adminIds as any[])) {
+                    const adminIdStr = typeof rawAdminId === 'string' ? rawAdminId : (rawAdminId.$oid || rawAdminId.toString());
                     await (prisma as any).$runCommandRaw({
                         insert: 'Notification',
                         documents: [{
-                            userId: { $oid: adminId },
+                            userId: { $oid: adminIdStr },
                             type: 'TEACHER_LEFT',
                             title: 'শিক্ষক ছেড়ে গেছেন',
                             message: `${userData.name} ${instituteData.name} থেকে চলে গেছেন।`,
