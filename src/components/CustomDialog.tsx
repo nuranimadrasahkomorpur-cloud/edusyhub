@@ -44,7 +44,7 @@ export default function CustomDialog({
                             <h3 className="text-xl font-black text-slate-800 tracking-tight font-bengali">
                                 {title}
                             </h3>
-                            <p className="text-slate-500 leading-relaxed font-medium font-bengali">
+                            <p className="text-slate-500 leading-relaxed font-medium font-bengali whitespace-pre-line">
                                 {message}
                             </p>
                         </div>

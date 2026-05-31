@@ -147,26 +147,29 @@ export default function AttendanceDashboard() {
 
     // Center active tab when it changes
     useEffect(() => {
-        if (scrollRef.current) {
-            const container = scrollRef.current;
-            const activeBtn = container.querySelector(`[data-class-id="${selectedClassId || ''}"]`) as HTMLElement;
-            if (activeBtn) {
-                const containerWidth = container.offsetWidth;
-                const btnOffset = activeBtn.offsetLeft;
-                const btnWidth = activeBtn.offsetWidth;
+        const timer = setTimeout(() => {
+            if (scrollRef.current) {
+                const container = scrollRef.current;
+                const activeBtn = container.querySelector(`[data-class-id="${selectedClassId || ''}"]`) as HTMLElement;
+                if (activeBtn) {
+                    const containerWidth = container.offsetWidth;
+                    const btnOffset = activeBtn.offsetLeft;
+                    const btnWidth = activeBtn.offsetWidth;
 
-                container.scrollTo({
-                    left: btnOffset - (containerWidth / 2) + (btnWidth / 2),
-                    behavior: 'smooth'
-                });
+                    container.scrollTo({
+                        left: btnOffset - (containerWidth / 2) + (btnWidth / 2),
+                        behavior: 'smooth'
+                    });
+                }
             }
-        }
+        }, 100);
+        return () => clearTimeout(timer);
     }, [selectedClassId, classes]);
 
     return (
         <div className="min-h-screen bg-[#f8fafc] font-bengali">
             {/* Ultra-Compact Header */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-50 px-4 md:px-6 py-2 shadow-sm">
+            <div className="bg-white border-b border-slate-200 sticky top-0 z-20 px-4 md:px-6 py-2 shadow-sm">
                 <div className="max-w-[1640px] mx-auto flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-[#045c84] rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-900/10 shrink-0">

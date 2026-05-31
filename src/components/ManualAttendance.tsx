@@ -117,6 +117,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     const [visibleDays, setVisibleDays] = useState<number[]>([]);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
+    const [bulkScope, setBulkScope] = useState<'ALL' | 'UNMARKED'>('ALL');
 
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -223,21 +224,24 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
     // Center active status filter tab when it changes
     useEffect(() => {
-        if (filterScrollRef.current) {
-            const container = filterScrollRef.current;
-            const activeBtn = container.querySelector(`[data-filter-id="${statusFilter}"]`) as HTMLElement;
-            if (activeBtn) {
-                const containerWidth = container.offsetWidth;
-                const btnOffset = activeBtn.offsetLeft;
-                const btnWidth = activeBtn.offsetWidth;
+        const timer = setTimeout(() => {
+            if (filterScrollRef.current) {
+                const container = filterScrollRef.current;
+                const activeBtn = container.querySelector(`[data-filter-id="${statusFilter}"]`) as HTMLElement;
+                if (activeBtn) {
+                    const containerWidth = container.offsetWidth;
+                    const btnOffset = activeBtn.offsetLeft;
+                    const btnWidth = activeBtn.offsetWidth;
 
-                container.scrollTo({
-                    left: btnOffset - (containerWidth / 2) + (btnWidth / 2),
-                    behavior: 'smooth'
-                });
+                    container.scrollTo({
+                        left: btnOffset - (containerWidth / 2) + (btnWidth / 2),
+                        behavior: 'smooth'
+                    });
+                }
             }
-        }
-    }, [statusFilter]);
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [statusFilter, students]);
 
     const openProfileModal = (student: Student, tab: typeof modalTab = 'attendance') => {
         setModalTab(tab);
@@ -432,25 +436,41 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         if (status === 'RESET') return;
 
         const now = new Date().toISOString();
-        const toUpdate: { id: string; status: Student['attendance']; classId?: string }[] = [];
-
-        setStudents(prev => prev.map(s => {
-            if (!isAdmin && s.initialAttendance === 'LEAVE_PENDING') {
-                return s;
+        
+        // Find which students to update based on scope
+        const studentsToUpdate = students.filter(s => {
+            const isUnmarked = (s.initialAttendance === 'ABSENT' && !s.updatedAt) && s.attendance === 'ABSENT';
+            if (bulkScope === 'UNMARKED' && !isUnmarked) {
+                return false;
             }
+            if (!isAdmin && s.initialAttendance === 'LEAVE_PENDING') {
+                return false;
+            }
+            return true;
+        });
 
+        if (studentsToUpdate.length === 0) {
+            showToast('হাজিরা পরিবর্তন করার মতো কোনো শিক্ষার্থী নেই।', 'INFO');
+            return;
+        }
+
+        const toUpdate = studentsToUpdate.map(s => {
             let finalStatus = status;
             if (isTeacher && finalStatus === 'LEAVE') {
                 finalStatus = 'LEAVE_PENDING';
             }
+            return { id: s.id, status: finalStatus, classId: s.classId };
+        });
 
-            toUpdate.push({ id: s.id, status: finalStatus, classId: s.classId });
+        setStudents(prev => prev.map(s => {
+            const target = toUpdate.find(item => item.id === s.id);
+            if (!target) return s;
 
             return {
                 ...s,
-                attendance: finalStatus,
-                initialAttendance: finalStatus, // mark as saved
-                updatedAt: finalStatus !== 'ABSENT' ? now : s.updatedAt
+                attendance: target.status,
+                initialAttendance: target.status,
+                updatedAt: now
             };
         }));
 
@@ -649,7 +669,21 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         const savedStudents = students.filter(s => s.initialAttendance !== 'ABSENT' || s.updatedAt);
         if (savedStudents.length === 0) return;
 
-        if (!await ui.confirm('আপনি কি আজকের সমস্ত হাজিরা রেকর্ড মুছে ফেলতে চান? এটি রিপোর্ট থেকেও মুছে যাবে।')) {
+        const totalSaved = savedStudents.length;
+        const presentCount = savedStudents.filter(s => s.initialAttendance === 'PRESENT').length;
+        const absentCount = savedStudents.filter(s => s.initialAttendance === 'ABSENT').length;
+        const leaveCount = savedStudents.filter(s => s.initialAttendance === 'LEAVE').length;
+        const pendingCount = savedStudents.filter(s => s.initialAttendance === 'LEAVE_PENDING').length;
+
+        const summaryText = `আজকের হাজিরা সামারি:\n\n` +
+            `• মোট রেকর্ড: ${totalSaved}টি\n` +
+            `• উপস্থিত (Present): ${presentCount}টি\n` +
+            `• অনুপস্থিত (Absent): ${absentCount}টি\n` +
+            `• ছুটি (Leave): ${leaveCount}টি\n` +
+            (pendingCount > 0 ? `• অপেক্ষমান (Pending): ${pendingCount}টি\n` : '') +
+            `\nআপনি কি আজকের এই সমস্ত হাজিরা রেকর্ড মুছে ফেলতে চান?\n(এটি রিপোর্ট থেকেও মুছে যাবে।)`;
+
+        if (!await ui.confirm(summaryText)) {
             return;
         }
 
@@ -791,11 +825,35 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     }, [studentsWithStats, searchQuery, statusFilter, sortConfig, activeClassDays]);
 
     const hasChanges = students.some(s => s.attendance !== s.initialAttendance);
+    const savedCount = students.filter(s => s.initialAttendance !== 'ABSENT' || s.updatedAt).length;
 
     return (
         <div className="space-y-6">
             {/* Redesigned Toolbar */}
-            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-40">
+            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-20 relative">
+                {/* Float Save Button at the top-right corner */}
+                {!isReadOnlyAttendance && (
+                    <button
+                        onClick={handleSave}
+                        disabled={saving || loading || !hasChanges}
+                        className={`absolute -top-2.5 -right-2.5 w-9 h-9 rounded-full flex items-center justify-center border-2 border-white shadow-lg transition-all duration-300 z-30 ${
+                            saving
+                                ? 'bg-[#045c84] text-white shadow-[#045c84]/40 cursor-wait'
+                                : hasChanges
+                                    ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/40 cursor-pointer active:scale-95 hover:scale-110'
+                                    : 'bg-emerald-500 text-white shadow-emerald-500/30 cursor-default'
+                        }`}
+                        title={saving ? 'সেভ হচ্ছে...' : hasChanges ? 'পেন্ডিং পরিবর্তন সংরক্ষণ করুন' : 'সংরক্ষিত'}
+                    >
+                        {saving ? (
+                            <Loader2 size={16} className="animate-spin" />
+                        ) : hasChanges ? (
+                            <Save size={16} className="animate-pulse" />
+                        ) : (
+                            <Check size={16} />
+                        )}
+                    </button>
+                )}
                 <div className="flex items-center gap-3">
                     {/* Expanding Search Bar */}
                     <motion.div
@@ -889,26 +947,12 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                         </div>
                     </div>
 
-                    {/* Save Button — hidden when teacher lacks canTakeAttendance */}
-                    {!isReadOnlyAttendance && (
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || loading}
-                            className={`px-8 py-4 rounded-[22px] font-black text-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-xl active:scale-95 shrink-0 ${saving
-                                ? 'bg-slate-100 text-slate-400 shadow-none cursor-not-allowed opacity-70'
-                                : 'bg-[#045c84]/10 text-[#045c84] hover:bg-[#045c84]/20'
-                                }`}
-                        >
-                            {saving ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
-                            <span className={searchFocused ? 'hidden sm:inline' : 'inline'}>{saving ? 'সেভ হচ্ছে...' : 'সেভড'}</span>
-                        </button>
-                    )}
                 </div>
 
                 {/* Interactive Status Tabs - Always in one scrollable row */}
                 <div 
                     ref={filterScrollRef}
-                    className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 relative"
+                    className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1 relative scroll-smooth"
                 >
                     {[
                         { id: 'ALL', label: 'সব', count: students.length, color: 'slate', activeBg: 'bg-slate-800', activeText: 'text-white' },
@@ -937,14 +981,40 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
             {/* Bulk Actions — hide in register mode */}
             {viewMode === 'CARD' && !isReadOnlyAttendance && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-2">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3 px-2 overflow-x-auto no-scrollbar py-1">
+                <div className="flex items-center gap-2 shrink-0">
+                    {/* Bulk Scope Toggle */}
+                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-full text-[10px] font-black mr-1 border border-slate-200/50">
+                        <button
+                            type="button"
+                            onClick={() => setBulkScope('ALL')}
+                            className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap ${
+                                bulkScope === 'ALL'
+                                    ? 'bg-white text-[#045c84] shadow-sm font-black'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            সবাইকে
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setBulkScope('UNMARKED')}
+                            className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap ${
+                                bulkScope === 'UNMARKED'
+                                    ? 'bg-white text-[#045c84] shadow-sm font-black'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            বাকিদের
+                        </button>
+                    </div>
+
                     <button onClick={() => bulkUpdate('PRESENT')} className="px-5 py-2.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-[11px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all">উপস্থিত</button>
                     <button onClick={() => bulkUpdate('ABSENT')} className="px-5 py-2.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100 text-[11px] font-black uppercase hover:bg-rose-500 hover:text-white transition-all">অনুপস্থিত</button>
                     <button onClick={() => bulkUpdate('LEAVE')} className="px-5 py-2.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 text-[11px] font-black uppercase hover:bg-blue-500 hover:text-white transition-all">ছুটি</button>
                 </div>
 
-                <div className="flex items-center gap-3 ml-auto">
+                <div className="flex items-center gap-3 shrink-0 ml-auto">
                     <AnimatePresence>
                         {hasChanges && (
                             <motion.button
@@ -959,14 +1029,14 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                         )}
                     </AnimatePresence>
 
-                    {students.some(s => s.initialAttendance !== 'ABSENT' || s.updatedAt) && (
+                    {savedCount > 0 && (
                         <button
                             onClick={handleClearSaved}
                             disabled={saving}
                             className="px-6 py-2.5 rounded-full text-[11px] font-black uppercase text-slate-500 bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:text-slate-700 transition-all active:scale-95 whitespace-nowrap shadow-sm flex items-center gap-2"
                         >
                             <Trash2 size={12} className="opacity-70" />
-                            <span>আজকের ডাটা মুছুন</span>
+                            <span>আজকের ডাটা মুছুন ({savedCount})</span>
                         </button>
                     )}
                 </div>
@@ -1335,11 +1405,19 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <div className="flex items-center gap-1.5">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
                                                         <span className="text-[10px] font-black text-slate-400 opacity-60">#{student.rollNumber || 'N/A'}</span>
                                                         {classId === '' && student.className && (
                                                             <span className="text-[10px] font-black text-[#045c84] uppercase truncate opacity-50">
                                                                 {student.className}
+                                                            </span>
+                                                        )}
+                                                        {student.stats && (
+                                                            <span className={`whitespace-nowrap text-[10px] font-black px-2 py-0.5 rounded-md leading-tight ${
+                                                                student.stats.percentage >= 80 ? 'bg-emerald-50 text-emerald-600' :
+                                                                student.stats.percentage >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-500'
+                                                            }`}>
+                                                                {student.stats.presentDays}/{student.stats.totalSchoolDays || student.stats.totalDays} দিন
                                                             </span>
                                                         )}
                                                     </div>
@@ -1356,14 +1434,6 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         <div className="flex items-center gap-3 shrink-0">
                                             <div className="flex flex-col items-end gap-1">
                                                 <span className={`text-[9px] font-black uppercase tracking-widest text-${current.color}-600 opacity-70`}>{current.label}</span>
-                                                {student.stats && (
-                                                    <span className={`whitespace-nowrap text-[10px] font-black px-2 py-0.5 rounded-md leading-tight ${
-                                                        student.stats.percentage >= 80 ? 'bg-emerald-50 text-emerald-600' :
-                                                        student.stats.percentage >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-500'
-                                                    }`}>
-                                                        {student.stats.presentDays}/{student.stats.totalSchoolDays || student.stats.totalDays} দিন
-                                                    </span>
-                                                )}
                                                 {isAdmin && status === 'LEAVE_PENDING' ? (
                                                     <div className="flex items-center gap-2">
                                                         <button 
@@ -1401,18 +1471,20 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
 
                                         {/* Segmented Bottom Border */}
-                                        <div className="absolute bottom-0 left-0 right-0 h-1 flex rounded-b-[20px] overflow-hidden">
-                                            <div
-                                                className="h-full bg-emerald-500 transition-all duration-500"
-                                                style={{ width: `${presentPct}%` }}
-                                            />
-                                            <div
-                                                className="h-full bg-rose-500 transition-all duration-500"
-                                                style={{ width: `${absentPct}%` }}
-                                            />
-                                            {total === 0 && (
-                                                <div className="h-full bg-slate-100 w-full" />
-                                            )}
+                                        <div className="absolute bottom-[1px] left-[1px] right-[1px] h-[20px] rounded-b-[19px] overflow-hidden pointer-events-none opacity-60">
+                                            <div className="absolute bottom-0 left-0 right-0 h-[2px]">
+                                                <div
+                                                    className="absolute left-0 bottom-0 h-full bg-emerald-500 transition-all duration-500"
+                                                    style={{ width: `${presentPct}%` }}
+                                                />
+                                                <div
+                                                    className="absolute right-0 bottom-0 h-full bg-rose-500 transition-all duration-500"
+                                                    style={{ width: `${absentPct}%` }}
+                                                />
+                                                {total === 0 && (
+                                                    <div className="absolute inset-0 bg-slate-100" />
+                                                )}
+                                            </div>
                                         </div>
                                     </motion.div>
                                 );
