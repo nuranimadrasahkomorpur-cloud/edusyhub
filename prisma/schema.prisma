@@ -382,6 +382,8 @@ model Transaction {
   instituteId String   @db.ObjectId
   institute   Institute @relation(fields: [instituteId], references: [id])
   
+  receiptNo   String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

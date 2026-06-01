@@ -8,14 +8,17 @@ interface PrintLayoutProps {
     institute?: any;
     children: React.ReactNode;
     date?: string;
+    pageSize?: 'A4' | 'A5';
+    previewOnly?: boolean;
 }
 
-export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD') }: PrintLayoutProps) {
+export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false }: PrintLayoutProps) {
+    const isA5 = pageSize === 'A5';
     return (
-        <div className="print-area bg-white p-8 font-serif text-black border-4 border-double border-slate-300 m-2 min-h-[10.5in]">
+        <div className={`${previewOnly ? '' : 'print-area'} bg-white p-5 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 ${isA5 ? 'min-h-[210mm] max-w-[148mm] mx-auto text-[16px]' : 'min-h-[10.5in] text-[16px]'}`}>
             {/* Institute Header */}
-            <div className="flex flex-col items-center text-center space-y-3 mb-8 border-b-2 border-slate-800 pb-6">
-                <div className="flex items-center gap-4">
+            <div className="flex justify-center mb-0 border-b-2 border-slate-800 pb-4 relative">
+                <div className="flex items-center gap-3">
                     {institute?.logo ? (
                         <img src={institute.logo} alt={institute.name} className="w-20 h-20 object-contain" />
                     ) : (
@@ -24,26 +27,32 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                         </div>
                     )}
                     <div className="text-left">
-                        <h1 className="text-4xl font-black uppercase tracking-tight text-slate-900 leading-tight">
+                        <h1 className="text-[24px] font-black uppercase tracking-tight text-slate-900 leading-tight">
                             {institute?.name || 'Education Institute'}
                         </h1>
-                        <p className="text-lg font-bold text-slate-600">
+                        <p className="text-[16px] font-bold text-slate-600">
                             {institute?.address || 'Address not provided'}
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Document Title & Date */}
-            <div className="flex justify-between items-center mb-10">
-                <div className="bg-slate-900 text-white px-8 py-2 rounded-lg font-black text-xl uppercase tracking-widest">
+            {/* Document Title overlapping the break line */}
+            <div className="flex justify-center mb-4" style={{ marginTop: '-18px' }}>
+                <div className="inline-block bg-slate-900 text-white px-6 py-1 rounded-full font-black text-[18px] uppercase tracking-widest relative z-10 border-[6px] border-white">
                     {title}
                 </div>
-                <div className="text-right">
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">তারিখ (Date)</p>
-                    <p className="text-lg font-black text-slate-800">{date}</p>
-                </div>
             </div>
+
+            {/* Date */}
+            {date && (
+                <div className="flex justify-end mb-4">
+                    <div className="text-right">
+                        <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">তারিখ (Date)</p>
+                        <p className="text-[16px] font-black text-slate-800">{date}</p>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="flex-1">
@@ -51,29 +60,33 @@ export default function PrintLayout({ title, institute, children, date = new Dat
             </div>
 
             {/* Signature Area */}
-            <div className="mt-20 pt-10 grid grid-cols-3 gap-10 text-center items-end">
-                <div className="space-y-2 border-t border-slate-300 pt-2">
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">অভিভাবকের স্বাক্ষর</p>
-                    <p className="text-[10px] text-slate-300">(Guardian's Signature)</p>
+            <div className="mt-10 pt-6 grid grid-cols-3 gap-6 text-center items-end">
+                <div className="space-y-1 border-t border-slate-300 pt-2">
+                    <p className="text-[14px] font-bold text-slate-600 uppercase tracking-widest">অভিভাবকের স্বাক্ষর</p>
+                    <p className="text-[10px] text-slate-400">(Guardian's Signature)</p>
                 </div>
-                <div className="space-y-2 border-t border-slate-300 pt-2">
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">হিসাবরক্ষকের স্বাক্ষর</p>
-                    <p className="text-[10px] text-slate-300">(Accountant's Signature)</p>
+                <div className="space-y-1 border-t border-slate-300 pt-2">
+                    <p className="text-[14px] font-bold text-slate-600 uppercase tracking-widest">হিসাবরক্ষকের স্বাক্ষর</p>
+                    <p className="text-[10px] text-slate-400">(Accountant's Signature)</p>
                 </div>
-                <div className="space-y-2 border-t border-slate-300 pt-2">
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">অধ্যক্ষের স্বাক্ষর</p>
-                    <p className="text-[10px] text-slate-300">(Principal's Signature)</p>
+                <div className="space-y-1 border-t border-slate-300 pt-2">
+                    <p className="text-[14px] font-bold text-slate-600 uppercase tracking-widest">অধ্যক্ষের স্বাক্ষর</p>
+                    <p className="text-[10px] text-slate-400">(Principal's Signature)</p>
                 </div>
             </div>
 
             {/* Footer Notice */}
-            <div className="mt-12 text-center text-[10px] text-slate-400 italic">
+            <div className="mt-6 text-center text-[10px] text-slate-500 italic">
                 <p>This is an electronically generated official document from {institute?.name || 'Edusy'}.</p>
                 <p>Powered by Edusy - Software for Educational Institutions</p>
             </div>
 
             <style jsx global>{`
                 @media print {
+                    @page {
+                        size: ${pageSize} portrait;
+                        margin: 10mm;
+                    }
                     body * {
                         visibility: hidden;
                     }
@@ -87,7 +100,7 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                         width: 100%;
                         height: 100%;
                         margin: 0;
-                        padding: 2rem;
+                        padding: 10mm;
                         border: none;
                     }
                     .no-print {

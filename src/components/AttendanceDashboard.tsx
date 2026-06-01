@@ -59,7 +59,7 @@ export default function AttendanceDashboard() {
         if (isOwner) return true;
         if (user?.teacherProfiles) {
             const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
-            if (!profile || profile.status !== 'ACTIVE') return false;
+            if (!profile || profile.status === 'REJECTED') return false;
             if (profile.isAdmin) return true;
             if (!profile.permissions?.classWise) return false;
 
@@ -91,7 +91,7 @@ export default function AttendanceDashboard() {
         if (isOwner) return true;
         if (user?.teacherProfiles) {
             const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute?.id);
-            if (!profile || profile.status !== 'ACTIVE') return false;
+            if (!profile || profile.status === 'REJECTED') return false;
             if (profile.isAdmin) return true;
             
             // Check if class is in assignedClassIds or has class-wise permission config

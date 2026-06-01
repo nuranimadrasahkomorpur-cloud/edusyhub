@@ -77,7 +77,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         if (!user?.teacherProfiles || !activeInstitute?.id) return false;
         
         const profile = (user.teacherProfiles || []).find((p: any) => p.instituteId === activeInstitute.id);
-        if (!profile || profile.status !== 'ACTIVE') return false;
+        if (!profile || profile.status === 'REJECTED') return false;
         if (profile.isAdmin === true) return true;
         
         const targetClassId = getCleanId(classId);
@@ -830,7 +830,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     return (
         <div className="space-y-6">
             {/* Redesigned Toolbar */}
-            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-20 relative">
+            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-40 relative">
                 {/* Float Save Button at the top-right corner */}
                 {!isReadOnlyAttendance && (
                     <button
@@ -1107,7 +1107,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                             <thead>
                                 <tr className="bg-[#045c84] text-white select-none">
                                     <th 
-                                        className="sticky top-0 left-0 z-30 bg-[#045c84] text-center px-3 py-3 font-black text-[10px] uppercase tracking-widest w-10 border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
+                                        className="sticky top-0 left-0 z-30 bg-[#045c84] text-center px-1.5 py-2 font-black text-[10px] uppercase tracking-widest w-8 border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
                                         onClick={() => handleSort('roll')}
                                     >
                                         <div className="flex items-center justify-center gap-1">
@@ -1116,7 +1116,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
                                     </th>
                                     <th 
-                                        className="sticky top-0 left-10 z-30 bg-[#045c84] text-left px-3 py-3 font-black text-[10px] uppercase tracking-widest min-w-[150px] border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
+                                        className="sticky top-0 left-8 z-30 bg-[#045c84] text-left px-2 py-2 font-black text-[10px] uppercase tracking-widest min-w-[140px] border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
                                         onClick={handleNameIdSort}
                                     >
                                         <div className="flex items-center gap-1.5">
@@ -1141,7 +1141,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                             <th
                                                 key={day}
                                                 onClick={() => handleSort(`date_${dayStr}`)}
-                                                className={`sticky top-0 z-20 py-2 font-black min-w-[70px] sm:min-w-[44px] text-center border-r border-white/10 cursor-pointer hover:bg-[#034a6a] ${
+                                                className={`sticky top-0 z-20 py-1.5 font-black min-w-[40px] sm:min-w-[34px] text-center border-r border-white/10 cursor-pointer hover:bg-[#034a6a] ${
                                                     isToday ? 'bg-amber-400 text-slate-900 hover:bg-amber-500' : 'bg-[#045c84]'
                                                 }`}
                                             >
@@ -1158,7 +1158,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         );
                                     })}
                                     <th 
-                                        className="sticky top-0 z-20 bg-[#045c84] text-center px-2 py-3 font-black text-[10px] uppercase tracking-widest w-16 border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
+                                        className="sticky top-0 z-20 bg-[#045c84] text-center px-1.5 py-2 font-black text-[10px] uppercase tracking-widest w-12 border-r border-white/10 cursor-pointer hover:bg-[#034a6a]"
                                         onClick={() => handleSort('totalP')}
                                     >
                                         <div className="flex items-center justify-center gap-1">
@@ -1167,7 +1167,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
                                     </th>
                                     <th 
-                                        className="sticky top-0 z-20 bg-[#045c84] text-center px-2 py-3 font-black text-[10px] uppercase tracking-widest w-16 cursor-pointer hover:bg-[#034a6a]"
+                                        className="sticky top-0 z-20 bg-[#045c84] text-center px-1.5 py-2 font-black text-[10px] uppercase tracking-widest w-12 cursor-pointer hover:bg-[#034a6a]"
                                         onClick={() => handleSort('percentage')}
                                     >
                                         <div className="flex items-center justify-center gap-1">
@@ -1189,15 +1189,15 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 } hover:bg-blue-50/40`}
                                             >
                                                 {/* SL / Roll */}
-                                                <td className={`sticky left-0 z-10 px-3 py-2 font-black text-slate-400 text-center border-r border-slate-100 ${
+                                                <td className={`sticky left-0 z-10 px-1.5 py-1.5 font-black text-slate-400 text-center border-r border-slate-100 ${
                                                     idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                                                 }`}>{student.assignedRoll}</td>
                                                 {/* Name & ID */}
-                                                <td className={`sticky left-10 z-10 px-3 py-2 font-bold text-slate-700 border-r border-slate-100 ${
+                                                <td className={`sticky left-8 z-10 px-2 py-1.5 font-bold text-slate-700 border-r border-slate-100 ${
                                                     idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                                                 }`}>
-                                                    <span className="block truncate max-w-[150px]">{student.name}</span>
-                                                    <span className="block text-[9px] text-slate-400 font-medium">ID: {student.metadata?.studentId || 'N/A'}</span>
+                                                    <span className="block truncate max-w-[130px] text-[16px] leading-tight">{student.name}</span>
+                                                    <span className="block text-[9px] text-slate-400 font-medium leading-none mt-0.5">ID: {student.metadata?.studentId || 'N/A'}</span>
                                                 </td>
                                                 {/* Day cells */}
                                                 {monthDays.map(day => {
@@ -1243,7 +1243,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                                     e.preventDefault();
                                                                 }
                                                             }}
-                                                            className={`py-2 text-center border-r border-slate-100 font-black text-[10px] ${
+                                                            className={`px-1 py-1 text-center border-r border-slate-100 font-black text-[10px] ${
                                                                 isReadOnlyAttendance ? 'opacity-30 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-blue-100/50'
                                                             } focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#045c84] focus:bg-blue-50 transition-colors ${
                                                                 isToday ? 'ring-1 ring-inset ring-amber-300 bg-amber-50/60' : ''
@@ -1256,10 +1256,10 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                     );
                                                 })}
                                                 {/* Summary */}
-                                                <td className="px-2 py-2 text-center font-black text-emerald-600 border-l border-slate-100">
+                                                <td className="px-1 py-1.5 text-center font-black text-emerald-600 border-l border-slate-100 text-[11px]">
                                                     {presentCount}/{activeClassDays}
                                                 </td>
-                                                <td className="px-2 py-2 text-center font-black">
+                                                <td className="px-1 py-1.5 text-center font-black">
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${
                                                         activeClassDays > 0 && (presentCount/activeClassDays) >= 0.8 ? 'bg-emerald-100 text-emerald-700' :
                                                         activeClassDays > 0 && (presentCount/activeClassDays) >= 0.5 ? 'bg-amber-100 text-amber-700' :
@@ -1350,8 +1350,10 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 </div>
                                             </div>
                                             <div className="flex flex-col min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <h4 className="text-[15px] font-black text-slate-800 truncate mb-0.5 cursor-pointer hover:text-[#045c84]" onClick={() => setSelectedStudentForModal(student)}>{student.name}</h4>
+                                                <div className="flex items-start justify-between w-full">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <h4 className="text-[15px] font-black text-slate-800 truncate mb-0.5 cursor-pointer hover:text-[#045c84]" onClick={() => setSelectedStudentForModal(student)}>{student.name}</h4>
+                                                    </div>
                                                     <div className="relative">
                                                         <button
                                                             onClick={(e) => {
@@ -1406,14 +1408,22 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[10px] font-black text-slate-400 opacity-60">#{student.rollNumber || 'N/A'}</span>
+                                                        <span className="text-[10px] font-black text-slate-400 opacity-60">#{student.assignedRoll}</span>
                                                         {classId === '' && student.className && (
                                                             <span className="text-[10px] font-black text-[#045c84] uppercase truncate opacity-50">
                                                                 {student.className}
                                                             </span>
                                                         )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                        {status !== 'ABSENT' && attendanceTime && (
+                                                            <div className="flex items-center gap-1">
+                                                                <Clock size={9} className="text-slate-300" />
+                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">{attendanceTime}</span>
+                                                            </div>
+                                                        )}
                                                         {student.stats && (
-                                                            <span className={`whitespace-nowrap text-[10px] font-black px-2 py-0.5 rounded-md leading-tight ${
+                                                            <span className={`w-fit whitespace-nowrap text-[9px] font-black px-1.5 py-0.5 rounded-md leading-tight ${
                                                                 student.stats.percentage >= 80 ? 'bg-emerald-50 text-emerald-600' :
                                                                 student.stats.percentage >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-500'
                                                             }`}>
@@ -1421,12 +1431,6 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {status !== 'ABSENT' && attendanceTime && (
-                                                        <div className="flex items-center gap-1 mt-0.5">
-                                                            <Clock size={9} className="text-slate-300" />
-                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">{attendanceTime}</span>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -1471,20 +1475,15 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
 
                                         {/* Segmented Bottom Border */}
-                                        <div className="absolute bottom-[1px] left-[1px] right-[1px] h-[20px] rounded-b-[19px] overflow-hidden pointer-events-none opacity-60">
-                                            <div className="absolute bottom-0 left-0 right-0 h-[2px]">
-                                                <div
-                                                    className="absolute left-0 bottom-0 h-full bg-emerald-500 transition-all duration-500"
-                                                    style={{ width: `${presentPct}%` }}
-                                                />
-                                                <div
-                                                    className="absolute right-0 bottom-0 h-full bg-rose-500 transition-all duration-500"
-                                                    style={{ width: `${absentPct}%` }}
-                                                />
-                                                {total === 0 && (
-                                                    <div className="absolute inset-0 bg-slate-100" />
-                                                )}
-                                            </div>
+                                        <div className="absolute inset-x-0 bottom-0 h-[20px] pointer-events-none opacity-40">
+                                            {total === 0 ? (
+                                                <div className="absolute inset-0 border-b-[1.5px] border-slate-200 rounded-b-[20px]" />
+                                            ) : (
+                                                <>
+                                                    <div className="absolute inset-0 border-b-[1.5px] border-rose-500 rounded-b-[20px] transition-all duration-500" style={{ clipPath: `inset(0 0 0 ${100 - absentPct}%)` }} />
+                                                    <div className="absolute inset-0 border-b-[1.5px] border-emerald-500 rounded-b-[20px] transition-all duration-500" style={{ clipPath: `inset(0 ${100 - presentPct}% 0 0)` }} />
+                                                </>
+                                            )}
                                         </div>
                                     </motion.div>
                                 );

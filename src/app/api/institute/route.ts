@@ -65,11 +65,35 @@ export async function GET(req: Request) {
                 }
             } else {
                 console.log('User not found or no institutes via raw fetch');
-                return NextResponse.json([]);
             }
         }
 
-        console.log(`GET /api/institute found ${instituteIds.length} IDs via RAW:`, instituteIds);
+        // Auto-heal: upgrade any PENDING teacher profiles to ACTIVE
+        try {
+            await (prisma as any).teacherProfile.updateMany({
+                where: { userId: userId, status: 'PENDING' },
+                data: { status: 'ACTIVE' }
+            });
+        } catch (e) {
+            console.error('Auto-heal teacher profile error:', e);
+        }
+
+        // Fetch any institutes where user is an ACTIVE teacher
+        try {
+            const teacherProfiles = await (prisma as any).teacherProfile.findMany({
+                where: { userId: userId, status: 'ACTIVE' },
+                select: { instituteId: true }
+            });
+            if (teacherProfiles && teacherProfiles.length > 0) {
+                const teacherInstIds = teacherProfiles.map((tp: any) => tp.instituteId);
+                instituteIds = Array.from(new Set([...instituteIds, ...teacherInstIds]));
+                console.log(`✅ Added ${teacherInstIds.length} instituteIds via TeacherProfile`);
+            }
+        } catch (tpError) {
+            console.warn('⚠️ Failed to fetch teacher profiles:', tpError);
+        }
+
+        console.log(`GET /api/institute found ${instituteIds.length} total IDs:`, instituteIds);
 
         if (instituteIds.length === 0) {
             return NextResponse.json([]);

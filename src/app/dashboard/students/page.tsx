@@ -128,6 +128,11 @@ export default function StudentManagementPage() {
 
     const [classes, setClasses] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
+    
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [activeTab, setActiveTab] = useState<'students' | 'applications' | 'books' | 'teachers'>('students');
     const [activeFormTab, setActiveFormTab] = useState<'profile' | 'account'>('profile');
 
@@ -158,6 +163,7 @@ export default function StudentManagementPage() {
     const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
     const [credentialsData, setCredentialsData] = useState<any>(null);
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
+    const [visibleCount, setVisibleCount] = useState(50);
 
     useEffect(() => {
         setMounted(true);
@@ -428,21 +434,35 @@ export default function StudentManagementPage() {
         }
     };
 
-    const fetchStudents = async () => {
+    const fetchStudents = async (pageToFetch = 1) => {
         if (!activeInstitute?.id) return;
-        setLoading(true);
+
+        if (pageToFetch === 1) {
+            setLoading(true);
+            setHasMore(true);
+        } else {
+            setIsLoadingMore(true);
+        }
+        
         try {
-            const classFilter = selectedClassId !== 'all' ? `&classId=${selectedClassId}` : '';
-            const groupFilter = selectedGroupId !== 'all' ? `&groupId=${selectedGroupId}` : '';
             const instituteFilter = activeInstitute?.id ? `&instituteId=${activeInstitute.id}` : '';
             const statusFilterQuery = activeTab === 'applications' ? '&admissionStatus=PENDING' : `&status=${statusFilter}`;
 
-            const res = await fetch(`/api/admin/users?role=STUDENT&search=${debouncedSearch}${classFilter}${groupFilter}${instituteFilter}${statusFilterQuery}`);
+            // Fetch students without class/group filters so we can filter locally instantly
+            const res = await fetch(`/api/admin/users?role=STUDENT&search=${debouncedSearch}${instituteFilter}${statusFilterQuery}&page=${pageToFetch}&limit=1000`);
             const text = await res.text();
             try {
                 const data = JSON.parse(text);
                 const list = Array.isArray(data) ? data : [];
-                setStudents(list);
+                
+                if (pageToFetch === 1) {
+                    setStudents(list);
+                } else {
+                    setStudents(prev => [...prev, ...list]);
+                }
+                
+                setHasMore(list.length === 20);
+                setCurrentPage(pageToFetch);
                 
                 // Sync selectedStudent state with the updated record from the database
                 if (selectedStudent) {
@@ -453,12 +473,16 @@ export default function StudentManagementPage() {
                 }
             } catch (e) {
                 console.error('Invalid JSON from fetchStudents:', text.substring(0, 100));
-                setStudents([]);
+                if (pageToFetch === 1) setStudents([]);
             }
         } catch (error) {
             console.error('Fetch students error:', error);
         } finally {
-            setLoading(false);
+            if (pageToFetch === 1) {
+                setLoading(false);
+            } else {
+                setIsLoadingMore(false);
+            }
         }
     };
 
@@ -480,14 +504,18 @@ export default function StudentManagementPage() {
 
     // Fetch data immediately when filters or tab change
     useEffect(() => {
-        if (!activeInstitute?.id) return;
+        setVisibleCount(50);
+        if (!activeInstitute?.id) {
+            setLoading(false);
+            return;
+        }
 
         if (activeTab === 'books') {
             fetchBooks();
         } else if (activeTab === 'students' || activeTab === 'applications') {
-            fetchStudents();
+            fetchStudents(1);
         }
-    }, [debouncedSearch, activeInstitute?.id, selectedClassId, selectedGroupId, activeTab, statusFilter]);
+    }, [debouncedSearch, activeInstitute?.id, activeTab, statusFilter]);
 
     // Strict Owner/SuperAdmin check
     const isOwner = activeRole === 'SUPER_ADMIN' || (activeInstitute?.adminIds || []).includes(currentUser?.id) || activeInstitute?.isOwner === true;
@@ -841,9 +869,23 @@ export default function StudentManagementPage() {
                     type: 'success'
                 });
                 setIsAddModalOpen(false);
-                setEditingStudent(null);
                 setFormData({ name: '', email: '', password: '', metadata: {} });
-                fetchStudents();
+                
+                if (editingStudent) {
+                    // Update locally
+                    setStudents(prev => prev.map(s => s.id === editingStudent.id ? { 
+                        ...s, 
+                        name: payload.name || s.name,
+                        phone: payload.phone || s.phone,
+                        email: payload.email || s.email,
+                        metadata: payload.metadata || s.metadata,
+                        faceDescriptor: payload.faceDescriptor || s.faceDescriptor
+                    } : s));
+                } else {
+                    // Fetch for new student to get DB ID
+                    fetchStudents();
+                }
+                setEditingStudent(null);
             } else {
                 const data = await res.json();
                 setToast({ message: data.message || 'ব্যর্থ হয়েছে।', type: 'error' });
@@ -956,7 +998,7 @@ export default function StudentManagementPage() {
             const res = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setToast({ message: 'শিক্ষার্থী ডিলিট হয়েছে!', type: 'success' });
-                fetchStudents();
+                setStudents(prev => prev.filter(s => s.id !== id));
             }
         } catch (error) {
             setToast({ message: 'ডিলিট করতে ক্রুটি হয়েছে।', type: 'error' });
@@ -986,7 +1028,11 @@ export default function StudentManagementPage() {
 
             if (res && res.ok) {
                 setToast({ message: `আবেদনটি ${status === 'APPROVED' ? 'মঞ্জুর' : 'বাতিল'} করা হয়েছে।`, type: 'success' });
-                fetchStudents();
+                if (status === 'APPROVED') {
+                    setStudents(prev => prev.map(s => s.id === studentId ? { ...s, metadata: { ...s.metadata, admissionStatus: 'APPROVED', status: 'ACTIVE' } } : s));
+                } else {
+                    setStudents(prev => prev.filter(s => s.id !== studentId));
+                }
                 fetchPendingCount();
             }
         } catch (error) {
@@ -1066,8 +1112,8 @@ export default function StudentManagementPage() {
             if (res.ok) {
                 setToast({ message: 'শিক্ষার্থীদের গ্রুপে যোগ করা হয়েছে!', type: 'success' });
                 setIsStudentSelectionModalOpen(false);
+                setStudents(prev => prev.map(s => selectedStudentsForGroup.includes(s.id) ? { ...s, metadata: { ...s.metadata, groupId: selectedGroupId } } : s));
                 setSelectedStudentsForGroup([]);
-                fetchStudents();
             } else {
                 setToast({ message: 'ব্যর্থ হয়েছে।', type: 'error' });
             }
@@ -1097,7 +1143,7 @@ export default function StudentManagementPage() {
 
             if (res.ok) {
                 setToast({ message: 'গ্রুপ থেকে বাদ দেওয়া হয়েছে!', type: 'success' });
-                fetchStudents();
+                setStudents(prev => prev.map(s => s.id === student.id ? { ...s, metadata: updatedMetadata } : s));
             } else {
                 setToast({ message: 'ব্যর্থ হয়েছে।', type: 'error' });
             }
@@ -1488,12 +1534,21 @@ export default function StudentManagementPage() {
                     ) : students.length === 0 ? (
                         <div className="py-20 text-center flex flex-col items-center justify-center text-slate-400">
                             <Users className="mb-4 opacity-20" size={64} />
-                            <span className="text-lg font-medium">কোন শিক্ষার্থী পাওয়া যায়নি।</span>
+                            <span className="text-lg font-medium">
+                                {activeTab === 'students' && selectedClassId === 'all' && !debouncedSearch 
+                                    ? 'শিক্ষার্থী দেখতে একটি ক্লাস নির্বাচন করুন অথবা সার্চ করুন।' 
+                                    : 'কোন শিক্ষার্থী পাওয়া যায়নি।'}
+                            </span>
                         </div>
                     ) : (
+                        <>
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-32">
                             {students
                                 .filter(s => {
+                                    // Local class and group filtering
+                                    if (selectedClassId !== 'all' && s.metadata?.classId !== selectedClassId) return false;
+                                    if (selectedGroupId !== 'all' && s.metadata?.groupId !== selectedGroupId) return false;
+
                                     if (activeRole === 'TEACHER') {
                                         if (allowedClasses.length > 0) {
                                             const studentClassId = s.metadata?.classId;
@@ -1511,7 +1566,7 @@ export default function StudentManagementPage() {
                                             setIsProfileModalOpen(true);
                                         }}
                                         className="bg-white p-3.5 rounded-[24px] border border-slate-100 shadow-sm hover:shadow-lg hover:border-blue-100 transition-all flex items-center gap-3 md:gap-4 relative group cursor-pointer animate-staggered-fade-in w-full min-w-[280px] overflow-hidden"
-                                        style={{ animationDelay: `${index * 50}ms` }}
+                                        style={{ animationDelay: `${(index % 15) * 30}ms` }}
                                     >
                                         {/* Avatar */}
                                         {(() => {
@@ -1525,11 +1580,19 @@ export default function StudentManagementPage() {
 
                                             return (
                                                 <div className="relative shrink-0">
-                                                    <div className={`w-12 h-12 rounded-full ${bgColor} border-2 border-white shadow-md overflow-hidden flex items-center justify-center text-white font-bold text-lg group-hover:scale-110 transition-transform duration-300`}>
-                                                        {s.metadata?.studentPhoto ? (
-                                                            <img src={s.metadata.studentPhoto} alt={s.name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            s.name?.[0] || 'S'
+                                                    <div className={`w-12 h-12 rounded-full ${bgColor} border-2 border-white shadow-md overflow-hidden flex items-center justify-center text-white font-bold text-lg group-hover:scale-110 transition-transform duration-300 relative`}>
+                                                        {/* Initial Character Placeholder */}
+                                                        <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
+                                                        
+                                                        {/* Lazy Loaded Image */}
+                                                        {s.metadata?.studentPhoto && (
+                                                            <img 
+                                                                src={s.metadata.studentPhoto} 
+                                                                alt={s.name} 
+                                                                loading="lazy"
+                                                                className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
+                                                                onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
+                                                            />
                                                         )}
                                                     </div>
                                                     {/* Status Dot */}
@@ -1618,6 +1681,35 @@ export default function StudentManagementPage() {
                                     </div>
                                 ))}
                         </div>
+                        {students.filter(s => {
+                            // Local class and group filtering
+                            if (selectedClassId !== 'all' && s.metadata?.classId !== selectedClassId) return false;
+                            if (selectedGroupId !== 'all' && s.metadata?.groupId !== selectedGroupId) return false;
+
+                            if (activeRole === 'TEACHER') {
+                                if (allowedClasses.length > 0) {
+                                    const studentClassId = s.metadata?.classId;
+                                    return allowedClasses.some(c => c.id === studentClassId);
+                                }
+                                return false;
+                            }
+                            return true;
+                        }).length > 0 && hasMore && (
+                            <div className="flex justify-center mt-8 pb-10">
+                                <button 
+                                    onClick={() => fetchStudents(currentPage + 1)} 
+                                    disabled={isLoadingMore}
+                                    className="px-6 py-2.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white rounded-xl font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {isLoadingMore ? (
+                                        <><Loader2 className="animate-spin" size={18} /> লোড হচ্ছে...</>
+                                    ) : (
+                                        <>আরও লোড করুন <ChevronDown size={18} /></>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </>
                     )
                 ) : activeTab === 'books' ? (
                     <div className="relative">
@@ -1675,7 +1767,7 @@ export default function StudentManagementPage() {
                             : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
                             }`}>
                             {books.filter(b => b && b.id).map((book, index) => (
-                                <div key={book.id} className="animate-staggered-fade-in" style={{ animationDelay: `${index * 40}ms` }}>
+                                <div key={book.id} className="animate-staggered-fade-in" style={{ animationDelay: `${(index % 15) * 30}ms` }}>
                                     <BookCard
                                         book={book}
                                         onDelete={handleBookDelete}
@@ -1733,7 +1825,7 @@ export default function StudentManagementPage() {
 
                             return filteredTeachers.length > 0 ? (
                                 filteredTeachers.map((teacher: any, index: number) => (
-                                    <div key={teacher.id} className="animate-staggered-fade-in" style={{ animationDelay: `${index * 60}ms` }}>
+                                    <div key={teacher.id} className="animate-staggered-fade-in" style={{ animationDelay: `${(index % 15) * 30}ms` }}>
                                         <TeacherCard
                                             teacher={teacher}
                                             currentUser={currentUser}
@@ -1754,7 +1846,7 @@ export default function StudentManagementPage() {
                 ) : (
                     <div className="space-y-3">
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-32">
-                            {students.map((s, index) => (
+                            {students.slice(0, visibleCount).map((s, index) => (
                                 <div
                                     key={s.id}
                                     onClick={() => {
@@ -1773,7 +1865,7 @@ export default function StudentManagementPage() {
                                         setIsAddModalOpen(true);
                                     }}
                                     className="bg-white p-3.5 rounded-[24px] border border-slate-100 shadow-sm hover:shadow-lg hover:border-blue-100 transition-all flex items-center gap-3 md:gap-4 relative group cursor-pointer animate-staggered-fade-in w-full min-w-[280px]"
-                                    style={{ animationDelay: `${index * 50}ms` }}
+                                    style={{ animationDelay: `${(index % 15) * 30}ms` }}
                                 >
                                     {(() => {
                                         const colors = ['bg-orange-500', 'bg-yellow-400', 'bg-teal-500', 'bg-emerald-500', 'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500'];
@@ -1862,6 +1954,13 @@ export default function StudentManagementPage() {
                                 </div>
                             ))}
                         </div>
+                        {students.length > visibleCount && (
+                            <div className="flex justify-center mt-8 pb-10">
+                                <button onClick={() => setVisibleCount(v => v + 50)} className="px-6 py-2.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white rounded-xl font-bold transition-all flex items-center gap-2">
+                                    আরও লোড করুন <ChevronDown size={18} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )
                 }
@@ -3118,7 +3217,23 @@ export default function StudentManagementPage() {
                 isOpen={isProfileModalOpen}
                 onClose={() => setIsProfileModalOpen(false)}
                 student={selectedStudent}
-                onUpdate={fetchStudents}
+                onUpdate={async () => {
+                    if (selectedStudent?.id) {
+                        try {
+                            const res = await fetch(`/api/admin/users?id=${selectedStudent.id}`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                const updatedStudent = Array.isArray(data) ? data[0] : data;
+                                if (updatedStudent) {
+                                    setStudents((prev: any[]) => prev.map(s => s.id === updatedStudent.id ? { ...s, ...updatedStudent } : s));
+                                    setSelectedStudent((prev: any) => prev?.id === updatedStudent.id ? { ...prev, ...updatedStudent } : prev);
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Failed to fetch updated student", e);
+                        }
+                    }
+                }}
                 onEdit={canManageClass(selectedStudent?.metadata?.classId) ? (s, context) => {
                     setIsProfileModalOpen(false);
                     setEditingStudent(s);

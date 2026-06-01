@@ -42,6 +42,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     const [status, setStatus] = useState<'IDLE' | 'LOADING_MODELS' | 'READY' | 'CAPTURING' | 'SAVING' | 'SUCCESS' | 'ERROR'>('IDLE');
     const [currentStep, setCurrentStep] = useState<'LEFT' | 'MIDDLE' | 'RIGHT' | 'DONE'>('LEFT');
     const [capturedMiddle, setCapturedMiddle] = useState<number[] | null>(null);
+    const [capturedMiddleImageBase64, setCapturedMiddleImageBase64] = useState<string | null>(null);
     const [capturedLeft, setCapturedLeft] = useState<number[] | null>(null);
     const [capturedRight, setCapturedRight] = useState<number[] | null>(null);
     const [isStepLocked, setIsStepLocked] = useState(false);
@@ -50,6 +51,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState(0);
     const [isUsingPhoto, setIsUsingPhoto] = useState(false);
+    const [isCameraActive, setIsCameraActive] = useState(false);
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
     const { isLowCapacity } = usePerformance();
 
@@ -116,6 +118,8 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
             });
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
+                // Important: wait for video to start playing to hide fallback
+                videoRef.current.onplaying = () => setIsCameraActive(true);
             }
         } catch (err: any) {
             console.error('Error accessing camera:', err);
@@ -130,6 +134,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     };
 
     const stopCamera = () => {
+        setIsCameraActive(false);
         if (videoRef.current && videoRef.current.srcObject) {
             const stream = videoRef.current.srcObject as MediaStream;
             stream.getTracks().forEach(track => track.stop());
@@ -158,6 +163,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
             });
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
+                videoRef.current.onplaying = () => setIsCameraActive(true);
             }
         } catch (err: any) {
             console.error('Error accessing camera:', err);
@@ -211,8 +217,8 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
             const landmarks = detections.landmarks;
             const box = detections.detection.box;
 
-            // Check confidence (75%+)
-            if (score < 0.75) {
+            // Check confidence
+            if (score < 0.50) {
                 setError('ছবিটি যথেষ্ট পরিষ্কার নয়। দয়া করে পর্যাপ্ত আলোতে ভালো ক্যামেরা ব্যবহার করুন।');
                 setStatus('READY');
                 clearCurrentPreview();
@@ -394,10 +400,94 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
         }
     };
 
-    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const fileToBase64 = (f: File) => new Promise<string>((res) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.readAsDataURL(f);
+    });
 
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        if (files.length > 1) {
+            // Batch processing mode
+            setIsUsingPhoto(true);
+            setProgress(10);
+            setStatus('CAPTURING');
+            setError(null);
+            
+            try {
+                let leftDesc: number[] | null = null;
+                let middleDesc: number[] | null = null;
+                let rightDesc: number[] | null = null;
+                
+                let leftPreview: string | null = null;
+                let middlePreview: string | null = null;
+                let rightPreview: string | null = null;
+                
+                let middleImageBase64: string | null = null;
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    setProgress(10 + (i / files.length) * 50);
+                    const img = await faceapi.bufferToImage(file);
+                    const detections = await faceapi
+                        .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.5 }))
+                        .withFaceLandmarks()
+                        .withFaceDescriptor();
+                        
+                    if (detections && detections.detection.score >= 0.50) {
+                        const orientation = getFaceOrientation(detections.landmarks);
+                        const desc = Array.from(detections.descriptor);
+                        const previewUrl = URL.createObjectURL(file);
+                        
+                        if (orientation === 'LEFT' && !leftDesc) {
+                            leftDesc = desc;
+                            leftPreview = previewUrl;
+                        } else if (orientation === 'MIDDLE' && !middleDesc) {
+                            middleDesc = desc;
+                            middlePreview = previewUrl;
+                            middleImageBase64 = await fileToBase64(file);
+                        } else if (orientation === 'RIGHT' && !rightDesc) {
+                            rightDesc = desc;
+                            rightPreview = previewUrl;
+                        }
+                    }
+                }
+                
+                if (leftDesc) { setCapturedLeft(leftDesc); setPreviewLeft(leftPreview); previewsRef.current.left = leftPreview; }
+                if (middleDesc) { 
+                    setCapturedMiddle(middleDesc); 
+                    setPreviewMiddle(middlePreview); 
+                    previewsRef.current.middle = middlePreview; 
+                    if (middleImageBase64) setCapturedMiddleImageBase64(middleImageBase64);
+                }
+                if (rightDesc) { setCapturedRight(rightDesc); setPreviewRight(rightPreview); previewsRef.current.right = rightPreview; }
+                
+                if (leftDesc && middleDesc && rightDesc) {
+                    setProgress(90);
+                    await saveFaceDescriptors([leftDesc, middleDesc, rightDesc], middleImageBase64 || undefined);
+                } else {
+                    setError('সবগুলো দিক (বাম, ডান, সোজা) সফলভাবে সনাক্ত করা যায়নি। অনুগ্রহ করে অনুপস্থিত ছবিগুলো আলাদাভাবে আপলোড করুন।');
+                    if (!leftDesc) setCurrentStep('LEFT');
+                    else if (!middleDesc) setCurrentStep('MIDDLE');
+                    else if (!rightDesc) setCurrentStep('RIGHT');
+                    else setCurrentStep('DONE');
+                    setStatus('READY');
+                }
+            } catch (err) {
+                 setError('ছবিগুলো প্রসেস করতে সমস্যা হয়েছে।');
+                 setStatus('READY');
+            } finally {
+                 setIsUsingPhoto(false);
+                 if (uploadInputRef.current) uploadInputRef.current.value = '';
+            }
+            return;
+        }
+
+        // Single upload fallback
+        const file = files[0];
         // Generate and set preview for current step
         const previewUrl = URL.createObjectURL(file);
         if (currentStep === 'LEFT') {
@@ -406,6 +496,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
         } else if (currentStep === 'MIDDLE') {
             setPreviewMiddle(previewUrl);
             previewsRef.current.middle = previewUrl;
+            setCapturedMiddleImageBase64(await fileToBase64(file));
         } else if (currentStep === 'RIGHT') {
             setPreviewRight(previewUrl);
             previewsRef.current.right = previewUrl;
@@ -417,13 +508,16 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     };
 
 
-    const saveFaceDescriptors = async (descriptors: number[][]) => {
+    const saveFaceDescriptors = async (descriptors: number[][], middleImageBase64Override?: string) => {
         try {
             setStatus('SAVING');
             const response = await fetch(`/api/students/${studentId}/face`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ descriptor: descriptors }),
+                body: JSON.stringify({ 
+                    descriptor: descriptors,
+                    middleImageBase64: middleImageBase64Override || capturedMiddleImageBase64
+                }),
             });
 
             if (!response.ok) throw new Error('Failed to save face data');
@@ -459,6 +553,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     const handleEnroll = () => {
         setError(null);
         setCapturedMiddle(null);
+        setCapturedMiddleImageBase64(null);
         setCapturedLeft(null);
         setCapturedRight(null);
         setCurrentStep('LEFT');
@@ -559,7 +654,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                     }
                 }
 
-                if (detections && detections.detection.score >= 0.88) {
+                if (detections && detections.detection.score >= 0.65) {
                     const orientation = getFaceOrientation(detections.landmarks);
                     setDetectedOrientation(orientation);
                     
@@ -599,6 +694,22 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                             }
                         } catch (err) {
                             console.warn('Duplicate check failed');
+                        }
+
+                        // Capture clean frame for profile picture if needed
+                        if (videoRef.current) {
+                            const tempCanvas = document.createElement('canvas');
+                            tempCanvas.width = videoRef.current.videoWidth;
+                            tempCanvas.height = videoRef.current.videoHeight;
+                            const tCtx = tempCanvas.getContext('2d');
+                            if (tCtx) {
+                                if (facingMode === 'user') {
+                                    tCtx.translate(tempCanvas.width, 0);
+                                    tCtx.scale(-1, 1);
+                                }
+                                tCtx.drawImage(videoRef.current, 0, 0);
+                                setCapturedMiddleImageBase64(tempCanvas.toDataURL('image/jpeg', 0.8));
+                            }
                         }
 
                         setCapturedMiddle(Array.from(detections.descriptor));
@@ -697,6 +808,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                     ref={uploadInputRef}
                     onChange={handlePhotoUpload}
                     accept="image/*"
+                    multiple
                     className="hidden"
                 />
                 {/* Header */}
@@ -780,7 +892,10 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                     <Sparkles size={14} className="text-[#045c84]" />
                                     ম্যানুয়াল ফটো আপলোড
                                 </h4>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">বাম, সামনে এবং ডান দিকের ছবি আপলোড করুন</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                    বাম, সামনে এবং ডান দিকের ছবি আপলোড করুন
+                                    <br />(একসাথে ৩টি ছবি আপলোড করা যাবে)
+                                </p>
                             </div>
 
                             {/* Three Upload Slots Grid */}
@@ -996,7 +1111,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                             </motion.div>
                         )}
 
-                        {mode === 'CAMERA' && (error || ((status === 'READY' || status === 'CAPTURING') && !videoRef.current?.srcObject)) && (
+                        {mode === 'CAMERA' && (error || ((status === 'READY' || status === 'CAPTURING') && !isCameraActive)) && (
                             <motion.div key="camera-fallback-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                 className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center text-white text-center p-6 backdrop-blur-md z-30">
                                 <div className={`w-24 h-24 border-4 border-dashed rounded-full flex items-center justify-center ${!isLowCapacity ? 'animate-[spin_20s_linear_infinite]' : 'border-white/20'}`}>

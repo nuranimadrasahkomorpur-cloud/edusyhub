@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, BookOpen, CreditCard, TrendingUp, ChevronRight, User, Edit, ChevronDown, ChevronUp, Printer, Trash2, Loader2, Check, Key, LogIn, Disc, ScanFace, Sparkles, AlertCircle, RefreshCw, Clock, History, Settings, Percent } from 'lucide-react';
+import { X, Calendar, BookOpen, CreditCard, TrendingUp, ChevronRight, User, Edit, ChevronDown, ChevronUp, Printer, Trash2, Loader2, Check, Key, LogIn, Disc, ScanFace, Sparkles, AlertCircle, RefreshCw, Clock, History, Settings, Percent, Camera } from 'lucide-react';
 import { useSession } from './SessionProvider';
 import { useUI } from './UIProvider';
 import dynamic from 'next/dynamic';
@@ -88,6 +88,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
     const [customDate, setCustomDate] = useState(new Date().toISOString().split('T')[0]);
     const printRef = useRef<HTMLDivElement>(null);
     const tabButtonsRef = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+    const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
     // --- FEE & TRANSACTION LOGIC ---
     const dueTransactions = transactions.filter(t => 
@@ -112,6 +113,43 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
             console.error('Failed to fetch guardian info:', error);
         } finally {
             setLoadingGuardian(false);
+        }
+    };
+
+    const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsSaving(true);
+        try {
+            const reader = new FileReader();
+            reader.onload = async () => {
+                const base64 = reader.result as string;
+                const res = await fetch('/api/admin/users', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: student.id,
+                        metadata: {
+                            ...(student.metadata || {}),
+                            studentPhoto: base64,
+                            photo: base64
+                        }
+                    })
+                });
+                if (res.ok) {
+                    onUpdate?.();
+                } else {
+                    await alert('ছবি আপলোড করা সম্ভব হয়নি।');
+                }
+            };
+            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('Failed to upload photo:', error);
+            await alert('একটি ত্রুটি হয়েছে।');
+        } finally {
+            setIsSaving(false);
+            if (profilePhotoInputRef.current) profilePhotoInputRef.current.value = '';
         }
     };
 
@@ -534,16 +572,33 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                     </div>
                 </div>
 
+                {/* Hidden File Input for Profile Photo */}
+                <input
+                    type="file"
+                    ref={profilePhotoInputRef}
+                    onChange={handleProfilePhotoUpload}
+                    accept="image/*"
+                    className="hidden"
+                />
+
                 {/* Scrollable Container */}
                 <div className="flex-1 overflow-y-auto scrollbar-hide" data-lenis-prevent>
                     {/* Profile Hero */}
                     <div className="flex flex-col items-center py-8 font-bengali">
                         <div className="relative mb-4">
-                            <div className="w-24 h-24 rounded-full bg-[#CCF2F4] border-4 border-white shadow-sm flex items-center justify-center text-[#045c84] font-bold text-3xl overflow-hidden">
-                                {student.metadata?.studentPhoto ? (
-                                    <img src={student.metadata.studentPhoto} alt={student.name} className="w-full h-full object-cover" />
+                            <div className="w-24 h-24 rounded-full bg-[#CCF2F4] border-4 border-white shadow-sm flex items-center justify-center text-[#045c84] font-bold text-3xl overflow-hidden relative group">
+                                {student.metadata?.studentPhoto || student.metadata?.photo ? (
+                                    <img src={student.metadata.studentPhoto || student.metadata.photo} alt={student.name} className="w-full h-full object-cover" />
                                 ) : (
                                     student.name?.[0] || 'S'
+                                )}
+                                {isAdmin && (
+                                    <div 
+                                        onClick={() => profilePhotoInputRef.current?.click()}
+                                        className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity cursor-pointer ${isSaving ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                    >
+                                        {isSaving ? <Loader2 className="text-white animate-spin" size={24} /> : <Camera className="text-white" size={24} />}
+                                    </div>
                                 )}
                             </div>
                             {(() => {
@@ -645,6 +700,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                             const tierMultiplier = feeTier === 'half' ? 0.5 : feeTier === 'free' ? 0 : 1;
                                             const grandAggregateTotal = Object.entries(groupedByType).reduce((acc, [category, data]: [any, any]) => {
                                                 const categoryObj = categories.find(c => c.name === category);
+                                                if (!categoryObj) return acc; // Skip if category was deleted
                                                 const catConfig = categoryObj?.config || {};
                                                 const catStartDate = catConfig.startDate ? new Date(catConfig.startDate) : null;
                                                 const admissionDate = new Date(student.metadata?.admissionDate || student.createdAt);
@@ -732,6 +788,8 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                                     }
                                                     return entries.map(([category, data]: [any, any], idx) => {
                                                         const categoryObj = categories.find(c => c.name === category);
+                                                        if (!categoryObj) return null; // Skip deleted categories
+
                                                         const catConfig = categoryObj?.config || {};
                                                         const catStartDate = catConfig.startDate ? new Date(catConfig.startDate) : null;
                                                         const admissionDate = new Date(student.metadata?.admissionDate || student.createdAt);

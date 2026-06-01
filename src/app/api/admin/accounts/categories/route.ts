@@ -230,16 +230,50 @@ export async function DELETE(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');
+        const deletePaid = searchParams.get('deletePaid') === 'true';
 
         if (!id) {
             return NextResponse.json({ message: 'ID is required' }, { status: 400 });
         }
 
-        await (prisma as any).accountCategory.delete({
-            where: { id }
-        });
+        if (deletePaid) {
+            // Delete ALL transactions (paid and pending) for this category
+            await (prisma as any).transaction.deleteMany({
+                where: { categoryId: id }
+            });
 
-        return NextResponse.json({ message: 'Category deleted successfully' });
+            // Delete the category completely
+            await (prisma as any).accountCategory.delete({
+                where: { id }
+            });
+        } else {
+            // Delete ONLY PENDING transactions for this category
+            await (prisma as any).transaction.deleteMany({
+                where: {
+                    categoryId: id,
+                    status: 'PENDING'
+                }
+            });
+
+            // Keep the category as 'Archived' (controller) so past paid records remain linked
+            const existingCat = await (prisma as any).accountCategory.findUnique({
+                where: { id }
+            });
+            if (existingCat) {
+                const config = typeof existingCat.config === 'object' ? existingCat.config : {};
+                await (prisma as any).accountCategory.update({
+                    where: { id },
+                    data: {
+                        config: {
+                            ...config,
+                            isArchived: true
+                        }
+                    }
+                });
+            }
+        }
+
+        return NextResponse.json({ message: 'Category and associated pending dues deleted successfully' });
     } catch (error) {
         console.error('Delete Category Error:', error);
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

@@ -27,17 +27,113 @@ export async function GET(req: Request) {
             orderBy: { date: 'desc' }
         });
 
-        // Calculate summary stats
-        const totalIncome = transactions
-            .filter((t: any) => t.type === 'INCOME' && t.status === 'COMPLETED')
+        // Load categories to check existence for orphaned dues checking and exclusion flags
+        let categoryNames = new Set<string>();
+        let categoryIds = new Set<string>();
+        let categoryMap = new Map<string, any>();
+        
+        const targetInstituteId = instituteId || (transactions.length > 0 ? transactions[0].instituteId : null);
+        if (targetInstituteId) {
+            const categories = await (prisma as any).accountCategory.findMany({
+                where: { instituteId: targetInstituteId },
+                select: { id: true, name: true, config: true }
+            });
+            categories.forEach((c: any) => {
+                if (c.name) categoryNames.add(c.name.trim().toLowerCase());
+                if (c.id) {
+                    const idStr = c.id.toString();
+                    categoryIds.add(idStr);
+                    categoryMap.set(idStr, c);
+                }
+            });
+        }
+
+        // Fetch student user metadata to attach profile images and institute-specific student IDs
+        const studentIdsToFetch = Array.from(
+            new Set(transactions.map((t: any) => t.studentId ? t.studentId.toString() : null).filter(Boolean))
+        ) as string[];
+
+        let students: any[] = [];
+        if (studentIdsToFetch.length > 0) {
+            students = await (prisma as any).user.findMany({
+                where: {
+                    id: { in: studentIdsToFetch }
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    metadata: true
+                }
+            });
+        }
+
+        const studentMap = new Map(students.map(s => [s.id.toString(), s]));
+        const transactionsWithStudentInfo = transactions.map((t: any) => {
+            const rawTx = typeof t.toJSON === 'function' ? t.toJSON() : t;
+            
+            const categoryNameLower = t.category ? t.category.trim().toLowerCase() : '';
+            const catIdStr = t.categoryId ? t.categoryId.toString() : '';
+            const categoryExists = categoryNames.has(categoryNameLower) || (catIdStr && categoryIds.has(catIdStr));
+
+            let displayCategory = rawTx.category;
+            if (displayCategory && displayCategory.includes('মাসিক')) {
+                // For pending fees, date is the due date. For completed fees, date is payment date so use createdAt
+                const targetDate = rawTx.status === 'PENDING' ? rawTx.date : (rawTx.createdAt || rawTx.date);
+                const d = new Date(targetDate);
+                const monthYear = d.toLocaleDateString('bn-BD', { month: 'long', year: 'numeric' });
+                const baseCat = displayCategory.replace(/\s*-?\s*\d{4}\s*$/, '').trim();
+                displayCategory = `${baseCat} (${monthYear})`;
+            }
+
+            let studentInfo = {
+                studentUniqueId: t.studentId ? t.studentId.toString() : null,
+                studentPhoto: null as string | null,
+                fatherName: null as string | null,
+                mobileNumber: null as string | null
+            };
+
+            if (t.studentId) {
+                const sId = t.studentId.toString();
+                const s = studentMap.get(sId);
+                if (s) {
+                    const metadata = s.metadata && typeof s.metadata === 'object' ? s.metadata : {};
+                    studentInfo.studentUniqueId = metadata.studentId || sId;
+                    studentInfo.studentPhoto = metadata.studentPhoto || null;
+                    studentInfo.fatherName = metadata.fathersName || metadata.guardianName || null;
+                    studentInfo.mobileNumber = metadata.fathersPhone || metadata.guardianPhone || s.phone || null;
+                }
+            }
+
+            const catInfo = catIdStr ? categoryMap.get(catIdStr) : null;
+            const isExcludedFromSummary = catInfo?.config?.isExcludedFromSummary || false;
+
+            return {
+                ...rawTx,
+                originalCategory: rawTx.category,
+                category: displayCategory,
+                ...studentInfo,
+                categoryExists: !!categoryExists,
+                isExcludedFromSummary
+            };
+        });
+
+        // Advance balance: stored separately as __ADVANCE__ category transactions
+        const advanceBalance = transactionsWithStudentInfo
+            .filter((t: any) => t.type === 'INCOME' && t.status === 'COMPLETED' && typeof t.category === 'string' && t.category.startsWith('__ADVANCE__'))
             .reduce((sum: number, t: any) => sum + t.amount, 0);
 
-        const totalExpense = transactions
-            .filter((t: any) => t.type === 'EXPENSE' && t.status === 'COMPLETED')
+        // Total income excludes advance entries (they are not real income, just prepayments)
+        const totalIncome = transactionsWithStudentInfo
+            .filter((t: any) => t.type === 'INCOME' && t.status === 'COMPLETED' && !t.isExcludedFromSummary && !(typeof t.category === 'string' && t.category.startsWith('__ADVANCE__')))
             .reduce((sum: number, t: any) => sum + t.amount, 0);
 
-        const pendingFees = transactions
-            .filter((t: any) => t.type === 'INCOME' && t.status === 'PENDING')
+        const totalExpense = transactionsWithStudentInfo
+            .filter((t: any) => t.type === 'EXPENSE' && t.status === 'COMPLETED' && !t.isExcludedFromSummary)
+            .reduce((sum: number, t: any) => sum + t.amount, 0);
+
+        const pendingFees = transactionsWithStudentInfo
+            .filter((t: any) => t.type === 'INCOME' && t.status === 'PENDING' && !t.isExcludedFromSummary)
             .reduce((sum: number, t: any) => sum + t.amount, 0);
 
         const balance = totalIncome - totalExpense;
@@ -48,16 +144,19 @@ export async function GET(req: Request) {
             totalExpense,
             pendingFees,
             balance,
+            advanceBalance,
             incomeChange: '+0%',
             expenseChange: '+0%',
             pendingChange: '+0%',
             balanceChange: '+0%'
         };
 
-        return NextResponse.json({
+        const response = NextResponse.json({
             summary,
-            transactions
+            transactions: transactionsWithStudentInfo
         });
+        response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+        return response;
     } catch (error: any) {
         console.error('Accounts API Error:', error);
         return NextResponse.json({ 
@@ -82,7 +181,8 @@ export async function POST(req: Request) {
             data: {
                 ...rest,
                 instituteId,
-                date: new Date(rest.date || Date.now())
+                date: new Date(rest.date || Date.now()),
+                createdAt: new Date(rest.date || Date.now())
             }
         });
 
@@ -90,5 +190,52 @@ export async function POST(req: Request) {
     } catch (error) {
         console.error('Create Transaction Error:', error);
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: Request) {
+    try {
+        const { searchParams } = new URL(req.url);
+        const instituteId = searchParams.get('instituteId');
+        const categoryName = searchParams.get('category');
+
+        if (!instituteId) {
+            return NextResponse.json({ message: 'Institute ID is required' }, { status: 400 });
+        }
+        if (!categoryName) {
+            return NextResponse.json({ message: 'Category name is required' }, { status: 400 });
+        }
+
+        // Verify if category does NOT exist in the AccountCategory collection
+        const existingCategory = await (prisma as any).accountCategory.findFirst({
+            where: {
+                instituteId,
+                name: {
+                    equals: categoryName,
+                    mode: 'insensitive'
+                }
+            }
+        });
+
+        if (existingCategory) {
+            return NextResponse.json({ message: 'This category exists, cannot delete as orphaned' }, { status: 400 });
+        }
+
+        // Delete pending transactions of this category name for the given institute
+        const deleteResult = await (prisma as any).transaction.deleteMany({
+            where: {
+                instituteId,
+                category: categoryName,
+                status: 'PENDING'
+            }
+        });
+
+        return NextResponse.json({ 
+            message: 'Orphaned pending dues deleted successfully', 
+            count: deleteResult.count 
+        });
+    } catch (error: any) {
+        console.error('Delete Orphaned Dues Error:', error);
+        return NextResponse.json({ message: 'Internal server error', error: error.message }, { status: 500 });
     }
 }

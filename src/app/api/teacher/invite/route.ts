@@ -76,7 +76,7 @@ export async function POST(request: Request) {
             data: {
                 userId: user.id,
                 instituteId,
-                status: 'PENDING', // Explicitly set to PENDING
+                status: 'ACTIVE', // Automatically set to ACTIVE so they can start using the system immediately
                 permissions: {}, // No permissions initially
                 assignedClassIds: [],
             },

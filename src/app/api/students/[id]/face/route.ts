@@ -7,10 +7,26 @@ export async function POST(
 ) {
     try {
         const { id } = await params;
-        const { descriptor } = await req.json();
+        const { descriptor, middleImageBase64 } = await req.json();
 
         if (!descriptor || !Array.isArray(descriptor)) {
             return NextResponse.json({ error: 'Invalid face descriptor' }, { status: 400 });
+        }
+
+        // Fetch user to check if metadata.photo is empty
+        const user = await prisma.user.findUnique({
+            where: { id },
+            select: { metadata: true }
+        });
+        
+        let updateData: any = { 
+            faceDescriptor: descriptor,
+            "metadata.hasFaceId": true
+        };
+
+        const metadata = user?.metadata as any;
+        if (middleImageBase64 && (!metadata || !metadata.photo)) {
+            updateData["metadata.photo"] = middleImageBase64;
         }
 
         // Save descriptor to user using raw MongoDB command to bypass Prisma schema validation issues
@@ -19,12 +35,7 @@ export async function POST(
             updates: [
                 {
                     q: { _id: { $oid: id } },
-                    u: { 
-                        $set: { 
-                            faceDescriptor: descriptor,
-                            "metadata.hasFaceId": true
-                        } 
-                    }
+                    u: { $set: updateData }
                 }
             ]
         });

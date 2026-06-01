@@ -47,7 +47,8 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
         deselectedStudents: initialData?.config?.deselectedStudents || {},
         customStudentAmounts: initialData?.config?.customStudentAmounts || {},
         studentWaivers: initialData?.config?.studentWaivers || {},
-        thresholdDays: initialData?.config?.thresholdDays || 0
+        thresholdDays: initialData?.config?.thresholdDays || 0,
+        isExcludedFromSummary: initialData?.config?.isExcludedFromSummary || false
     });
 
     const [targetCycles, setTargetCycles] = useState(1);
@@ -170,6 +171,13 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
     }, [formData, availableClasses, classGroups, availableTeachers, targetCycles]);
 
     useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, []);
+
+    useEffect(() => {
         const fetchAllData = async () => {
             if (!activeInstitute?.id) return;
             setLoadingData(true);
@@ -200,8 +208,8 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
     }, [activeInstitute?.id]);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
             
             <div className="relative bg-white w-full max-w-2xl rounded-[48px] shadow-2xl overflow-hidden animate-scale-in flex flex-col font-bengali h-[90vh]">
                 {/* Modal Header */}
@@ -215,7 +223,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                     formData.type === 'income' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-emerald-500'
                                 }`}
                             >
-                                <TrendingUp size={16} /> আয়
+                                <TrendingUp size={16} /> আয় / ফি
                             </button>
                             <button 
                                 onClick={() => setFormData({...formData, type: 'expense'})}
@@ -835,6 +843,26 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                 </div>
                             </div>
                         )}
+                    </div>
+                    {/* EXCLUSION SETTING */}
+                    <div className="bg-amber-50/50 border border-amber-100 rounded-3xl p-6 flex items-start gap-4 mt-8 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="mt-1">
+                            <input 
+                                type="checkbox" 
+                                id="excludeSummary"
+                                className="w-5 h-5 text-amber-500 rounded border-amber-300 focus:ring-amber-500 cursor-pointer"
+                                checked={formData.isExcludedFromSummary}
+                                onChange={(e) => setFormData({...formData, isExcludedFromSummary: e.target.checked})}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="excludeSummary" className="text-sm font-black text-slate-800 cursor-pointer block mb-1">
+                                মূল হিসাব থেকে বাদ দিন (ব্যক্তিগত হিসাব)
+                            </label>
+                            <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                                এই খাতের লেনদেনগুলো শুধুমাত্র এই খাতেই দেখা যাবে। প্রতিষ্ঠানের মূল আয়-ব্যয়ের সামারি বা ব্যালেন্সে এই টাকা যোগ হবে না। শিক্ষক বা একাউন্ট্যান্টের নিজস্ব লেনদেনের জন্য ব্যবহার করুন।
+                            </p>
+                        </div>
                     </div>
 
                     {/* SUMMARY CARD (Bottom of scrollable area) */}

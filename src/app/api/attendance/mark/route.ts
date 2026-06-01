@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
                 profile: profile ? { id: profile.id, userId: profile.userId, instituteId: profile.instituteId, status: profile.status, isAdmin: profile.isAdmin } : null
             });
 
-            if (!profile || profile.status !== 'ACTIVE') {
+            if (!profile || profile.status === 'REJECTED') {
                 return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
             }
 

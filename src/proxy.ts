@@ -19,7 +19,7 @@ const PUBLIC_PATH_PREFIXES = [
 
 const SESSION_COOKIE = 'edusy_auth_token';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // 1. Handle pluralized /apis/ to /api/ normalization
@@ -51,7 +51,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    // Run middleware on all routes except static assets
+    // Run proxy on all routes except static assets
     matcher: [
         '/((?!_next/static|_next/image|favicon.ico|fonts/).*)',
     ],

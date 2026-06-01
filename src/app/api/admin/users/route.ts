@@ -69,7 +69,7 @@ export async function GET(req: Request) {
         if (baseRole !== 'SUPER_ADMIN' || activeRole !== 'SUPER_ADMIN') {
             const managedInstIds = (instituteIds || []).filter((id: any) => typeof id === 'string' && id.length === 24);
             const joinedInstIds = (teacherProfiles || [])
-                .filter((p: any) => p.status === 'ACTIVE' && p.instituteId)
+                .filter((p: any) => p.status !== 'REJECTED' && p.instituteId)
                 .map((p: any) => p.instituteId)
                 .filter((id: any) => typeof id === 'string' && id.length === 24);
             
@@ -121,7 +121,12 @@ export async function GET(req: Request) {
             }
 
             if (!profile.isAdmin) {
-                const assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                let assignedClassIds = (profile.assignedClassIds || []).map(id => id.toString());
+                const classWise = (profile.permissions as any)?.classWise;
+                if (classWise) {
+                    assignedClassIds = Array.from(new Set([...assignedClassIds, ...Object.keys(classWise)]));
+                }
+
                 if (assignedClassIds.length === 0) {
                     return NextResponse.json([]); // Return empty list, no classes assigned
                 }
@@ -220,8 +225,17 @@ export async function GET(req: Request) {
             pipeline.push({ $match: match });
         }
 
-        // Sort by creation date
-        pipeline.push({ $sort: { createdAt: -1 } });
+        // Sort removed temporarily because it causes 50s+ hangs on unindexed collections with 5000+ documents
+        // pipeline.push({ $sort: { createdAt: -1 } });
+
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '300');
+        const skip = (page - 1) * limit;
+
+        if (skip > 0) {
+            pipeline.push({ $skip: skip });
+        }
+        pipeline.push({ $limit: limit });
 
         // Lookup first institute for each user (since they can have multiple)
         pipeline.push(
@@ -236,6 +250,12 @@ export async function GET(req: Request) {
             {
                 $addFields: {
                     institute: { $arrayElemAt: ['$institutes', 0] }
+                }
+            },
+            {
+                $project: {
+                    faceDescriptor: 0,
+                    institutes: 0
                 }
             }
         );
@@ -257,7 +277,7 @@ export async function GET(req: Request) {
             updatedAt: user.updatedAt?.$date || user.updatedAt,
             institute: user.institute ? { name: user.institute.name } : null,
             metadata: user.metadata || {},
-            faceDescriptor: user.faceDescriptor || []
+            faceDescriptor: [] // Ensure array is returned so frontend doesn't crash
         }));
 
         // --- Server-side Class/Group Name Resolution ---
@@ -550,7 +570,7 @@ export async function PATCH(req: Request) {
             };
         }
         if (phone) set.phone = phone;
-        if (faceDescriptor && Array.isArray(faceDescriptor)) set.faceDescriptor = faceDescriptor;
+        if (faceDescriptor && Array.isArray(faceDescriptor) && faceDescriptor.length > 0) set.faceDescriptor = faceDescriptor;
 
         await (prisma as any).$runCommandRaw({
             update: 'User',

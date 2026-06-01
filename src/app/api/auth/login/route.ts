@@ -235,8 +235,8 @@ export async function POST(req: Request) {
             }
         });
 
-        // Set HttpOnly auth cookie so the middleware can validate on every request
-        // Token is the userId — middleware only checks presence, deep validation via API
+        // Set HttpOnly auth cookie so the proxy can validate on every request
+        // Token is the userId — proxy only checks presence, deep validation via API
         const isProduction = process.env.NODE_ENV === 'production';
         response.cookies.set('edusy_auth_token', userId, {
             httpOnly: true,
