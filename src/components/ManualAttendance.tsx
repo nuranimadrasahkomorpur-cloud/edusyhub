@@ -118,6 +118,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [bulkScope, setBulkScope] = useState<'ALL' | 'UNMARKED'>('ALL');
+    const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -208,6 +209,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
     const columnPickerRef = useRef<HTMLDivElement>(null);
     const filterScrollRef = useRef<HTMLDivElement>(null);
+    const sortDropdownRef = useRef<HTMLDivElement>(null);
 
     // Close dropdowns on click outside
     useEffect(() => {
@@ -216,6 +218,9 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
             
             if (columnPickerRef.current && !columnPickerRef.current.contains(e.target as Node)) {
                 setShowColumnPicker(false);
+            }
+            if (sortDropdownRef.current && !sortDropdownRef.current.contains(e.target as Node)) {
+                setIsSortDropdownOpen(false);
             }
         };
         window.addEventListener('click', handleClick);
@@ -736,8 +741,16 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     };
 
     const studentsWithRoll = useMemo(() => {
-        const sorted = [...students].sort((a, b) => a.name.localeCompare(b.name));
-        return sorted.map((s, idx) => ({ ...s, assignedRoll: idx + 1 }));
+        const sorted = [...students].sort((a, b) => {
+            const rollA = a.rollNumber ? parseInt(a.rollNumber, 10) : Infinity;
+            const rollB = b.rollNumber ? parseInt(b.rollNumber, 10) : Infinity;
+            if (rollA !== rollB && !isNaN(rollA) && !isNaN(rollB)) return rollA - rollB;
+            return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        return sorted.map((s, idx) => ({ 
+            ...s, 
+            assignedRoll: s.rollNumber && !isNaN(parseInt(s.rollNumber, 10)) ? parseInt(s.rollNumber, 10) : idx + 1 
+        }));
     }, [students]);
 
     // Calculate total active class days for the month
@@ -788,7 +801,9 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                     valA = a.assignedRoll;
                     valB = b.assignedRoll;
                 } else if (sortConfig.key === 'name') {
-                    return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+                    return sortConfig.direction === 'asc' 
+                        ? a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }) 
+                        : b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' });
                 } else if (sortConfig.key === 'id') {
                     valA = parseInt(a.metadata?.studentId || '0', 10);
                     valB = parseInt(b.metadata?.studentId || '0', 10);
@@ -814,7 +829,9 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                 }
 
                 if (typeof valA === 'string' && typeof valB === 'string') {
-                    return sortConfig.direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    return sortConfig.direction === 'asc' 
+                        ? valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' }) 
+                        : valB.localeCompare(valA, undefined, { numeric: true, sensitivity: 'base' });
                 }
                 if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -878,6 +895,70 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
                     {/* View Mode Toggle */}
                     <div className="flex items-center gap-2 shrink-0">
+                        {/* Sort Dropdown for Card View */}
+                        {viewMode === 'CARD' && (
+                            <div className="relative" ref={sortDropdownRef}>
+                                <button
+                                    onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                                    className="flex items-center gap-1.5 bg-white border border-slate-200 shadow-sm rounded-[14px] px-4 py-2.5 hover:bg-slate-50 transition-colors text-[11px] font-black uppercase tracking-wider text-[#045c84]"
+                                >
+                                    <span>
+                                        {sortConfig ? (
+                                            sortConfig.key === 'roll' ? 'রোল' :
+                                            sortConfig.key === 'name' ? 'নাম' :
+                                            sortConfig.key === 'id' ? 'আইডি' : 'ডিফল্ট'
+                                        ) : 'ডিফল্ট সর্ট'}
+                                    </span>
+                                    <ChevronDown size={14} className={`transition-transform duration-200 ${isSortDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                
+                                <AnimatePresence>
+                                    {isSortDropdownOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 5 }}
+                                            className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5"
+                                        >
+                                            <div className="px-2 py-1.5 border-b border-slate-100 mb-1">
+                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">কিভাবে সাজাবেন?</span>
+                                            </div>
+                                            {[
+                                                { id: 'default', label: 'ডিফল্ট সর্ট' },
+                                                { id: 'roll_asc', label: 'রোল (ছোট-বড়)' },
+                                                { id: 'roll_desc', label: 'রোল (বড়-ছোট)' },
+                                                { id: 'name_asc', label: 'নাম (A-Z)' },
+                                                { id: 'name_desc', label: 'নাম (Z-A)' },
+                                                { id: 'id_asc', label: 'আইডি (ছোট-বড়)' },
+                                                { id: 'id_desc', label: 'আইডি (বড়-ছোট)' },
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    onClick={() => {
+                                                        if (opt.id === 'default') setSortConfig(null);
+                                                        else {
+                                                            const [key, direction] = opt.id.split('_');
+                                                            setSortConfig({ key, direction: direction as 'asc' | 'desc' });
+                                                        }
+                                                        setIsSortDropdownOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center justify-between text-left px-3 py-2 rounded-lg text-[11px] font-bold transition-colors ${
+                                                        (opt.id === 'default' && !sortConfig) || (sortConfig && opt.id === `${sortConfig.key}_${sortConfig.direction}`)
+                                                            ? 'bg-blue-50 text-[#045c84]'
+                                                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                    {((opt.id === 'default' && !sortConfig) || (sortConfig && opt.id === `${sortConfig.key}_${sortConfig.direction}`)) && (
+                                                        <Check size={12} className="text-[#045c84]" />
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
                         <div className="flex items-center bg-slate-100 rounded-[18px] p-1">
                             <button
                                 onClick={() => {
