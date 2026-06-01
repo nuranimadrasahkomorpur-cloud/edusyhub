@@ -168,12 +168,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const { openAssignmentModal } = useUI();
-    const { user, activeRole, logout, isLoading } = useSession();
+    const { user, activeRole, activeInstitute, logout, isLoading } = useSession();
     const pathname = usePathname();
     const router = useRouter();
 
     const [activeTab, setActiveTab] = useState<string>('');
     const [visitedPaths, setVisitedPaths] = useState<string[]>([]);
+
+    // Determine teacher permissions globally
+    const teacherProfile = activeRole === 'TEACHER' ? user?.teacherProfiles?.find((p: any) => p.instituteId === activeInstitute?.id) : null;
+    const isTeacherAdmin = teacherProfile?.isAdmin === true;
+
+    const hasTeacherPermission = useMemo(() => {
+        return (permId: string) => {
+            if (activeRole !== 'TEACHER') return true;
+            if (isTeacherAdmin) return true;
+            if (!teacherProfile || !teacherProfile.permissions?.classWise) return false;
+            
+            return Object.values(teacherProfile.permissions.classWise).some((classData: any) => {
+                const perms = classData?.permissions;
+                return Array.isArray(perms) && perms.includes(permId);
+            });
+        };
+    }, [activeRole, isTeacherAdmin, teacherProfile]);
 
     useEffect(() => {
         const handleOpenProfile = () => setIsProfileModalOpen(true);
@@ -274,6 +291,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (activeRole === 'GUARDIAN') {
             return ['/dashboard', '/dashboard/guardian/children', '/dashboard/assignments', '/dashboard/settings'].includes(item.href);
         }
+        if (activeRole === 'TEACHER') {
+            if (item.href.startsWith('/dashboard/attendance') && !hasTeacherPermission('canTakeAttendance')) return false;
+            if (item.href.startsWith('/dashboard/accounts') && !hasTeacherPermission('canCollectFees')) return false;
+            if (item.href.startsWith('/dashboard/students') && !hasTeacherPermission('canManageAdmission')) return false;
+            if (item.href.startsWith('/dashboard/exams') && !hasTeacherPermission('canManageExam') && !hasTeacherPermission('canManageResult')) return false;
+            if (item.href.startsWith('/dashboard/calendar') && !hasTeacherPermission('canManageRoutine')) return false;
+        }
         return true;
     });
 
@@ -313,10 +337,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (activeRole === 'TEACHER') {
             const allowedExtra = [
                 '/dashboard/teacher',
-                '/dashboard/settings',
-                '/dashboard/calendar',
-                '/dashboard/attendance/summary'
+                '/dashboard/settings'
             ];
+            if (hasTeacherPermission('canManageRoutine')) allowedExtra.push('/dashboard/calendar');
+            if (hasTeacherPermission('canTakeAttendance')) allowedExtra.push('/dashboard/attendance/summary');
+            
             return allowedExtra.some(p => pathname === p || pathname.startsWith(p + '/'));
         }
 

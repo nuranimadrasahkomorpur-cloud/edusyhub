@@ -227,7 +227,9 @@ export default function TeacherPermissionModal({
             if (next[classId] !== undefined) {
                 delete next[classId];
             } else {
-                next[classId] = { permissions: [], groupIds: [], bookIds: [] };
+                // Inherit permissions from currently active class to prevent accidental empty permissions
+                const inheritedPerms = activeClassId && prev[activeClassId] ? [...(prev[activeClassId].permissions || [])] : [];
+                next[classId] = { permissions: inheritedPerms, groupIds: [], bookIds: [] };
             }
             return next;
         });
