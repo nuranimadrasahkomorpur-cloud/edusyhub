@@ -243,9 +243,13 @@ export async function DELETE(req: Request) {
             });
 
             // Delete the category completely
-            await (prisma as any).accountCategory.delete({
-                where: { id }
-            });
+            try {
+                await (prisma as any).accountCategory.delete({
+                    where: { id }
+                });
+            } catch(e: any) {
+                if (e.code !== 'P2025') throw e; // P2025: Record to delete does not exist
+            }
         } else {
             // Delete ONLY PENDING transactions for this category
             await (prisma as any).transaction.deleteMany({

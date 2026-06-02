@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as faceapi from '@vladmandic/face-api';
 import { createPortal } from 'react-dom';
 import { useSession } from '@/components/SessionProvider';
+import { usePathname } from 'next/navigation';
 import {
     Users,
     Search,
@@ -63,6 +64,7 @@ import { getCleanId } from '@/utils/digit-utils';
 
 export default function StudentManagementPage() {
     const { user: currentUser, activeRole, activeInstitute, isLoading } = useSession();
+    const pathname = usePathname();
     const { alert, confirm } = useUI();
     const [students, setStudents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -3875,7 +3877,7 @@ export default function StudentManagementPage() {
 
             {/* Dynamic FAB System */}
             {
-                mounted && (
+                mounted && pathname?.includes('/dashboard/students') && (
                     (activeTab === 'students' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (selectedClassId !== 'all' ? canManageClass(selectedClassId) : classes.some(c => canManageClass(c.id))))) ||
                     (activeTab === 'books' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN')) ||
                     (activeTab === 'applications' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (selectedClassId !== 'all' ? canManageClass(selectedClassId) : classes.some(c => canManageClass(c.id)))))

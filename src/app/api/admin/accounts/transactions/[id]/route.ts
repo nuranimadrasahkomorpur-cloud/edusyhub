@@ -3,10 +3,10 @@ import prisma from '@/utils/db';
 
 export async function DELETE(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await params;
         
         if (!id) {
             return NextResponse.json({ message: 'Transaction ID is required' }, { status: 400 });
@@ -17,7 +17,8 @@ export async function DELETE(
         });
 
         if (!transaction) {
-            return NextResponse.json({ message: 'Transaction not found' }, { status: 404 });
+            // Already deleted or doesn't exist, we can safely consider it a success
+            return NextResponse.json({ success: true, message: 'Transaction already deleted or not found' });
         }
 
         // Delete the transaction

@@ -334,7 +334,7 @@ export default function AttendanceSummary({
                                 <Loader2 className="animate-spin text-slate-300" size={40} />
                             </div>
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={300}>
                                 <AreaChart data={data?.dailyTrends}>
                                     <defs>
                                         <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
@@ -388,7 +388,7 @@ export default function AttendanceSummary({
                             </div>
                         ) : (
                             <>
-                                <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={300}>
                                     <PieChart>
                                         <Pie
                                             data={pieData}
@@ -437,7 +437,7 @@ export default function AttendanceSummary({
                                 <Loader2 className="animate-spin text-slate-300" size={40} />
                             </div>
                         ) : (
-                            <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={250}>
                                 <BarChart data={data?.classBreakdown} layout="vertical" margin={{ left: 40, right: 40 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
                                     <XAxis type="number" hide />

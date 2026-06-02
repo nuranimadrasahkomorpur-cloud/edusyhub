@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, CheckCircle2, CreditCard, Clock, ArrowRight, AlertTriangle,
-    TrendingUp, Zap, Wallet, Save, History, Receipt, BadgeCheck
+    TrendingUp, Zap, Wallet, Save, History, Receipt, BadgeCheck, Printer
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 
