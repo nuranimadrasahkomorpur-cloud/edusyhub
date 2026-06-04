@@ -45,8 +45,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ 
             message: 'Cleanup successful', 
             totalTransactions: transactions.length,
-            oishi: oishiTxns,
-            duplicateKeys
+            deletedCount: deletedIds.length
         });
 
     } catch (e: any) {
