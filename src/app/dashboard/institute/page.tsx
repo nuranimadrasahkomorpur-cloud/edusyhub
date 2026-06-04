@@ -16,7 +16,10 @@ import {
     Globe,
     AlertCircle,
     ChevronDown,
-    Save
+    Save,
+    Copy,
+    Link2,
+    CheckCheck
 } from 'lucide-react';
 import Toast from '@/components/Toast';
 import Modal from '@/components/Modal';
@@ -28,7 +31,7 @@ export default function MultiInstitutePage() {
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
-
+    const [copiedId, setCopiedId] = useState<string | null>(null);
     const [editingInst, setEditingInst] = useState<any>(null);
 
     // Toast state
@@ -322,6 +325,24 @@ export default function MultiInstitutePage() {
                                             className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-95 ${activeInstitute?.id === inst.id ? 'bg-slate-100 text-slate-400 cursor-default' : 'bg-slate-50 text-slate-600 hover:bg-[#045c84] hover:text-white'}`}
                                         >
                                             {activeInstitute?.id === inst.id ? 'সক্রিয়' : 'ডিফল্ট করুন'}
+                                        </button>
+                                        <button
+                                            title="Easy-Q এর জন্য API Link কপি করুন"
+                                            onClick={async () => {
+                                                const apiUrl = `${window.location.origin}/api/provider/sync?instituteId=${inst.id}`;
+                                                await navigator.clipboard.writeText(apiUrl);
+                                                setCopiedId(inst.id);
+                                                setToast({ message: 'API লিংক কপি হয়েছে! Easy-Q তে পেস্ট করুন।', type: 'success' });
+                                                setTimeout(() => setCopiedId(null), 3000);
+                                            }}
+                                            className={`px-3 py-3 rounded-xl transition-all flex items-center gap-1 text-xs font-black ${
+                                                copiedId === inst.id
+                                                    ? 'bg-emerald-50 text-emerald-600'
+                                                    : 'bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white'
+                                            }`}
+                                        >
+                                            {copiedId === inst.id ? <CheckCheck size={16} /> : <Link2 size={16} />}
+                                            <span>{copiedId === inst.id ? 'কপি!' : 'API'}</span>
                                         </button>
                                         <button
                                             onClick={() => handleOpenEdit(inst)}

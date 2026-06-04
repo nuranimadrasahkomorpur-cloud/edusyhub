@@ -1,0 +1,80 @@
+{
+  "student": "2 ইয়ামিন",
+  "metadata": {
+    "classId": "69b03cbc53c1983f18febd69",
+    "admissionStatus": "APPROVED",
+    "skipAccountSetup": true,
+    "studentId": "102",
+    "rollNumber": 4,
+    "className": "শ্রেণি- প্লে শাখা - ক",
+    "studentPhoto": "https://res.cloudinary.com/dlchfbphs/image/upload/v1776913775/edusy_uploads/rdkdzq0skwmiy1sduorz.jpg",
+    "originalPassword": "8l5rqkgfxx"
+  },
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false
+}\n{
+  "student": "3 রিয়ান",
+  "metadata": {
+    "classId": "69b03cbc53c1983f18febd69",
+    "admissionStatus": "APPROVED",
+    "skipAccountSetup": true,
+    "studentId": "103",
+    "rollNumber": 5,
+    "className": "শ্রেণি- প্লে শাখা - ক",
+    "studentPhoto": "https://res.cloudinary.com/dlchfbphs/image/upload/v1776913728/edusy_uploads/fi1sjhjomipvshlxqerp.jpg",
+    "originalPassword": "8zagu5g1ah"
+  },
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false
+}\n{
+  "student": "2 ইয়ামিন",
+  "studentId": "102",
+  "classId": "69b03cbc53c1983f18febd69",
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false,
+  "studentAmountType": "per-class",
+  "classAmounts": {
+    "69b03cbc53c1983f18febd69": 200,
+    "69b03cf453c1983f18febd6a": 250,
+    "69b03cf453c1983f18febd6b": 300
+  }
+}\n{
+  "student": "3 রিয়ান",
+  "studentId": "103",
+  "classId": "69b03cbc53c1983f18febd69",
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false,
+  "studentAmountType": "per-class",
+  "classAmounts": {
+    "69b03cbc53c1983f18febd69": 200,
+    "69b03cf453c1983f18febd6a": 250,
+    "69b03cf453c1983f18febd6b": 300
+  }
+}\n{
+  "student": "4 তাছনিন",
+  "studentId": "104",
+  "classId": "69b03cbc53c1983f18febd69",
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false,
+  "studentAmountType": "per-class",
+  "classAmounts": {
+    "69b03cbc53c1983f18febd69": 200,
+    "69b03cf453c1983f18febd6a": 250,
+    "69b03cf453c1983f18febd6b": 300
+  }
+}\n

@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Hide browser-native clear/X button on text inputs (Edge, Chrome) */
+input::-ms-clear,
+input::-ms-reveal,
+input::-webkit-search-decoration,
+input::-webkit-search-cancel-button,
+input::-webkit-search-results-button,
+input::-webkit-search-results-decoration {
+  display: none !important;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #020617;
@@ -344,4 +354,14 @@ html.lenis body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Hide scrollbar but keep scrollable - for class tabs */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }

@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const data = await req.json();
-        const { id, instituteId, name, type, amount: rawAmount, recipient, frequency, isFixed, ...rest } = data;
+        const { id, instituteId, name, type, amount: rawAmount, recipient, frequency, isFixed, applyFrom, ...rest } = data;
 
         if (!instituteId) {
             return NextResponse.json({ message: 'Institute ID is required' }, { status: 400 });
@@ -68,10 +68,28 @@ export async function POST(req: Request) {
         };
 
         let category;
-        if (id && id.length > 20) {
+        const isUpdate = id && id.length > 20;
+        
+        if (isUpdate) {
             category = await (prisma as any).accountCategory.update({
                 where: { id },
                 data: categoryData
+            });
+            
+            // If updating, delete existing PENDING transactions so they can be recreated with new settings
+            let deleteWhere: any = {
+                categoryId: category.id,
+                status: 'PENDING'
+            };
+
+            if (applyFrom === 'today') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                deleteWhere.date = { gte: today };
+            }
+
+            await (prisma as any).transaction.deleteMany({
+                where: deleteWhere
             });
         } else {
             category = await (prisma as any).accountCategory.create({
@@ -154,29 +172,94 @@ export async function POST(req: Request) {
                     }
 
                     if (finalAmount > 0) {
-                        // Check for existing pending transaction for this student and category
-                        const existing = await (prisma as any).transaction.findFirst({
+                        const datesToGenerate: Date[] = [];
+                        
+                        if (rest.frequencyType === 'fixed' && ['monthly', 'weekly', 'yearly', 'semester'].includes(rest.interval) && rest.startDate) {
+                            const start = new Date(rest.startDate);
+                            const current = new Date();
+                            const end = rest.endDate ? new Date(rest.endDate) : current;
+                            const actualEnd = end < start && !rest.endDate ? current : end;
+                            
+                            const dueTiming = rest.dueTiming || 'start';
+
+                            if (rest.interval === 'weekly') {
+                                let currentWeek = new Date(start);
+                                while (currentWeek <= actualEnd) {
+                                    datesToGenerate.push(new Date(currentWeek));
+                                    currentWeek.setDate(currentWeek.getDate() + 7);
+                                }
+                            } else if (rest.interval === 'semester') {
+                                let currentSemester = new Date(start);
+                                while (currentSemester <= actualEnd) {
+                                    datesToGenerate.push(new Date(currentSemester));
+                                    currentSemester.setMonth(currentSemester.getMonth() + 6);
+                                }
+                            } else if (rest.interval === 'yearly') {
+                                let currentYear = new Date(start);
+                                while (currentYear <= actualEnd) {
+                                    datesToGenerate.push(new Date(currentYear));
+                                    currentYear.setFullYear(currentYear.getFullYear() + 1);
+                                }
+                            } else {
+                                // Monthly
+                                let currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+                                const endMonth = new Date(actualEnd.getFullYear(), actualEnd.getMonth(), 1);
+                                while (currentMonth <= endMonth) {
+                                    datesToGenerate.push(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+                                    currentMonth.setMonth(currentMonth.getMonth() + 1);
+                                }
+                            }
+                        } else {
+                            datesToGenerate.push(new Date());
+                        }
+
+                        const existingTransactions = await (prisma as any).transaction.findMany({
                             where: {
                                 studentId: student.id,
-                                categoryId: category.id,
-                                status: 'PENDING'
+                                categoryId: category.id
                             }
                         });
+                        
+                        const existingKeys = new Set(existingTransactions.map((t: any) => {
+                            const d = new Date(t.date);
+                            if (rest.interval === 'weekly') return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                            if (rest.interval === 'yearly') return `${d.getFullYear()}`;
+                            return `${d.getFullYear()}-${d.getMonth()}`;
+                        }));
 
-                        if (!existing) {
-                            transactionsToCreate.push({
-                                amount: finalAmount,
-                                type: 'INCOME',
-                                category: name,
-                                categoryId: category.id,
-                                studentId: student.id,
-                                studentName: student.name,
-                                classId: sClassId,
-                                className: cls?.name,
-                                status: 'PENDING',
-                                instituteId,
-                                date: new Date()
-                            });
+                        for (const targetDate of datesToGenerate) {
+                            let dateKey = `${targetDate.getFullYear()}-${targetDate.getMonth()}`;
+                            if (rest.interval === 'weekly') dateKey = `${targetDate.getFullYear()}-${targetDate.getMonth()}-${targetDate.getDate()}`;
+                            if (rest.interval === 'yearly') dateKey = `${targetDate.getFullYear()}`;
+
+                            let shouldCreate = false;
+                            
+                            if (rest.frequencyType === 'fixed' && ['monthly', 'weekly', 'yearly', 'semester'].includes(rest.interval) && rest.startDate) {
+                                if (!existingKeys.has(dateKey)) {
+                                    shouldCreate = true;
+                                }
+                            } else {
+                                if (existingTransactions.length === 0) {
+                                    shouldCreate = true;
+                                    existingTransactions.push({ id: 'dummy' }); 
+                                }
+                            }
+
+                            if (shouldCreate) {
+                                transactionsToCreate.push({
+                                    amount: finalAmount,
+                                    type: 'INCOME',
+                                    category: name,
+                                    categoryId: category.id,
+                                    studentId: student.id,
+                                    studentName: student.name,
+                                    classId: sClassId,
+                                    className: cls?.name,
+                                    status: 'PENDING',
+                                    instituteId,
+                                    date: targetDate
+                                });
+                            }
                         }
                     }
                 }
@@ -236,48 +319,33 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ message: 'ID is required' }, { status: 400 });
         }
 
-        if (deletePaid) {
-            // Delete ALL transactions (paid and pending) for this category
-            await (prisma as any).transaction.deleteMany({
-                where: { categoryId: id }
-            });
-
-            // Delete the category completely
-            try {
-                await (prisma as any).accountCategory.delete({
-                    where: { id }
-                });
-            } catch(e: any) {
-                if (e.code !== 'P2025') throw e; // P2025: Record to delete does not exist
+        // Enforce: Always preserve PAID transactions.
+        // Delete ONLY PENDING transactions for this category
+        await (prisma as any).transaction.deleteMany({
+            where: {
+                categoryId: id,
+                status: 'PENDING'
             }
-        } else {
-            // Delete ONLY PENDING transactions for this category
-            await (prisma as any).transaction.deleteMany({
-                where: {
-                    categoryId: id,
-                    status: 'PENDING'
+        });
+
+        // Keep the category as 'Archived' so past paid records remain linked with their cycle names
+        const existingCat = await (prisma as any).accountCategory.findUnique({
+            where: { id }
+        });
+        if (existingCat) {
+            const config = typeof existingCat.config === 'object' ? existingCat.config : {};
+            await (prisma as any).accountCategory.update({
+                where: { id },
+                data: {
+                    config: {
+                        ...config,
+                        isArchived: true
+                    }
                 }
             });
-
-            // Keep the category as 'Archived' (controller) so past paid records remain linked
-            const existingCat = await (prisma as any).accountCategory.findUnique({
-                where: { id }
-            });
-            if (existingCat) {
-                const config = typeof existingCat.config === 'object' ? existingCat.config : {};
-                await (prisma as any).accountCategory.update({
-                    where: { id },
-                    data: {
-                        config: {
-                            ...config,
-                            isArchived: true
-                        }
-                    }
-                });
-            }
         }
 
-        return NextResponse.json({ message: 'Category and associated pending dues deleted successfully' });
+        return NextResponse.json({ message: 'Category archived and associated pending dues deleted successfully' });
     } catch (error) {
         console.error('Delete Category Error:', error);
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

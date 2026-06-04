@@ -37,6 +37,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
         startDate: initialData?.config?.startDate || '',
         endDate: initialData?.config?.endDate || '',
         dueDays: initialData?.config?.dueDays || 5,
+        dueTiming: initialData?.config?.dueTiming || 'start',
         alertDays: initialData?.config?.alertDays || 2,
         alertType: initialData?.config?.alertType || 'before',
         amount: (initialData?.amount === 'variable' || typeof initialData?.amount === 'string') ? 0 : (initialData?.amount || 0),
@@ -62,6 +63,8 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
     const [classStudents, setClassStudents] = useState<Record<string, any[]>>({});
     const [loadingStudents, setLoadingStudents] = useState<Record<string, boolean>>({});
     const [studentSearch, setStudentSearch] = useState('');
+
+    const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
 
     const handleExpandClass = async (classId: string) => {
         if (expandedClassId === classId) {
@@ -283,7 +286,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                             <div className="p-8 bg-slate-50 rounded-[40px] border border-slate-100 space-y-8 mt-4 animate-in fade-in duration-300">
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2">সময়কাল নির্বাচন করুন</label>
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                         {[
                                             { id: 'weekly', label: 'সাপ্তাহিক' },
                                             { id: 'monthly', label: 'মাসিক' },
@@ -305,7 +308,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200/50">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6 border-t border-slate-200/50">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-2">শুরুর তারিখ</label>
                                         <div className="relative group">
@@ -332,38 +335,75 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200/50">
-                                    {formData.type === 'income' && (
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2">বকেয়া সময়সীমা (দিন)</label>
-                                            <div className="relative group">
-                                                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <div className="grid grid-cols-1 gap-6 pt-6 border-t border-slate-200/50">
+                                {formData.type === 'income' && (
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2 truncate block">বকেয়া সময়সীমা</label>
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative group w-16 shrink-0">
                                                 <input 
                                                     type="number" 
-                                                    value={formData.dueDays}
-                                                    onChange={(e) => setFormData({...formData, dueDays: parseInt(e.target.value) || 0})}
-                                                    className="w-full pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-[#045c84]/10"
+                                                    value={formData.dueDays === 0 ? '' : formData.dueDays}
+                                                    onChange={(e) => setFormData({...formData, dueDays: (e.target.value === '' ? '' : (parseInt(e.target.value) || 0)) as any})}
+                                                    className="w-full px-2 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-[#045c84]/10 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 />
                                             </div>
+                                            <span className="text-[10px] font-black text-slate-400 shrink-0">দিন</span>
+                                            <div className="flex-1 flex items-center p-1 bg-slate-100 rounded-2xl overflow-hidden border border-slate-100">
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); setFormData({...formData, dueTiming: 'start'}); }}
+                                                    className={`flex-1 px-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                        formData.dueTiming === 'start' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                                                    }`}
+                                                >
+                                                    শুরুর তারিখ থেকে
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); setFormData({...formData, dueTiming: 'end'}); }}
+                                                    className={`flex-1 px-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                        formData.dueTiming === 'end' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                                                    }`}
+                                                >
+                                                    সাইকেল শেষের পর
+                                                </button>
+                                            </div>
                                         </div>
-                                    )}
+                                    </div>
+                                )}
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2">{formData.type === 'income' ? 'অ্যালার্ট সেটিংস' : 'পেমেন্ট রিমাইন্ডার'}</label>
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2 truncate block">{formData.type === 'income' ? 'অ্যালার্ট সেটিংস' : 'পেমেন্ট রিমাইন্ডার'}</label>
                                         <div className="flex items-center gap-2">
-                                            <input 
-                                                type="number" 
-                                                value={formData.alertDays}
-                                                onChange={(e) => setFormData({...formData, alertDays: parseInt(e.target.value) || 0})}
-                                                className="w-20 px-4 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-[#045c84]/10"
-                                            />
-                                            <select 
-                                                value={formData.alertType}
-                                                onChange={(e) => setFormData({...formData, alertType: e.target.value as 'before' | 'after'})}
-                                                className="flex-1 px-4 py-4 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none focus:ring-4 focus:ring-[#045c84]/10"
-                                            >
-                                                <option value="before">আগে (Before)</option>
-                                                <option value="after">পরে (After)</option>
-                                            </select>
+                                            <div className="relative group w-16 shrink-0">
+                                                <input 
+                                                    type="number" 
+                                                    value={formData.alertDays === 0 ? '' : formData.alertDays}
+                                                    onChange={(e) => setFormData({...formData, alertDays: (e.target.value === '' ? '' : (parseInt(e.target.value) || 0)) as any})}
+                                                    className="w-full px-2 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-[#045c84]/10 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-black text-slate-400 shrink-0">দিন</span>
+                                            <div className="flex-1 flex items-center p-1 bg-slate-100 rounded-2xl overflow-hidden border border-slate-100">
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); setFormData({...formData, alertType: 'before'}); }}
+                                                    className={`flex-1 px-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                        formData.alertType === 'before' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                                                    }`}
+                                                >
+                                                    আগে (BEFORE)
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); setFormData({...formData, alertType: 'after'}); }}
+                                                    className={`flex-1 px-2 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                        formData.alertType === 'after' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                                                    }`}
+                                                >
+                                                    পরে (AFTER)
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -452,24 +492,28 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                 )}
 
                                 {/* Threshold Days Setting */}
-                                <div className="space-y-4 pt-4 border-t border-slate-200/50">
-                                    <div className="flex items-center justify-between px-2">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84]">থ্রেশহোল্ড দিন (Admission Threshold)</label>
-                                        <span className="text-[9px] font-bold text-slate-400 bg-white px-2 py-1 rounded-lg border border-slate-100 italic">মাসের কত তারিখের পর ভর্তি হলে হাফ ফি?</span>
+                                <div className="space-y-2 pt-6 border-t border-slate-200/50">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] block">থ্রেশহোল্ড দিন (Admission Threshold)</label>
+                                            <p className="text-[9px] font-bold text-slate-400 italic">মাসের কত তারিখের পর ভর্তি হলে হাফ ফি?</p>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                                            <div className="relative group w-20 shrink-0">
+                                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    max="31"
+                                                    className="w-full pl-8 pr-2 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    value={formData.thresholdDays === 0 ? '' : formData.thresholdDays}
+                                                    onChange={(e) => setFormData({...formData, thresholdDays: (e.target.value === '' ? '' : (Math.floor(normalizeBengaliDigits(e.target.value)) || 0)) as any})}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-black text-slate-400 shrink-0">তারিখ</span>
+                                        </div>
                                     </div>
-                                    <div className="relative group max-w-[200px]">
-                                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#045c84]" size={18} />
-                                        <input 
-                                            type="number" 
-                                            min="0"
-                                            max="31"
-                                            placeholder="যেমন: ১০"
-                                            className="w-full pl-12 pr-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all"
-                                            value={formData.thresholdDays || ''}
-                                            onChange={(e) => setFormData({...formData, thresholdDays: Math.floor(normalizeBengaliDigits(e.target.value)) || 0})}
-                                        />
-                                    </div>
-                                    <p className="text-[9px] font-bold text-slate-400 px-2 leading-relaxed italic">
+                                    <p className="text-[9px] font-bold text-slate-400 px-2 pt-1 leading-relaxed italic">
                                         * শিক্ষার্থী যদি এই দিনের (যেমন ১০ তারিখ) পরে ভর্তি হয়, তবে বর্তমান মাসের ফি স্বয়ংক্রিয়ভাবে হাফ (৫০%) হিসেবে গণ্য হবে।
                                     </p>
                                 </div>
@@ -726,7 +770,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                         className="w-24 bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all"
                                                     />
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                     {(classGroups[cls.id] || []).map((grp: any) => (
                                                         <div key={grp.id} className="bg-slate-50 p-3.5 rounded-2xl flex items-center gap-2 border border-slate-100">
                                                             <span className="text-[10px] font-black text-slate-500 flex-1">{grp.name}</span>
@@ -935,29 +979,29 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                     </button>
                     <button 
                         onClick={() => {
-                            const selectedClasses = formData.studentAmountType === 'flat' 
-                                ? availableClasses.map(c => c.id) 
-                                : availableClasses.map(c => c.id).filter(id => {
-                                      if (formData.studentClassAmounts?.[id]) return true;
-                                      
-                                      const customAmts = formData.customStudentAmounts?.[id] || {};
-                                      if (Object.keys(customAmts).length > 0) return true;
-                                      
-                                      const groups = classGroups[id] || [];
-                                      const hasGroupAmount = groups.some((g: any) => formData.studentGroupAmounts?.[`${id}-${g.id}`]);
-                                      if (hasGroupAmount) return true;
+                            if (initialData?.id) {
+                                setShowUpdatePrompt(true);
+                            } else {
+                                const selectedClasses = formData.studentAmountType === 'flat' 
+                                    ? availableClasses.map(c => c.id) 
+                                    : availableClasses.map(c => c.id).filter(id => {
+                                          if (formData.studentClassAmounts?.[id]) return true;
+                                          const customAmts = formData.customStudentAmounts?.[id] || {};
+                                          if (Object.keys(customAmts).length > 0) return true;
+                                          const groups = classGroups[id] || [];
+                                          if (groups.some((g: any) => formData.studentGroupAmounts?.[`${id}-${g.id}`])) return true;
+                                          return false;
+                                      });
 
-                                      return false;
-                                  });
-
-                            onSave({ 
-                                ...formData, 
-                                id: initialData?.id || Date.now().toString(),
-                                selectedClasses,
-                                totalRecipients: formData.provider === 'anyone' ? 'উন্মুক্ত' : totalRecipients.toLocaleString('bn-BD'),
-                                totalDue: (formData.frequencyType === 'unpredictable' && totalDue === 0) ? 'ভ্যারিয়েবল' : totalDue.toLocaleString('bn-BD'),
-                                amount: formData.frequencyType === 'unpredictable' ? 'variable' : formData.amount.toString()
-                            });
+                                onSave({ 
+                                    ...formData, 
+                                    id: Date.now().toString(),
+                                    selectedClasses,
+                                    totalRecipients: formData.provider === 'anyone' ? 'উন্মুক্ত' : totalRecipients.toLocaleString('bn-BD'),
+                                    totalDue: (formData.frequencyType === 'unpredictable' && totalDue === 0) ? 'ভ্যারিয়েবল' : totalDue.toLocaleString('bn-BD'),
+                                    amount: formData.frequencyType === 'unpredictable' ? 'variable' : formData.amount.toString()
+                                });
+                            }
                         }}
                         className="px-12 py-4 bg-[#045c84] text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-[#045c84]/20 hover:shadow-[#045c84]/40 transition-all active:scale-95"
                     >
@@ -965,6 +1009,90 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                     </button>
                 </div>
             </div>
+
+            {/* UPDATE PROMPT OVERLAY */}
+            {showUpdatePrompt && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowUpdatePrompt(false)} />
+                    <div className="relative bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <h3 className="text-xl font-black text-slate-800 mb-2">পরিবর্তন প্রয়োগ পদ্ধতি</h3>
+                        <p className="text-sm font-bold text-slate-500 mb-8 leading-relaxed">
+                            আপনি খাতের সেটিংসে কিছু পরিবর্তন করেছেন (যেমন টাকার পরিমাণ)। এই পরিবর্তনগুলো পূর্বের বকেয়া লেনদেনে কীভাবে প্রয়োগ করবেন?
+                        </p>
+                        
+                        <div className="space-y-3">
+                            <button 
+                                onClick={() => {
+                                    const selectedClasses = formData.studentAmountType === 'flat' 
+                                        ? availableClasses.map(c => c.id) 
+                                        : availableClasses.map(c => c.id).filter(id => {
+                                              if (formData.studentClassAmounts?.[id]) return true;
+                                              const customAmts = formData.customStudentAmounts?.[id] || {};
+                                              if (Object.keys(customAmts).length > 0) return true;
+                                              const groups = classGroups[id] || [];
+                                              if (groups.some((g: any) => formData.studentGroupAmounts?.[`${id}-${g.id}`])) return true;
+                                              return false;
+                                          });
+
+                                    onSave({ 
+                                        ...formData, 
+                                        id: initialData?.id,
+                                        selectedClasses,
+                                        applyFrom: 'today',
+                                        totalRecipients: formData.provider === 'anyone' ? 'উন্মুক্ত' : totalRecipients.toLocaleString('bn-BD'),
+                                        totalDue: (formData.frequencyType === 'unpredictable' && totalDue === 0) ? 'ভ্যারিয়েবল' : totalDue.toLocaleString('bn-BD'),
+                                        amount: formData.frequencyType === 'unpredictable' ? 'variable' : formData.amount.toString()
+                                    });
+                                    setShowUpdatePrompt(false);
+                                }}
+                                className="w-full text-left p-5 rounded-2xl border-2 border-slate-100 hover:border-[#045c84] hover:bg-blue-50/50 transition-all group"
+                            >
+                                <p className="font-black text-slate-800 group-hover:text-[#045c84]">আজ থেকে প্রয়োগ করুন</p>
+                                <p className="text-xs font-bold text-slate-500 mt-1">পুরোনো বকেয়া লেনদেনগুলোতে পুরোনো ফি-ই বহাল থাকবে। শুধুমাত্র আজকের পর থেকে তৈরি হওয়া বকেয়াগুলোতে নতুন ফি প্রযোজ্য হবে।</p>
+                            </button>
+                            
+                            <button 
+                                onClick={() => {
+                                    const selectedClasses = formData.studentAmountType === 'flat' 
+                                        ? availableClasses.map(c => c.id) 
+                                        : availableClasses.map(c => c.id).filter(id => {
+                                              if (formData.studentClassAmounts?.[id]) return true;
+                                              const customAmts = formData.customStudentAmounts?.[id] || {};
+                                              if (Object.keys(customAmts).length > 0) return true;
+                                              const groups = classGroups[id] || [];
+                                              if (groups.some((g: any) => formData.studentGroupAmounts?.[`${id}-${g.id}`])) return true;
+                                              return false;
+                                          });
+
+                                    onSave({ 
+                                        ...formData, 
+                                        id: initialData?.id,
+                                        selectedClasses,
+                                        applyFrom: 'start',
+                                        totalRecipients: formData.provider === 'anyone' ? 'উন্মুক্ত' : totalRecipients.toLocaleString('bn-BD'),
+                                        totalDue: (formData.frequencyType === 'unpredictable' && totalDue === 0) ? 'ভ্যারিয়েবল' : totalDue.toLocaleString('bn-BD'),
+                                        amount: formData.frequencyType === 'unpredictable' ? 'variable' : formData.amount.toString()
+                                    });
+                                    setShowUpdatePrompt(false);
+                                }}
+                                className="w-full text-left p-5 rounded-2xl border-2 border-slate-100 hover:border-rose-500 hover:bg-rose-50/50 transition-all group"
+                            >
+                                <p className="font-black text-slate-800 group-hover:text-rose-600">শুরু থেকে (সব) প্রয়োগ করুন</p>
+                                <p className="text-xs font-bold text-slate-500 mt-1">আগের তৈরি হওয়া সমস্ত অপরিশোধিত (Pending) বকেয়া লেনদেন ডিলিট হয়ে নতুন ফি অনুযায়ী স্বয়ংক্রিয়ভাবে পুনরায় তৈরি হবে।</p>
+                            </button>
+                        </div>
+                        
+                        <div className="mt-6 flex justify-end">
+                            <button 
+                                onClick={() => setShowUpdatePrompt(false)}
+                                className="px-6 py-3 text-slate-400 text-xs font-black uppercase tracking-widest hover:text-slate-600 transition-colors"
+                            >
+                                বাতিল করুন
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

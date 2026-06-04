@@ -689,7 +689,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
 
                                             const groupedByType = (transactions || []).reduce((acc: any, t: any) => {
                                                 if (t.status?.toString().toUpperCase() === 'PENDING' && t.type?.toString().toUpperCase() === 'INCOME') {
-                                                    const key = t.category || 'অন্যান্য';
+                                                    const key = t.originalCategory || t.category || 'অন্যান্য';
                                                     if (!acc[key]) acc[key] = { items: [], total: 0 };
                                                     acc[key].items.push(t);
                                                     acc[key].total += (Number(t.amount) || 0);
@@ -770,7 +770,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
 
                                                     const groupedByType = (transactions || []).reduce((acc: any, t: any) => {
                                                         if (t.status?.toString().toUpperCase() === 'PENDING' && t.type?.toString().toUpperCase() === 'INCOME') {
-                                                            const key = t.category || 'অন্যান্য';
+                                                            const key = t.originalCategory || t.category || 'অন্যান্য';
                                                             if (!acc[key]) acc[key] = { items: [], total: 0 };
                                                             acc[key].items.push(t);
                                                             acc[key].total += (Number(t.amount) || 0);
@@ -1078,7 +1078,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
 
                                 const groupedByType = (transactions || []).reduce((acc: any, t: any) => {
                                     if (t.status?.toString().toUpperCase() === 'PENDING' && t.type?.toString().toUpperCase() === 'INCOME') {
-                                        const key = t.category || 'অন্যান্য';
+                                        const key = t.originalCategory || t.category || 'অন্যান্য';
                                         if (!acc[key]) acc[key] = { items: [], total: 0 };
                                         acc[key].items.push(t);
                                         acc[key].total += (Number(t.amount) || 0);

@@ -30238,3 +30238,588 @@
   "isOwner": true
 }
 
+[2026-06-03T12:42:31.904Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-03",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T12:42:31.966Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T12:42:31.966Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T12:42:32.035Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T12:42:32.292Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-03",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T12:42:32.396Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T12:42:32.397Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T12:42:32.487Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T12:44:04.440Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T12:44:04.487Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T12:44:04.487Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T12:44:04.535Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T12:44:14.509Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T12:44:14.555Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T12:44:14.555Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T12:44:14.603Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T13:09:53.535Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T13:09:53.589Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T13:09:53.590Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T13:09:53.643Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T16:49:13.848Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-03",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T16:49:13.906Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T16:49:13.906Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T16:49:13.959Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T16:49:14.146Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-03",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T16:49:14.191Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T16:49:14.192Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T16:49:14.241Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T17:00:20.716Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-03",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T17:00:20.774Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T17:00:20.775Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T17:00:20.834Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T18:06:52.543Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-04",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T18:06:52.595Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T18:06:52.595Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T18:06:52.648Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-03T18:06:52.820Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-04",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-03T18:06:52.877Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-03T18:06:52.878Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-03T18:06:52.930Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-04T01:41:34.700Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-04",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-04T01:41:34.754Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-04T01:41:34.755Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-04T01:41:34.805Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-04T01:41:35.000Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-04",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-04T01:41:35.049Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-04T01:41:35.049Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-04T01:41:35.098Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-04T05:20:26.920Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6c",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-04",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-04T05:20:26.996Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-04T05:20:26.997Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-04T05:20:27.042Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-04T05:20:27.201Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6c",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-04",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-04T05:20:27.246Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-04T05:20:27.247Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-04T05:20:27.292Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-04T05:49:21.123Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6c",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-06-04",
+  "month": null,
+  "sessionUser": {
+    "id": "69cb30b956b543f4b97311d5",
+    "email": "hmdselim@gmail.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-04T05:49:21.177Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69cb30b956b543f4b97311d5"
+}
+
+[2026-06-04T05:49:21.177Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-04T05:49:21.234Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "69cb30ba56b543f4b97311d6",
+    "userId": "69cb30b956b543f4b97311d5",
+    "instituteId": "69b03c35b2ae6e1d28ae2137",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+

@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
         const transactions = await (prisma as any).transaction.findMany({
             where,
-            orderBy: { date: 'desc' }
+            orderBy: { updatedAt: 'desc' }
         });
 
         // Load categories to check existence for orphaned dues checking and exclusion flags
@@ -77,9 +77,35 @@ export async function GET(req: Request) {
             const categoryExists = categoryNames.has(categoryNameLower) || (catIdStr && categoryIds.has(catIdStr));
 
             let displayCategory = rawTx.category;
-            if (displayCategory && displayCategory.includes('মাসিক')) {
-                // For pending fees, date is the due date. For completed fees, date is payment date so use createdAt
-                const targetDate = rawTx.status === 'PENDING' ? rawTx.date : (rawTx.createdAt || rawTx.date);
+            const catInfo = catIdStr ? categoryMap.get(catIdStr) : null;
+            const interval = catInfo?.config?.interval;
+            const frequencyType = catInfo?.config?.frequencyType;
+
+            if (frequencyType === 'fixed' && interval) {
+                const targetDate = rawTx.date;
+                const d = new Date(targetDate);
+                
+                let cycleName = '';
+                if (interval === 'monthly') {
+                    cycleName = d.toLocaleDateString('bn-BD', { month: 'long', year: 'numeric' });
+                } else if (interval === 'yearly') {
+                    cycleName = d.toLocaleDateString('bn-BD', { year: 'numeric' });
+                } else if (interval === 'semester') {
+                    const half = d.getMonth() < 6 ? '১ম' : '২য়';
+                    cycleName = `${half} ষান্মাসিক, ${d.toLocaleDateString('bn-BD', { year: 'numeric' })}`;
+                } else if (interval === 'weekly') {
+                    // Approximate week number in month
+                    const firstDay = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+                    const week = Math.ceil((d.getDate() + firstDay) / 7);
+                    cycleName = `সপ্তাহ ${week.toLocaleString('bn-BD')}, ${d.toLocaleDateString('bn-BD', { month: 'short', year: 'numeric' })}`;
+                }
+                
+                if (cycleName) {
+                    const baseCat = displayCategory.replace(/\s*\(.*\)\s*$/, '').trim(); 
+                    displayCategory = `${baseCat} (${cycleName})`;
+                }
+            } else if (displayCategory && displayCategory.includes('মাসিক')) {
+                const targetDate = rawTx.date;
                 const d = new Date(targetDate);
                 const monthYear = d.toLocaleDateString('bn-BD', { month: 'long', year: 'numeric' });
                 const baseCat = displayCategory.replace(/\s*-?\s*\d{4}\s*$/, '').trim();
@@ -102,16 +128,45 @@ export async function GET(req: Request) {
                     studentInfo.studentPhoto = metadata.studentPhoto || null;
                     studentInfo.fatherName = metadata.fathersName || metadata.guardianName || null;
                     studentInfo.mobileNumber = metadata.fathersPhone || metadata.guardianPhone || s.phone || null;
+                    // Use className from transaction record first, fallback to student metadata
+                    if (!rawTx.className && metadata.className) {
+                        (studentInfo as any).className = metadata.className;
+                    }
                 }
             }
 
-            const catInfo = catIdStr ? categoryMap.get(catIdStr) : null;
+
+            let dueDate = new Date(rawTx.date);
+            if (catInfo?.config) {
+                const config = catInfo.config;
+                const dueTiming = config.dueTiming || 'start';
+                const dueDays = Number(config.dueDays) || 0;
+                
+                if (config.interval === 'monthly') {
+                    if (dueTiming === 'end') {
+                        dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, dueDays || 1);
+                    } else {
+                        dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDays || 1);
+                    }
+                } else if (config.interval === 'weekly') {
+                    if (dueTiming === 'end') dueDate.setDate(dueDate.getDate() + 7);
+                    dueDate.setDate(dueDate.getDate() + dueDays);
+                } else if (config.interval === 'semester') {
+                    if (dueTiming === 'end') dueDate.setMonth(dueDate.getMonth() + 6);
+                    dueDate.setDate(dueDate.getDate() + dueDays);
+                } else if (config.interval === 'yearly') {
+                    if (dueTiming === 'end') dueDate.setFullYear(dueDate.getFullYear() + 1);
+                    dueDate.setDate(dueDate.getDate() + dueDays);
+                }
+            }
+
             const isExcludedFromSummary = catInfo?.config?.isExcludedFromSummary || false;
 
             return {
                 ...rawTx,
                 originalCategory: rawTx.category,
                 category: displayCategory,
+                dueDate: dueDate.toISOString(),
                 ...studentInfo,
                 categoryExists: !!categoryExists,
                 isExcludedFromSummary

@@ -107,6 +107,26 @@ interface FieldLibraryProps {
 
 export default function FieldLibrary({ isOpen, onClose, currentFields, onAddField, onRemoveField }: FieldLibraryProps) {
     const [mounted, setMounted] = useState(false);
+    const [customFields, setCustomFields] = useState<FieldDefinition[]>([]);
+    const [isCreatingCustom, setIsCreatingCustom] = useState(false);
+    const [newFieldLabel, setNewFieldLabel] = useState('');
+    const [newFieldType, setNewFieldType] = useState<FieldType>('text');
+
+    const handleCreateCustomField = () => {
+        if (!newFieldLabel.trim()) return;
+        const newField: FieldDefinition = {
+            id: `custom_${Date.now()}`,
+            label: newFieldLabel.trim(),
+            type: newFieldType,
+            category: 'কাস্টম ফিল্ড',
+            icon: newFieldType === 'number' ? Hash : newFieldType === 'date' ? Calendar : newFieldType === 'attachment' ? FileUp : Type
+        };
+        setCustomFields([...customFields, newField]);
+        setNewFieldLabel('');
+        setNewFieldType('text');
+        setIsCreatingCustom(false);
+        onAddField(newField);
+    };
 
     useEffect(() => {
         setMounted(true);
@@ -122,7 +142,8 @@ export default function FieldLibrary({ isOpen, onClose, currentFields, onAddFiel
 
     if (!mounted || !isOpen) return null;
 
-    const categories = Array.from(new Set(POSSIBLE_FIELDS.map(f => f.category)));
+    const ALL_FIELDS = [...POSSIBLE_FIELDS, ...customFields];
+    const categories = Array.from(new Set(ALL_FIELDS.map(f => f.category)));
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex justify-end">
@@ -142,13 +163,67 @@ export default function FieldLibrary({ isOpen, onClose, currentFields, onAddFiel
                     className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar"
                     data-lenis-prevent
                 >
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                        {!isCreatingCustom ? (
+                            <button
+                                onClick={() => setIsCreatingCustom(true)}
+                                className="w-full py-3 flex items-center justify-center gap-2 text-sm font-bold text-[#045c84] hover:bg-blue-50 rounded-xl transition-all border border-dashed border-blue-200"
+                            >
+                                <Plus size={18} />
+                                নতুন কাস্টম ফিল্ড তৈরি করুন
+                            </button>
+                        ) : (
+                            <div className="space-y-4 animate-fade-in">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-sm font-bold text-slate-700">কাস্টম ফিল্ড যোগ করুন</h3>
+                                    <button onClick={() => setIsCreatingCustom(false)} className="p-1 hover:bg-slate-200 rounded-lg">
+                                        <X size={16} className="text-slate-500" />
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">ফিল্ডের নাম</label>
+                                        <input
+                                            type="text"
+                                            value={newFieldLabel}
+                                            onChange={(e) => setNewFieldLabel(e.target.value)}
+                                            placeholder="যেমন: রক্তের গ্রুপ, উচ্চতা..."
+                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84]"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">ফিল্ডের ধরন</label>
+                                        <select
+                                            value={newFieldType}
+                                            onChange={(e) => setNewFieldType(e.target.value as FieldType)}
+                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84]"
+                                        >
+                                            <option value="text">টেক্সট / মোবাইল</option>
+                                            <option value="number">নম্বর / বয়স</option>
+                                            <option value="date">তারিখ / ক্যালেন্ডার</option>
+                                            <option value="attachment">ছবি / ফাইল আপলোড</option>
+                                        </select>
+                                    </div>
+                                    <button
+                                        onClick={handleCreateCustomField}
+                                        disabled={!newFieldLabel.trim()}
+                                        className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 text-white font-bold rounded-xl transition-all"
+                                    >
+                                        যোগ করুন
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {categories.map(category => (
                         <div key={category} className="space-y-4">
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-l-4 border-[#045c84] pl-3">
                                 {category}
                             </h3>
                             <div className="grid grid-cols-1 gap-3">
-                                {POSSIBLE_FIELDS.filter(f => f.category === category).map(field => {
+                                {ALL_FIELDS.filter(f => f.category === category).map(field => {
                                     const isAdded = currentFields.some(cf => cf.id === field.id);
                                     const Icon = field.icon || Type;
 

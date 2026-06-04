@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, startTransition } from 'react';
 import * as faceapi from '@vladmandic/face-api';
 import { createPortal } from 'react-dom';
 import { useSession } from '@/components/SessionProvider';
 import { usePathname } from 'next/navigation';
+
 import {
     Users,
     Search,
@@ -46,7 +47,8 @@ import {
     User,
     Info,
     Key,
-    History
+    History,
+    Wallet
 } from 'lucide-react';
 import { ScrollableTabs } from '@/components/ui/ScrollableTabs';
 import Toast from '@/components/Toast';
@@ -59,8 +61,157 @@ import BookDetailsModal from '@/components/BookDetailsModal';
 import PdfReaderModal from '@/components/PdfReaderModal';
 import TeacherPermissionModal from '@/components/TeacherPermissionModal';
 import SubjectGradingModal from '@/components/SubjectGradingModal';
+import FeeCollectModal from '@/components/FeeCollectModal';
+import PrintReceiptModal from '@/components/PrintReceiptModal';
 import { useUI } from '@/components/UIProvider';
 import { getCleanId } from '@/utils/digit-utils';
+
+const EditableCell = ({ value, type, onSave, onClose, options }: { value: any, type: string, onSave: (val: any) => void, onClose?: () => void, options?: { id: string, name: string }[] }) => {
+    const [tempValue, setTempValue] = useState(value || '');
+    const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top' | null>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
+
+    useEffect(() => {
+        if (type === 'select') {
+            document.body.style.overflow = 'hidden';
+
+            if (wrapperRef.current) {
+                const rect = wrapperRef.current.getBoundingClientRect();
+                const dropdownHeight = 224; // max-h-56
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const showAbove = spaceBelow < dropdownHeight + 8 && rect.top > dropdownHeight + 8;
+                
+                setDropdownRect({
+                    top: showAbove ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+                    left: rect.left,
+                    width: Math.max(rect.width, 200),
+                });
+                setDropdownPosition(showAbove ? 'top' : 'bottom');
+            }
+
+            return () => {
+                document.body.style.overflow = 'auto';
+            };
+        }
+    }, [type]);
+    const handleBlur = () => {
+        if (tempValue !== (value || '')) {
+            onSave(tempValue);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleBlur();
+            (e.target as HTMLElement).blur();
+        }
+    };
+
+    if (type === 'select') {
+        const closeDropdown = () => {
+            handleBlur();
+            document.body.style.overflow = 'auto';
+            if (onClose) onClose();
+        };
+
+        const dropdownList = dropdownRect ? createPortal(
+            <>
+                {/* Backdrop - click outside to close */}
+                <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        closeDropdown();
+                    }}
+                />
+
+                {/* Dropdown card */}
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: dropdownRect.top,
+                        left: dropdownRect.left,
+                        minWidth: Math.max(dropdownRect.width, 200),
+                        zIndex: 9999,
+                    }}
+                    className={`bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden flex flex-col transition-all duration-150 ${
+                        dropdownPosition === null ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'
+                    }`}
+                    onWheel={(e) => e.stopPropagation()}
+                >
+                    {/* Close button header */}
+                    <div className="flex items-center justify-end px-2 pt-2 pb-0">
+                        <button
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                closeDropdown();
+                            }}
+                            className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+
+                    {/* Options list */}
+                    <div className="flex flex-col gap-0.5 p-1.5 max-h-52 overflow-y-auto custom-scrollbar">
+                        <button
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                setTempValue('');
+                                onSave('');
+                                closeDropdown();
+                            }}
+                            className={`text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${tempValue === '' ? 'bg-[#045c84] text-white shadow-sm' : 'hover:bg-slate-50 text-slate-700'}`}
+                        >
+                            ফাঁকা রাখুন
+                        </button>
+                        {options?.map(opt => (
+                            <button
+                                key={opt.id}
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setTempValue(opt.id);
+                                    onSave(opt.id);
+                                    closeDropdown();
+                                }}
+                                className={`text-left px-3 py-2.5 text-xs font-bold rounded-xl transition-all ${tempValue === opt.id ? 'bg-[#045c84] text-white shadow-sm' : 'hover:bg-slate-50 text-slate-700'}`}
+                            >
+                                {opt.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </>,
+            document.body
+        ) : null;
+
+        return (
+            <div ref={wrapperRef} className="w-full h-full flex items-center" onClick={(e) => e.stopPropagation()}>
+                <span className="text-slate-700 text-xs font-bold">
+                    {options?.find(o => o.id === tempValue)?.name || '-'}
+                </span>
+                {dropdownList}
+            </div>
+        );
+    }
+
+    return (
+        <input
+            autoFocus
+            type={type}
+            value={tempValue}
+            onChange={(e) => setTempValue(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            className="w-full bg-transparent border-b border-dashed border-[#045c84] outline-none p-0 m-0 focus:ring-0 text-slate-900 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            style={{ textAlign: 'inherit' }}
+            onClick={(e) => e.stopPropagation()}
+        />
+    );
+};
 
 export default function StudentManagementPage() {
     const { user: currentUser, activeRole, activeInstitute, isLoading } = useSession();
@@ -83,6 +234,7 @@ export default function StudentManagementPage() {
     const [editingClass, setEditingClass] = useState<any>(null);
     const [editingGroup, setEditingGroup] = useState<any>(null);
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<string | null>(null);
+    const [showAllActionsInline, setShowAllActionsInline] = useState(false);
     const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [editingStudent, setEditingStudent] = useState<any>(null);
@@ -99,6 +251,70 @@ export default function StudentManagementPage() {
         password: '',
         metadata: {}
     });
+    
+    // Direct Image Upload from Table
+    const [uploadingStudentId, setUploadingStudentId] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleDirectImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!uploadingStudentId) return;
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (isFaceModelLoaded) {
+            extractFaceDescriptor(file, 'studentPhoto');
+        }
+
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+
+        const studentId = uploadingStudentId;
+        setUploadingStudentId(null);
+        if (e.target) e.target.value = '';
+
+        const localUrl = URL.createObjectURL(file);
+        setStudents(prev => prev.map(s => {
+            if (s.id === studentId) {
+                return { ...s, metadata: { ...(s.metadata || {}), studentPhoto: localUrl } };
+            }
+            return s;
+        }));
+
+        try {
+            setToast({ message: 'ছবি আপলোড হচ্ছে...', type: 'success' });
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: uploadData
+            });
+            const data = await res.json();
+            if (res.ok && data.url) {
+                const targetStudent = students.find(s => s.id === studentId);
+                await fetch(`/api/admin/users`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: studentId,
+                        metadata: {
+                            ...(targetStudent?.metadata || {}),
+                            studentPhoto: data.url
+                        }
+                    })
+                });
+
+                setStudents(prev => prev.map(s => {
+                    if (s.id === studentId) {
+                        return { ...s, metadata: { ...(s.metadata || {}), studentPhoto: data.url } };
+                    }
+                    return s;
+                }));
+                setToast({ message: 'ছবি আপডেট সফল হয়েছে', type: 'success' });
+            } else {
+                setToast({ message: data.message || 'আপলোড ব্যর্থ হয়েছে।', type: 'error' });
+            }
+        } catch (error) {
+            setToast({ message: 'ফাইল আপলোড ব্যর্থ হয়েছে।', type: 'error' });
+        }
+    };
 
     // Auto-sync fields between Profile and Account Setup
     useEffect(() => {
@@ -163,12 +379,189 @@ export default function StudentManagementPage() {
 
     // Login Credentials Modal States
     const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
+    const [loginType, setLoginType] = useState<'student' | 'guardian'>('student');
     const [credentialsData, setCredentialsData] = useState<any>(null);
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
+    const [viewMode, setViewMode] = useState<'DEFAULT' | 'FEES_COLLECT' | 'ADMISSION'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('students_viewMode') as any) || 'DEFAULT';
+        }
+        return 'DEFAULT';
+    });
+    const [optimisticViewMode, setOptimisticViewMode] = useState<'DEFAULT' | 'FEES_COLLECT' | 'ADMISSION'>(() => {
+        if (typeof window !== 'undefined') {
+            return (localStorage.getItem('students_viewMode') as any) || 'DEFAULT';
+        }
+        return 'DEFAULT';
+    });
     const [visibleCount, setVisibleCount] = useState(50);
+    const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
+    const [selectedStudentForFee, setSelectedStudentForFee] = useState<any>(null);
+    const [selectedTransactionForPrint, setSelectedTransactionForPrint] = useState<any>(null);
+    const [feesData, setFeesData] = useState<{ [studentId: string]: { totalPaid: number, totalDue: number, advance: number } } | null>(null);
+    const [loadingFees, setLoadingFees] = useState(false);
+    const [tableColumns, setTableColumns] = useState<Record<string, boolean>>(() => {
+        const defaults = {
+            ...POSSIBLE_FIELDS.reduce((acc, field) => ({ ...acc, [field.id]: false }), {}),
+            sl: true,
+            rollNumber: true,
+            studentId: true,
+            student: true,
+            className: true,
+            contact: true,
+            action: true
+        };
+        if (typeof window !== 'undefined') {
+            try {
+                const saved = localStorage.getItem('students_tableColumns');
+                if (saved) return { ...defaults, ...JSON.parse(saved) };
+            } catch {}
+        }
+        return defaults;
+    });
+    const [isTableEditMode, setIsTableEditMode] = useState(false);
+    const [editingCell, setEditingCell] = useState<{ studentId: string, fieldId: string } | null>(null);
+    const [sortField, setSortField] = useState<string>(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('students_sortField') || 'rollNumber';
+        return 'rollNumber';
+    });
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>(() => {
+        if (typeof window !== 'undefined') return (localStorage.getItem('students_sortDir') as any) || 'asc';
+        return 'asc';
+    });
+
+    const handleSort = (field: string) => {
+        if (sortField === field) {
+            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDir('asc');
+        }
+    };
+
+    const SortIcon = ({ field }: { field: string }) => {
+        if (sortField !== field) return <span className="opacity-20 ml-1">↕</span>;
+        return <span className="ml-1 text-[#045c84]">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+    };
+
+    // Persist state to localStorage
+    useEffect(() => { localStorage.setItem('students_viewMode', viewMode); }, [viewMode]);
+    useEffect(() => { localStorage.setItem('students_tableColumns', JSON.stringify(tableColumns)); }, [tableColumns]);
+    useEffect(() => { localStorage.setItem('students_sortField', sortField); }, [sortField]);
+    useEffect(() => { localStorage.setItem('students_sortDir', sortDir); }, [sortDir]);
+    const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
+    const [customColumns, setCustomColumns] = useState<{ id: string, label: string, type: string }[]>([]);
+    const [isCustomFieldModalOpen, setIsCustomFieldModalOpen] = useState(false);
+    const [newCustomColumnLabel, setNewCustomColumnLabel] = useState('');
+    const [newCustomColumnType, setNewCustomColumnType] = useState('text');
+
+    // Load custom columns from DB
+    useEffect(() => {
+        if (!activeInstitute?.id) return;
+        fetch(`/api/admin/institutes/custom-columns?instituteId=${activeInstitute.id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data) && data.length > 0) {
+                    setCustomColumns(data);
+                    setTableColumns(prev => {
+                        const newCols: Record<string, boolean> = { ...prev };
+                        data.forEach((col: any) => { newCols[col.id] = true; });
+                        return newCols;
+                    });
+                }
+            })
+            .catch(() => {});
+    }, [activeInstitute?.id]);
+
+    const saveCustomColumnsToDB = async (cols: { id: string, label: string, type: string }[]) => {
+        if (!activeInstitute?.id) return;
+        await fetch('/api/admin/institutes/custom-columns', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ instituteId: activeInstitute.id, customStudentColumns: cols })
+        });
+    };
+
+    const handleAddCustomColumn = () => {
+        if (!newCustomColumnLabel.trim()) return;
+        const newColId = `custom_${Date.now()}`;
+        const newCol = { id: newColId, label: newCustomColumnLabel.trim(), type: newCustomColumnType };
+        const updated = [...customColumns, newCol];
+        setCustomColumns(updated);
+        setTableColumns(prev => ({ ...prev, [newColId]: true }));
+        setNewCustomColumnLabel('');
+        setNewCustomColumnType('text');
+        setIsCustomFieldModalOpen(false);
+        setIsColumnDropdownOpen(false);
+        saveCustomColumnsToDB(updated);
+    };
+
+    const handleDeleteCustomColumn = (colId: string) => {
+        const updated = customColumns.filter(c => c.id !== colId);
+        setCustomColumns(updated);
+        setTableColumns(prev => { const n = { ...prev }; delete n[colId]; return n; });
+        saveCustomColumnsToDB(updated);
+    };
+
+
+    const fetchFeesData = () => {
+        if (!activeInstitute?.id) return;
+        setLoadingFees(true);
+        fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&_cb=${Date.now()}`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(data => {
+                const txns = data.transactions || [];
+                const feesMap: { [studentId: string]: { totalPaid: number, totalDue: number, advance: number } } = {};
+                
+                txns.forEach((t: any) => {
+                    if (!t.studentId) return;
+                    const sId = t.studentId;
+                    if (!feesMap[sId]) {
+                        feesMap[sId] = { totalPaid: 0, totalDue: 0, advance: 0 };
+                    }
+                    
+                    if (t.type === 'INCOME') {
+                        if (t.status === 'COMPLETED') {
+                            if (t.category && t.category.startsWith('__ADVANCE__')) {
+                                feesMap[sId].advance += t.amount;
+                            } else if (!t.isExcludedFromSummary) {
+                                feesMap[sId].totalPaid += t.amount;
+                            }
+                        } else if (t.status === 'PENDING' && !t.isExcludedFromSummary) {
+                            feesMap[sId].totalDue += t.amount;
+                        }
+                    }
+                });
+                
+                setFeesData(feesMap);
+            })
+            .catch(err => console.error("Error fetching fees data:", err))
+            .finally(() => setLoadingFees(false));
+    };
 
     useEffect(() => {
-        setMounted(true);
+        if (viewMode === 'FEES_COLLECT' && !feesData && activeInstitute?.id) {
+            const syncKey = `sync_${activeInstitute.id}`;
+            if (!sessionStorage.getItem(syncKey)) {
+                sessionStorage.setItem(syncKey, 'true');
+                fetch('/api/admin/accounts/sync-dues', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ instituteId: activeInstitute.id })
+                })
+                .then(() => fetchFeesData())
+                .catch(err => {
+                    console.error('Failed to sync dues:', err);
+                    sessionStorage.removeItem(syncKey);
+                    fetchFeesData();
+                });
+            } else {
+                fetchFeesData();
+            }
+        }
+    }, [viewMode, activeInstitute?.id]);
+
+    useEffect(() => {
         loadFaceModels();
     }, []);
 
@@ -804,11 +1197,8 @@ export default function StudentManagementPage() {
             const finalPhone = formData.metadata?.studentPhone || formData.phone;
             const gPhone = formData.metadata?.guardianPhone;
 
-            if (!formData.skipAccountSetup && !finalEmail && !finalPhone && !gPhone) {
-                setToast({ message: 'ইমেইল, শিক্ষার্থীর মোবাইল অথবা অভিভাবকের মোবাইল নম্বর - যেকোনো একটি অবশ্যই দিতে হবে।', type: 'error' });
-                setActionLoading(false);
-                return;
-            }
+            const isLoginEmpty = !finalEmail && !finalPhone && !gPhone;
+            const shouldSkipAccount = formData.skipAccountSetup || isLoginEmpty;
 
             // Build the final faceDescriptor payload
             let finalFaceDescriptor = formData.faceDescriptor || [];
@@ -843,10 +1233,11 @@ export default function StudentManagementPage() {
                 password: finalPassword,
                 phone: finalPhone || null,
                 role: 'STUDENT',
+                skipAccountSetup: shouldSkipAccount,
                 faceDescriptor: finalFaceDescriptor,
                 metadata: editingStudent?.metadata?.admissionStatus === 'PENDING'
-                    ? { ...cleanedMetadata, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Admission)', reason: 'প্রবেশাধিকার (Admission)' }] }
-                    : (editingStudent ? cleanedMetadata : { ...cleanedMetadata, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Creation)', reason: 'প্রবেশাধিকার (Admission)' }] }),
+                    ? { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Admission)', reason: 'প্রবেশাধিকার (Admission)' }] }
+                    : (editingStudent ? { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount } : { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Creation)', reason: 'প্রবেশাধিকার (Admission)' }] }),
                 instituteIds: editingStudent ? undefined : [activeInstitute.id] // only for POST
             };
 
@@ -897,6 +1288,58 @@ export default function StudentManagementPage() {
             setToast({ message: 'সার্ভার এরর।', type: 'error' });
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleInlineEditSave = async (studentId: string, fieldId: string, newValue: any) => {
+        const student = students.find(s => s.id === studentId);
+        if (!student) return;
+
+        // Optimistic update
+        setStudents(prev => prev.map(s => {
+            if (s.id !== studentId) return s;
+            if (fieldId === 'name' || fieldId === 'phone' || fieldId === 'email') {
+                return { ...s, [fieldId]: newValue };
+            }
+            return {
+                ...s,
+                metadata: {
+                    ...(s.metadata || {}),
+                    [fieldId]: newValue
+                }
+            };
+        }));
+        setEditingCell(null);
+
+        try {
+            const payload: any = { id: studentId };
+            if (fieldId === 'name' || fieldId === 'phone' || fieldId === 'email') {
+                payload[fieldId] = newValue;
+            } else {
+                payload.metadata = {
+                    ...(student.metadata || {}),
+                    [fieldId]: newValue
+                };
+            }
+
+            const res = await fetch('/api/admin/users', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                // Revert on fail
+                setStudents(prev => prev.map(s => s.id === studentId ? student : s));
+                setToast({ message: 'আপডেট ব্যর্থ হয়েছে।', type: 'error' });
+            } else {
+                setToast({ message: 'আপডেট করা হয়েছে!', type: 'success' });
+            }
+        } catch (error) {
+            console.error('Inline edit failed:', error);
+            // Revert on fail
+            setStudents(prev => prev.map(s => s.id === studentId ? student : s));
+            setToast({ message: 'সার্ভার এরর।', type: 'error' });
         }
     };
 
@@ -1278,50 +1721,72 @@ export default function StudentManagementPage() {
                 </div>
 
                 {activeTab === 'students' && (
-                    <details className="relative shrink-0 group z-[200]">
-                        <summary className="list-none flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none">
+                    <div className="flex items-center gap-2 shrink-0 z-[200]">
+                        {/* View Mode Toggle Button */}
+                        <button
+                            onClick={() => {
+                                const modes = ['DEFAULT', 'FEES_COLLECT', 'ADMISSION'] as const;
+                                const currentIndex = modes.indexOf(optimisticViewMode as any);
+                                const nextIndex = (currentIndex + 1) % modes.length;
+                                const nextMode = modes[nextIndex];
+                                
+                                setOptimisticViewMode(nextMode);
+                                startTransition(() => {
+                                    setViewMode(nextMode);
+                                });
+                            }}
+                            className="flex items-center gap-1.5 sm:gap-2 bg-[#045c84]/5 border border-[#045c84]/20 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-[#045c84] shadow-sm cursor-pointer hover:bg-[#045c84]/10 transition-all focus:outline-none shrink-0"
+                            title="পরিবর্তন করতে ক্লিক করুন"
+                        >
                             <span className="flex items-center gap-1.5">
-                                {statusFilter === 'ACTIVE' && <><span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:inline-block"></span> সক্রিয়</>}
-                                {statusFilter === 'INACTIVE' && <><span className="w-2 h-2 rounded-full bg-rose-500 hidden sm:inline-block"></span> নিষ্ক্রিয়</>}
-                                {statusFilter === 'ALL' && <><span className="w-2 h-2 rounded-full bg-slate-500 hidden sm:inline-block"></span> সকল</>}
+                                {optimisticViewMode === 'DEFAULT' ? <><Users size={16} className="hidden sm:block" /> স্ট্যান্ডার্ড</> : optimisticViewMode === 'FEES_COLLECT' ? <><Wallet size={16} className="hidden sm:block" /> ফিস কালেকশন</> : <><UserPlus size={16} className="hidden sm:block" /> ভর্তি মোড</>}
                             </span>
-                            <ChevronDown size={16} className="text-slate-400 group-open:rotate-180 transition-transform" />
-                        </summary>
-                        
-                        {/* Dropdown Menu */}
-                        <div className="absolute right-0 top-[calc(100%+0.5rem)] w-40 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-[210] flex flex-col gap-1">
-                            {[
-                                { id: 'ACTIVE', label: 'সক্রিয়', count: students.filter(s => (s.metadata?.status || 'ACTIVE') === 'ACTIVE').length, dot: 'bg-emerald-500' },
-                                { id: 'INACTIVE', label: 'নিষ্ক্রিয়', count: students.filter(s => s.metadata?.status === 'INACTIVE').length, dot: 'bg-rose-500' },
-                                { id: 'ALL', label: 'সকল', count: null, dot: 'bg-slate-500' }
-                            ].map((opt) => (
-                                <button
-                                    key={opt.id}
-                                    onClick={() => {
-                                        setStatusFilter(opt.id as any);
-                                        // Close dropdown by removing open attribute from closest details
-                                        const details = document.querySelector('details.group[open]') as HTMLDetailsElement;
-                                        if (details) details.removeAttribute('open');
-                                    }}
-                                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${
-                                        statusFilter === opt.id ? 'bg-[#045c84]/10 text-[#045c84]' : 'text-slate-600 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <span className={`w-1.5 h-1.5 rounded-full ${opt.dot}`}></span>
-                                        {opt.label}
-                                    </span>
-                                    {opt.count !== null && (
-                                        <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${
-                                            statusFilter === opt.id ? 'bg-[#045c84]/20 text-[#045c84]' : 'bg-slate-100 text-slate-500'
-                                        }`}>
-                                            {opt.count}
+                        </button>
+
+                        {/* Status Filter Dropdown */}
+                        <details className="relative shrink-0 group">
+                            <summary className="list-none flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none">
+                                <span className="flex items-center gap-1.5">
+                                    {statusFilter === 'ACTIVE' && <><span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:inline-block"></span> সক্রিয়</>}
+                                    {statusFilter === 'INACTIVE' && <><span className="w-2 h-2 rounded-full bg-rose-500 hidden sm:inline-block"></span> নিষ্ক্রিয়</>}
+                                    {statusFilter === 'ALL' && <><span className="w-2 h-2 rounded-full bg-slate-500 hidden sm:inline-block"></span> সকল</>}
+                                </span>
+                                <ChevronDown size={16} className="text-slate-400 group-open:rotate-180 transition-transform ml-1" />
+                            </summary>
+                            
+                            <div className="absolute right-0 top-[calc(100%+0.5rem)] w-40 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-[210] flex flex-col gap-1">
+                                {[
+                                    { id: 'ACTIVE', label: 'সক্রিয়', count: students.filter(s => (s.metadata?.status || 'ACTIVE') === 'ACTIVE').length, dot: 'bg-emerald-500' },
+                                    { id: 'INACTIVE', label: 'নিষ্ক্রিয়', count: students.filter(s => s.metadata?.status === 'INACTIVE').length, dot: 'bg-rose-500' },
+                                    { id: 'ALL', label: 'সকল', count: null, dot: 'bg-slate-500' }
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => {
+                                            setStatusFilter(opt.id as any);
+                                            const details = document.querySelectorAll('details.group[open]');
+                                            details.forEach(d => d.removeAttribute('open'));
+                                        }}
+                                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${
+                                            statusFilter === opt.id ? 'bg-[#045c84]/10 text-[#045c84]' : 'text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <span className={`w-1.5 h-1.5 rounded-full ${opt.dot}`}></span>
+                                            {opt.label}
                                         </span>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </details>
+                                        {opt.count !== null && (
+                                            <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${
+                                                statusFilter === opt.id ? 'bg-[#045c84]/20 text-[#045c84]' : 'bg-slate-100 text-slate-500'
+                                            }`}>
+                                                {opt.count}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </details>
+                    </div>
                 )}
             </div>
 
@@ -1329,9 +1794,9 @@ export default function StudentManagementPage() {
 
 
             {/* Class & Group Tabs */}
-            <div className="sticky top-0 z-[100] bg-slate-50 py-3 space-y-4 shadow-sm transition-all w-full min-w-0 overflow-hidden">
+            <div className="sticky top-0 z-[100] bg-slate-50 py-3 space-y-4 shadow-sm transition-all w-full min-w-0">
                 {/* Class Dropdown */}
-                <div className="flex items-center gap-2 relative z-[110] w-full overflow-hidden">
+                <div className="flex items-center gap-2 relative z-[110] w-full">
 
                     <ScrollableTabs
                         items={[
@@ -1404,46 +1869,125 @@ export default function StudentManagementPage() {
                 </div>
 
                 {/* Main Navigation Tabs */}
-                <div className="flex items-center gap-2 p-1 bg-slate-100/50 rounded-2xl w-fit">
-                    <button
-                        onClick={() => setActiveTab('students')}
-                        className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'students'
-                            ? 'bg-white text-[#045c84] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                    >
-                        শিক্ষার্থী
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('books')}
-                        className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'books'
-                            ? 'bg-white text-[#045c84] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                    >
-                        বই
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('teachers')}
-                        className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'teachers'
-                            ? 'bg-white text-[#045c84] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                    >
-                        শিক্ষক
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('applications')}
-                        className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'applications'
-                            ? 'bg-white text-[#045c84] shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                    >
-                        <span>আবেদনসমূহ</span>
-                        <span className="bg-[#045c84]/10 text-[#045c84] px-2 py-0.5 rounded-lg text-[10px]">
-                            {pendingCount || 0}
-                        </span>
-                    </button>
+                <div className="flex items-center justify-between gap-4 w-full">
+                    <div className="flex items-center gap-2 p-1 bg-slate-100/50 rounded-2xl w-fit shrink-0 overflow-x-auto custom-scrollbar">
+                        <button
+                            onClick={() => setActiveTab('students')}
+                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'students'
+                                ? 'bg-white text-[#045c84] shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            শিক্ষার্থী
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('books')}
+                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'books'
+                                ? 'bg-white text-[#045c84] shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            বই
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('teachers')}
+                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'teachers'
+                                ? 'bg-white text-[#045c84] shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            শিক্ষক
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('applications')}
+                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'applications'
+                                ? 'bg-white text-[#045c84] shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            <span>আবেদনসমূহ</span>
+                            <span className="bg-[#045c84]/10 text-[#045c84] px-2 py-0.5 rounded-lg text-[10px]">
+                                {pendingCount || 0}
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* Column Visibility Dropdown */}
+                    {activeTab === 'students' && viewMode === 'ADMISSION' && (
+                        <div className="flex items-center gap-3 shrink-0 z-[200]">
+                            <button
+                                onClick={() => {
+                                    setIsTableEditMode(!isTableEditMode);
+                                    setEditingCell(null);
+                                }}
+                                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold shadow-sm cursor-pointer transition-all focus:outline-none border ${isTableEditMode ? 'bg-[#045c84] text-white border-[#045c84]' : 'bg-white border-slate-200 text-slate-700 hover:border-[#045c84] hover:text-[#045c84]'}`}
+                            >
+                                <FileSpreadsheet size={16} />
+                                <span className="hidden sm:inline-block">এক্সেল এডিট মুড</span>
+                            </button>
+                            <div className="relative shrink-0">
+                                <button 
+                                    onClick={() => setIsColumnDropdownOpen(!isColumnDropdownOpen)}
+                                    className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
+                                >
+                                <Settings2 size={16} />
+                                <span className="hidden sm:inline-block">কলাম</span>
+                                <ChevronDown size={16} className={`text-slate-400 transition-transform ${isColumnDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {isColumnDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-[205]" onClick={() => setIsColumnDropdownOpen(false)}></div>
+                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] w-64 z-[210] animate-fade-in">
+                                        <div 
+                                            className="bg-white rounded-2xl shadow-xl border border-slate-100 p-2 flex flex-col gap-1 overflow-y-auto pointer-events-auto custom-scrollbar" 
+                                            style={{ maxHeight: '50vh' }}
+                                            onWheel={(e) => e.stopPropagation()}
+                                            onTouchMove={(e) => e.stopPropagation()}
+                                        >
+                                            {[
+                                                { id: 'sl', label: 'ক্র.নং' },
+                                                { id: 'rollNumber', label: 'রোল' },
+                                                { id: 'studentId', label: 'আইডি' },
+                                                { id: 'student', label: 'শিক্ষার্থী' },
+                                                { id: 'className', label: 'ক্লাস ও গ্রুপ' },
+                                                { id: 'contact', label: 'যোগাযোগ' },
+                                                ...POSSIBLE_FIELDS.filter(f => !['name', 'email', 'studentPhone', 'classId', 'groupId', 'rollNumber', 'studentId', 'studentPhoto', 'guardianPhone', 'guardianPassword', 'password', 'fathersPhone', 'mothersPhone'].includes(f.id)).map(f => ({ id: f.id, label: f.label })),
+                                                ...customColumns,
+                                                { id: 'action', label: 'অ্যাকশন' }
+                                            ].map((col) => (
+                                                <label key={col.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-xl cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={(tableColumns as any)[col.id]}
+                                                        onChange={(e) => {
+                                                            setTableColumns(prev => ({ ...prev, [col.id]: e.target.checked }));
+                                                        }}
+                                                        className="w-4 h-4 rounded border-slate-300 text-[#045c84] focus:ring-[#045c84]"
+                                                    />
+                                                    <span className="text-sm font-medium text-slate-700">{col.label}</span>
+                                                </label>
+                                            ))}
+                                            
+                                            <div className="pt-2 mt-1 border-t border-slate-100 sticky bottom-0 bg-white z-10">
+                                                <button 
+                                                    onClick={() => {
+                                                        setIsCustomFieldModalOpen(true);
+                                                        setIsColumnDropdownOpen(false);
+                                                    }}
+                                                    className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-[#045c84] hover:bg-slate-50 rounded-lg transition-colors border border-dashed border-blue-200"
+                                                >
+                                                    <Plus size={14} />
+                                                    নতুন কাস্টম ফিল্ড
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {selectedClassId !== 'all' && (
@@ -1544,6 +2088,391 @@ export default function StudentManagementPage() {
                         </div>
                     ) : (
                         <>
+                        {viewMode === 'ADMISSION' ? (
+                            <div className="overflow-auto w-full max-h-[calc(100vh-280px)] custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300 relative">
+                                <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleDirectImageUpload} />
+                                <table className="w-full text-left border-collapse bg-white rounded-2xl shadow-sm min-w-[800px] [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200">
+                                    <thead className="bg-slate-50 sticky top-0 z-20 border-b border-[#045c84]/10 shadow-sm">
+                                        <tr>
+                                            {tableColumns.sl && <th className="py-4 px-3 text-xs font-black text-[#045c84] whitespace-nowrap w-[1%] text-center select-none">ক্র.নং</th>}
+                                            {tableColumns.rollNumber && <th onClick={() => handleSort('rollNumber')} className="py-4 px-3 text-xs font-black text-[#045c84] whitespace-nowrap w-[10px] min-w-[10px] text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">রোল<SortIcon field="rollNumber" /></th>}
+                                            {tableColumns.studentId && <th onClick={() => handleSort('studentId')} className="py-4 px-3 text-xs font-black text-[#045c84] whitespace-nowrap w-[1%] text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">আইডি<SortIcon field="studentId" /></th>}
+                                            {viewMode === 'ADMISSION' && <th className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap w-[1%] text-center select-none">ছবি</th>}
+                                            {tableColumns.student && <th onClick={() => handleSort('name')} className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap w-[1%] text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">শিক্ষার্থী<SortIcon field="name" /></th>}
+                                            {tableColumns.className && <th onClick={() => handleSort('classId')} className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">ক্লাস ও গ্রুপ<SortIcon field="classId" /></th>}
+                                            {tableColumns.contact && <th className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center select-none">যোগাযোগ</th>}
+                                            {POSSIBLE_FIELDS.filter(f => !['name', 'email', 'studentPhone', 'classId', 'groupId', 'rollNumber', 'studentId', 'studentPhoto', 'guardianPhone', 'guardianPassword', 'password', 'fathersPhone', 'mothersPhone'].includes(f.id)).map(f => tableColumns[f.id] && (
+                                                <th key={f.id} onClick={() => handleSort(f.id)} className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">{f.label}<SortIcon field={f.id} /></th>
+                                            ))}
+                                            {customColumns.map(f => tableColumns[f.id] && (
+                                                <th key={f.id} onClick={() => handleSort(f.id)} className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">{f.label}<SortIcon field={f.id} /></th>
+                                            ))}
+                                            {tableColumns.action && (
+                                                <th 
+                                                    onClick={() => setShowAllActionsInline(prev => !prev)}
+                                                    className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center select-none cursor-pointer hover:bg-[#045c84]/10 transition-colors"
+                                                    title="সব অপশন একসাথে দেখুন"
+                                                >
+                                                    অ্যাকশন {showAllActionsInline ? '(-)' : '(+)'}
+                                                </th>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {students
+                                            .filter(s => {
+                                                if (selectedClassId !== 'all' && s.metadata?.classId !== selectedClassId) return false;
+                                                if (selectedGroupId !== 'all' && s.metadata?.groupId !== selectedGroupId) return false;
+                                                if (activeRole === 'TEACHER') {
+                                                    if (allowedClasses.length > 0) {
+                                                        const studentClassId = s.metadata?.classId;
+                                                        return allowedClasses.some(c => c.id === studentClassId);
+                                                    }
+                                                    return false;
+                                                }
+                                                return true;
+                                            })
+                                            .slice().sort((a, b) => {
+                                                let aVal: any, bVal: any;
+                                                if (sortField === 'name') { aVal = a.name || ''; bVal = b.name || ''; }
+                                                else if (sortField === 'rollNumber') { aVal = Number(a.metadata?.rollNumber) || 0; bVal = Number(b.metadata?.rollNumber) || 0; }
+                                                else if (sortField === 'studentId') { aVal = a.metadata?.studentId || ''; bVal = b.metadata?.studentId || ''; }
+                                                else if (sortField === 'classId') { aVal = classes.find(c => c.id === a.metadata?.classId)?.name || ''; bVal = classes.find(c => c.id === b.metadata?.classId)?.name || ''; }
+                                                else { aVal = a.metadata?.[sortField] || ''; bVal = b.metadata?.[sortField] || ''; }
+                                                if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+                                                if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+                                                return 0;
+                                            })
+                                            .map((s, index) => {
+                                                const colors = ['bg-orange-500', 'bg-yellow-400', 'bg-teal-500', 'bg-emerald-500', 'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500'];
+                                                const colorIndex = s.name ? s.name.length % colors.length : 0;
+                                                const bgColor = colors[colorIndex];
+                                                
+                                                return (
+                                                    <tr 
+                                                        key={s.id} 
+                                                        className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                                                        onClick={() => { 
+                                                            if (!isTableEditMode) {
+                                                                setSelectedStudent(s); setIsProfileModalOpen(true); 
+                                                            }
+                                                        }}
+                                                    >
+                                                        {tableColumns.sl && <td className="py-4 px-3 w-[1%] whitespace-nowrap text-center">
+                                                            <span className="text-xs font-bold text-slate-700 block w-6 mx-auto">{index + 1}</span>
+                                                        </td>}
+                                                        {tableColumns.rollNumber && <td 
+                                                            className={`py-4 px-3 w-[10px] min-w-[10px] whitespace-nowrap text-center ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                            onClick={(e) => {
+                                                                if (isTableEditMode) {
+                                                                    e.stopPropagation();
+                                                                    setEditingCell({ studentId: s.id, fieldId: 'rollNumber' });
+                                                                }
+                                                            }}
+                                                        >
+                                                            {editingCell?.studentId === s.id && editingCell?.fieldId === 'rollNumber' ? (
+                                                                <EditableCell 
+                                                                    value={s.metadata?.rollNumber} 
+                                                                    type="number" 
+                                                                    onSave={(val) => handleInlineEditSave(s.id, 'rollNumber', val)} 
+                                                                />
+                                                            ) : (
+                                                                <span className="text-xs font-bold text-slate-700">{s.metadata?.rollNumber || '-'}</span>
+                                                            )}
+                                                        </td>}
+                                                        {tableColumns.studentId && <td 
+                                                            className={`py-4 px-3 w-[1%] whitespace-nowrap text-center ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                            onClick={(e) => {
+                                                                if (isTableEditMode) {
+                                                                    e.stopPropagation();
+                                                                    setEditingCell({ studentId: s.id, fieldId: 'studentId' });
+                                                                }
+                                                            }}
+                                                        >
+                                                            {editingCell?.studentId === s.id && editingCell?.fieldId === 'studentId' ? (
+                                                                <EditableCell 
+                                                                    value={s.metadata?.studentId || s.id.substring(0, 6)} 
+                                                                    type="text" 
+                                                                    onSave={(val) => handleInlineEditSave(s.id, 'studentId', val)} 
+                                                                />
+                                                            ) : (
+                                                                <span className="text-xs font-bold text-slate-700">{s.metadata?.studentId || s.id.substring(0, 6)}</span>
+                                                            )}
+                                                        </td>}
+                                                        {viewMode === 'ADMISSION' && (
+                                                            <td className="p-4 w-[1%] whitespace-nowrap text-center">
+                                                                <div 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setUploadingStudentId(s.id);
+                                                                        fileInputRef.current?.click();
+                                                                    }}
+                                                                    className={`w-10 h-10 rounded-full ${bgColor} border-[0.5px] border-slate-600 shadow-sm overflow-hidden flex items-center justify-center text-white font-bold text-sm relative shrink-0 mx-auto group-hover:scale-105 transition-transform cursor-pointer`}
+                                                                >
+                                                                    <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
+                                                                    {s.metadata?.studentPhoto && (
+                                                                        <img 
+                                                                            src={s.metadata.studentPhoto} 
+                                                                            alt={s.name} 
+                                                                            loading="lazy"
+                                                                            className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
+                                                                            onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        )}
+                                                        {tableColumns.student && <td 
+                                                            className={`p-4 w-[1%] whitespace-nowrap ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                            onClick={(e) => {
+                                                                if (isTableEditMode) {
+                                                                    e.stopPropagation();
+                                                                    setEditingCell({ studentId: s.id, fieldId: 'name' });
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                {viewMode !== 'ADMISSION' && (
+                                                                    <div 
+                                                                        onClick={(e) => {
+                                                                            if (!isTableEditMode) {
+                                                                                e.stopPropagation();
+                                                                                setUploadingStudentId(s.id);
+                                                                                fileInputRef.current?.click();
+                                                                            }
+                                                                        }}
+                                                                        className={`w-10 h-10 rounded-full ${bgColor} border-[0.5px] border-slate-600 shadow-sm overflow-hidden flex items-center justify-center text-white font-bold text-sm relative shrink-0 group-hover:scale-105 transition-transform ${!isTableEditMode ? 'cursor-pointer' : ''}`}
+                                                                    >
+                                                                        <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
+                                                                        {s.metadata?.studentPhoto && (
+                                                                            <img 
+                                                                                src={s.metadata.studentPhoto} 
+                                                                                alt={s.name} 
+                                                                                loading="lazy"
+                                                                                className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
+                                                                                onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
+                                                                            />
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex-1">
+                                                                    {editingCell?.studentId === s.id && editingCell?.fieldId === 'name' ? (
+                                                                        <EditableCell 
+                                                                            value={s.name} 
+                                                                            type="text" 
+                                                                            onSave={(val) => handleInlineEditSave(s.id, 'name', val)} 
+                                                                        />
+                                                                    ) : (
+                                                                        <h3 className="font-bold text-slate-800 text-sm line-clamp-1">{s.name}</h3>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>}
+                                                        {tableColumns.className && <td 
+                                                            className={`p-4 ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                            onClick={(e) => {
+                                                                if (isTableEditMode) {
+                                                                    e.stopPropagation();
+                                                                    if (editingCell?.studentId === s.id && editingCell?.fieldId === 'classId') {
+                                                                        setEditingCell(null);
+                                                                    } else {
+                                                                        setEditingCell({ studentId: s.id, fieldId: 'classId' });
+                                                                    }
+                                                                }
+                                                            }}
+                                                        >
+                                                            {editingCell?.studentId === s.id && editingCell?.fieldId === 'classId' ? (
+                                                                <EditableCell 
+                                                                    value={s.metadata?.classId} 
+                                                                    type="select" 
+                                                                    options={classes}
+                                                                    onSave={(val) => handleInlineEditSave(s.id, 'classId', val)}
+                                                                    onClose={() => setEditingCell(null)}
+                                                                />
+                                                            ) : (
+                                                                <div className="text-xs font-bold text-slate-700">
+                                                                    {classes.find(c => c.id === s.metadata?.classId)?.name || 'শ্রেণী নেই'}
+                                                                    {s.metadata?.groupId ? ` • ${groups.find(g => g.id === s.metadata?.groupId)?.name}` : ''}
+                                                                </div>
+                                                            )}
+                                                        </td>}
+                                                        {tableColumns.contact && <td 
+                                                            className={`p-4 ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                            onClick={(e) => {
+                                                                if (isTableEditMode) {
+                                                                    e.stopPropagation();
+                                                                    setEditingCell({ studentId: s.id, fieldId: 'phone' });
+                                                                }
+                                                            }}
+                                                        >
+                                                            {editingCell?.studentId === s.id && editingCell?.fieldId === 'phone' ? (
+                                                                <EditableCell 
+                                                                    value={s.phone || s.metadata?.phone || s.metadata?.guardianPhone || ''} 
+                                                                    type="text" 
+                                                                    onSave={(val) => handleInlineEditSave(s.id, 'phone', val)} 
+                                                                />
+                                                            ) : (
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-xs font-bold text-slate-700">{s.phone || s.metadata?.phone || s.metadata?.guardianPhone || '-'}</span>
+                                                                </div>
+                                                            )}
+                                                        </td>}
+                                                        {POSSIBLE_FIELDS.filter(f => !['name', 'email', 'studentPhone', 'classId', 'groupId', 'rollNumber', 'studentId', 'studentPhoto', 'guardianPhone', 'guardianPassword', 'password', 'fathersPhone', 'mothersPhone'].includes(f.id)).map(f => tableColumns[f.id] && (
+                                                            <td 
+                                                                key={f.id} 
+                                                                className={`p-4 ${isTableEditMode && f.type !== 'attachment' ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                                onClick={(e) => {
+                                                                    if (isTableEditMode && f.type !== 'attachment') {
+                                                                        e.stopPropagation();
+                                                                        setEditingCell({ studentId: s.id, fieldId: f.id });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {editingCell?.studentId === s.id && editingCell?.fieldId === f.id ? (
+                                                                    <EditableCell 
+                                                                        value={s.metadata?.[f.id]} 
+                                                                        type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : f.type === 'select' ? 'select' : 'text'}
+                                                                        options={f.options?.map(o => ({ id: o, name: o }))}
+                                                                        onSave={(val) => handleInlineEditSave(s.id, f.id, val)} 
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-xs font-medium text-slate-600">
+                                                                        {f.type === 'attachment' ? (
+                                                                            s.metadata?.[f.id] ? (
+                                                                                <a href={s.metadata[f.id]} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">ফাইল</a>
+                                                                            ) : '-'
+                                                                        ) : (s.metadata?.[f.id] || '-')}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        ))}
+                                                        {customColumns.map(f => tableColumns[f.id] && (
+                                                            <td 
+                                                                key={f.id} 
+                                                                className={`p-4 ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                                onClick={(e) => {
+                                                                    if (isTableEditMode) {
+                                                                        e.stopPropagation();
+                                                                        setEditingCell({ studentId: s.id, fieldId: f.id });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {editingCell?.studentId === s.id && editingCell?.fieldId === f.id ? (
+                                                                    <EditableCell 
+                                                                        value={s.metadata?.[f.id] || s.metadata?.[f.label]} 
+                                                                        type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : f.type === 'select' ? 'select' : 'text'} 
+                                                                        onSave={(val) => handleInlineEditSave(s.id, f.id, val)} 
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-xs font-medium text-slate-600">
+                                                                        {s.metadata?.[f.id] || s.metadata?.[f.label] || '-'}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        ))}
+                                                        {tableColumns.action && <td className="p-4 text-right">
+                                                            {showAllActionsInline ? (
+                                                                <div className="flex justify-end items-center gap-1">
+                                                                    {canManageClass(s.metadata?.classId) && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const hasGuardian = !!s.metadata?.guardianId;
+                                                                                setCredentialsData({
+                                                                                    studentPhone: s.email || s.phone || s.metadata?.studentId || 'N/A',
+                                                                                    studentPassword: s.password || 'N/A',
+                                                                                    guardianPhone: hasGuardian ? (s.metadata?.guardianPhone || 'N/A') : 'N/A',
+                                                                                    guardianPassword: hasGuardian ? (s.metadata?.guardianPassword || 'N/A') : 'N/A'
+                                                                                });
+                                                                                setIsCredentialsModalOpen(true);
+                                                                            }}
+                                                                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                                                            title="লগইন তথ্য"
+                                                                        >
+                                                                            <Key size={16} />
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${s.phone || s.metadata?.studentPhone || s.metadata?.guardianPhone}`; }}
+                                                                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                                        title="কল করুন"
+                                                                    >
+                                                                        <Phone size={16} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); window.location.href = `sms:${s.phone || s.metadata?.studentPhone || s.metadata?.guardianPhone}`; }}
+                                                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                        title="মেসেজ পাঠান"
+                                                                    >
+                                                                        <MessageSquare size={16} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); const phone = s.phone || s.metadata?.studentPhone || s.metadata?.guardianPhone; window.open(`https://wa.me/${phone?.replace(/\D/g, '')}`, '_blank'); }}
+                                                                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                        title="হোয়াটসঅ্যাপ"
+                                                                    >
+                                                                        <MessageCircle size={16} />
+                                                                    </button>
+                                                                    {canManageClass(s.metadata?.classId) && selectedGroupId !== 'all' && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleRemoveFromGroup(s); }}
+                                                                            className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                                                            title="গ্রুপ থেকে বাদ দিন"
+                                                                        >
+                                                                            <FileX size={16} />
+                                                                        </button>
+                                                                    )}
+                                                                    {canManageClass(s.metadata?.classId) && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }}
+                                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                            title="মুছে ফেলুন"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex justify-end items-center gap-2">
+                                                                    {(s.phone || s.metadata?.phone || s.metadata?.guardianPhone) && (
+                                                                        <a
+                                                                            href={`tel:${s.phone || s.metadata?.phone || s.metadata?.guardianPhone}`}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                                                            title="কল করুন"
+                                                                        >
+                                                                            <Phone size={18} />
+                                                                        </a>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const rect = e.currentTarget.getBoundingClientRect();
+                                                                            const menuHeight = 280; 
+                                                                            const spaceBelow = window.innerHeight - rect.bottom;
+                                                                            const showAbove = spaceBelow < menuHeight;
+                                                                            setMenuPosition({
+                                                                                top: showAbove
+                                                                                    ? rect.top + window.scrollY - menuHeight - 8
+                                                                                    : rect.bottom + window.scrollY + 8,
+                                                                                left: rect.right + window.scrollX - 220
+                                                                            });
+                                                                            setIsActionMenuOpen(isActionMenuOpen === s.id ? null : s.id);
+                                                                        }}
+                                                                        className="p-2 text-slate-500 hover:text-[#045c84] hover:bg-blue-50 rounded-xl transition-all"
+                                                                    >
+                                                                        <MoreVertical size={18} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </td>}
+                                                    </tr>
+                                                );
+                                            })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-32">
                             {students
                                 .filter(s => {
@@ -1560,129 +2489,218 @@ export default function StudentManagementPage() {
                                     }
                                     return true;
                                 })
-                                .map((s, index) => (
-                                    <div
-                                        key={s.id}
-                                        onClick={() => {
-                                            setSelectedStudent(s);
-                                            setIsProfileModalOpen(true);
-                                        }}
-                                        className="bg-white p-3.5 rounded-[24px] border border-slate-100 shadow-sm hover:shadow-lg hover:border-blue-100 transition-all flex items-center gap-3 md:gap-4 relative group cursor-pointer animate-staggered-fade-in w-full min-w-[280px] overflow-hidden"
-                                        style={{ animationDelay: `${(index % 15) * 30}ms` }}
-                                    >
-                                        {/* Avatar */}
-                                        {(() => {
-                                            const colors = ['bg-orange-500', 'bg-yellow-400', 'bg-teal-500', 'bg-emerald-500', 'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500'];
-                                            const colorIndex = s.name ? s.name.length % colors.length : 0;
-                                            const bgColor = colors[colorIndex];
+                                .map((s, index) => {
+                                    const isFeesMode = viewMode === 'FEES_COLLECT';
+                                    
+                                    return (
+                                        <div
+                                            key={s.id}
+                                            onClick={() => {
+                                                if (isFeesMode) {
+                                                    setSelectedStudentForFee({
+                                                        studentId: s.id,
+                                                        studentName: s.name,
+                                                        studentUniqueId: s.metadata?.studentId || s.id,
+                                                        studentPhoto: s.metadata?.studentPhoto || null,
+                                                        items: [],
+                                                        totalAmount: 0
+                                                    });
+                                                    setIsFeeModalOpen(true);
+                                                } else {
+                                                    setSelectedStudent(s);
+                                                    setIsProfileModalOpen(true);
+                                                }
+                                            }}
+                                            className={`bg-white p-3.5 rounded-[24px] border shadow-sm transition-all flex items-center gap-3 md:gap-4 relative group cursor-pointer animate-staggered-fade-in w-full min-w-[280px] overflow-hidden ${
+                                                isFeesMode ? 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-100/50 hover:bg-emerald-50/10' : 'border-slate-100 hover:shadow-lg hover:border-blue-100'
+                                            }`}
+                                            style={{ animationDelay: `${(index % 15) * 30}ms` }}
+                                        >
+                                            {/* Avatar */}
+                                            {(() => {
+                                                const colors = ['bg-orange-500', 'bg-yellow-400', 'bg-teal-500', 'bg-emerald-500', 'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500'];
+                                                const colorIndex = s.name ? s.name.length % colors.length : 0;
+                                                const bgColor = colors[colorIndex];
 
-                                            const isOnline = s.updatedAt && (new Date().getTime() - new Date(s.updatedAt).getTime() < 5 * 60 * 1000);
-                                            const status = s.metadata?.status || 'ACTIVE';
-                                            const indicatorColor = isOnline ? 'bg-emerald-500' : (status === 'ACTIVE' ? 'bg-blue-500' : 'bg-red-500');
+                                                const isOnline = s.updatedAt && (new Date().getTime() - new Date(s.updatedAt).getTime() < 5 * 60 * 1000);
+                                                const status = s.metadata?.status || 'ACTIVE';
+                                                const indicatorColor = isOnline ? 'bg-emerald-500' : (status === 'ACTIVE' ? 'bg-blue-500' : 'bg-red-500');
 
-                                            return (
-                                                <div className="relative shrink-0">
-                                                    <div className={`w-12 h-12 rounded-full ${bgColor} border-2 border-white shadow-md overflow-hidden flex items-center justify-center text-white font-bold text-lg group-hover:scale-110 transition-transform duration-300 relative`}>
-                                                        {/* Initial Character Placeholder */}
-                                                        <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
-                                                        
-                                                        {/* Lazy Loaded Image */}
-                                                        {s.metadata?.studentPhoto && (
-                                                            <img 
-                                                                src={s.metadata.studentPhoto} 
-                                                                alt={s.name} 
-                                                                loading="lazy"
-                                                                className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
-                                                                onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
-                                                            />
+                                                return (
+                                                    <div className="relative shrink-0">
+                                                        <div className={`w-12 h-12 rounded-full ${bgColor} border-2 border-white shadow-md overflow-hidden flex items-center justify-center text-white font-bold text-lg group-hover:scale-110 transition-transform duration-300 relative`}>
+                                                            {/* Initial Character Placeholder */}
+                                                            <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
+                                                            
+                                                            {/* Lazy Loaded Image */}
+                                                            {s.metadata?.studentPhoto && (
+                                                                <img 
+                                                                    src={s.metadata.studentPhoto} 
+                                                                    alt={s.name} 
+                                                                    loading="lazy"
+                                                                    className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
+                                                                    onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                        {/* Status Dot */}
+                                                        <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white shadow-sm ${indicatorColor} ${isOnline ? 'animate-pulse' : ''}`} title={isOnline ? 'Online' : (status === 'ACTIVE' ? 'Active' : 'Inactive')} />
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-[18px] font-bold text-slate-800 truncate mb-1" title={s.name}>
+                                                    {s.name || 'নাম নেই'}
+                                                </h3>
+
+                                                {isFeesMode ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                                            <span>ID: {s.metadata?.studentId || '-'}</span>
+                                                        </div>
+                                                        {s.metadata?.feeTier && s.metadata.feeTier !== 'full' && (
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                                                s.metadata.feeTier === 'half' ? 'bg-amber-100 text-amber-700' :
+                                                                s.metadata.feeTier === 'free' ? 'bg-emerald-100 text-emerald-700' : ''
+                                                            }`}>
+                                                                {s.metadata.feeTier === 'half' ? 'অর্ধ ফি' : 'বিনামূল্যে'}
+                                                            </span>
                                                         )}
                                                     </div>
-                                                    {/* Status Dot */}
-                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white shadow-sm ${indicatorColor} ${isOnline ? 'animate-pulse' : ''}`} title={isOnline ? 'Online' : (status === 'ACTIVE' ? 'Active' : 'Inactive')} />
-                                                </div>
-                                            );
-                                        })()}
+                                                ) : (
+                                                    <>
+                                                        {/* ID | Roll Tag */}
+                                                        <div className="flex-shrink-0 inline-flex items-center gap-1.5 px-1.5 py-0 bg-blue-50/50 border border-blue-100 rounded-full group/tag hover:bg-blue-50 transition-colors whitespace-nowrap">
+                                                            <div className="flex items-center gap-1 text-[#045c84] text-[7px] font-medium uppercase tracking-wider">
+                                                                <span>ID: {s.metadata?.studentId || '-'}</span>
+                                                                <span className="opacity-30">|</span>
+                                                                <span>Roll: {s.metadata?.rollNumber || '-'}</span>
+                                                            </div>
+                                                            <ChevronDown size={8} className="text-[#045c84] opacity-40 group-hover/tag:translate-y-0.5 transition-transform" />
+                                                        </div>
+                                                        {/* Fee Tier & History Badges */}
+                                                        <div className="flex flex-wrap gap-2 mt-1">
+                                                            {s.metadata?.statusHistory && s.metadata.statusHistory.length > 0 && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedStudent(s);
+                                                                        setIsProfileModalOpen(true);
+                                                                    }}
+                                                                    className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100 hover:text-[#045c84] hover:border-blue-200 transition-all"
+                                                                    title="History"
+                                                                >
+                                                                    <History size={12} />
+                                                                </button>
+                                                            )}
 
-                                        {/* Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="text-[18px] font-bold text-slate-800 truncate mb-1" title={s.name}>
-                                                {s.name || 'নাম নেই'}
-                                            </h3>
-
-                                            {/* ID | Roll Tag */}
-                                            <div className="flex-shrink-0 inline-flex items-center gap-1.5 px-1.5 py-0 bg-blue-50/50 border border-blue-100 rounded-full group/tag hover:bg-blue-50 transition-colors whitespace-nowrap">
-                                                <div className="flex items-center gap-1 text-[#045c84] text-[7px] font-medium uppercase tracking-wider">
-                                                    <span>ID: {s.metadata?.studentId || '-'}</span>
-                                                    <span className="opacity-30">|</span>
-                                                    <span>Roll: {s.metadata?.rollNumber || '-'}</span>
-                                                </div>
-                                                <ChevronDown size={8} className="text-[#045c84] opacity-40 group-hover/tag:translate-y-0.5 transition-transform" />
-                                            </div>
-                                            {/* Fee Tier & History Badges */}
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                {s.metadata?.statusHistory && s.metadata.statusHistory.length > 0 && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedStudent(s);
-                                                            setIsProfileModalOpen(true);
-                                                        }}
-                                                        className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100 hover:text-[#045c84] hover:border-blue-200 transition-all"
-                                                        title="History"
-                                                    >
-                                                        <History size={12} />
-                                                    </button>
+                                                            {s.metadata?.feeTier && s.metadata.feeTier !== 'full' && (
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                                                                    s.metadata.feeTier === 'half' ? 'bg-amber-100 text-amber-700' :
+                                                                    s.metadata.feeTier === 'free' ? 'bg-emerald-100 text-emerald-700' : ''
+                                                                }`}>
+                                                                    {s.metadata.feeTier === 'half' ? '৳ অর্ধ ফি' : '৳ বিনামূল্যে'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </>
                                                 )}
+                                            </div>
 
-                                                {s.metadata?.feeTier && s.metadata.feeTier !== 'full' && (
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
-                                                        s.metadata.feeTier === 'half' ? 'bg-amber-100 text-amber-700' :
-                                                        s.metadata.feeTier === 'free' ? 'bg-emerald-100 text-emerald-700' : ''
-                                                    }`}>
-                                                        {s.metadata.feeTier === 'half' ? '৳ অর্ধ ফি' : '৳ বিনামূল্যে'}
-                                                    </span>
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                {isFeesMode ? (
+                                                    <div className="flex items-center gap-3">
+                                                        {loadingFees ? (
+                                                            <div className="h-10 w-20 bg-slate-50 animate-pulse rounded-lg"></div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-end gap-0.5">
+                                                                {(feesData?.[s.id]?.totalDue || 0) > 0 && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">বকেয়া:</span>
+                                                                        <span className="text-sm font-black text-rose-600 leading-none">
+                                                                            ৳{feesData?.[s.id]?.totalDue?.toLocaleString()}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {(feesData?.[s.id]?.totalPaid || 0) > 0 && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">পরিশোধ:</span>
+                                                                        <span className="text-sm font-black text-emerald-600 leading-none">
+                                                                            ৳{feesData?.[s.id]?.totalPaid?.toLocaleString()}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {(feesData?.[s.id]?.advance || 0) > 0 && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">অগ্রিম:</span>
+                                                                        <span className="text-sm font-black text-amber-600 leading-none">
+                                                                            ৳{feesData?.[s.id]?.advance?.toLocaleString()}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                                {!((feesData?.[s.id]?.totalDue || 0) > 0) && !((feesData?.[s.id]?.totalPaid || 0) > 0) && !((feesData?.[s.id]?.advance || 0) > 0) && (
+                                                                    <span className="text-xs font-bold text-slate-400">
+                                                                        কোনো রেকর্ড নেই
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {(s.phone || s.metadata?.phone || s.metadata?.guardianPhone) && (
+                                                            <a
+                                                                href={`tel:${s.phone || s.metadata?.phone || s.metadata?.guardianPhone}`}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-100 rounded-xl transition-all shrink-0 shadow-sm"
+                                                                title="কল করুন"
+                                                            >
+                                                                <Phone size={16} />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {(s.phone || s.metadata?.phone || s.metadata?.guardianPhone) && (
+                                                            <a
+                                                                href={`tel:${s.phone || s.metadata?.phone || s.metadata?.guardianPhone}`}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                                                title="কল করুন"
+                                                            >
+                                                                <Phone size={20} />
+                                                            </a>
+                                                        )}
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                                    const menuHeight = 280; // Estimated max height for student menu
+                                                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                                                    const showAbove = spaceBelow < menuHeight;
+
+                                                                    setMenuPosition({
+                                                                        top: showAbove
+                                                                            ? rect.top + window.scrollY - menuHeight - 8
+                                                                            : rect.bottom + window.scrollY + 8,
+                                                                        left: rect.right + window.scrollX - 220
+                                                                    });
+                                                                    setIsActionMenuOpen(isActionMenuOpen === s.id ? null : s.id);
+                                                                }}
+                                                                className="p-2 text-slate-500 hover:text-[#045c84] hover:bg-blue-50 rounded-xl transition-all"
+                                                            >
+                                                                <MoreVertical size={20} />
+                                                            </button>
+                                                        </div>
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
-
-                                        {/* Actions */}
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            {(s.phone || s.metadata?.phone || s.metadata?.guardianPhone) && (
-                                                <a
-                                                    href={`tel:${s.phone || s.metadata?.phone || s.metadata?.guardianPhone}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                                                    title="কল করুন"
-                                                >
-                                                    <Phone size={20} />
-                                                </a>
-                                            )}
-                                            <div className="relative">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const rect = e.currentTarget.getBoundingClientRect();
-                                                        const menuHeight = 280; // Estimated max height for student menu
-                                                        const spaceBelow = window.innerHeight - rect.bottom;
-                                                        const showAbove = spaceBelow < menuHeight;
-
-                                                        setMenuPosition({
-                                                            top: showAbove
-                                                                ? rect.top + window.scrollY - menuHeight - 8
-                                                                : rect.bottom + window.scrollY + 8,
-                                                            left: rect.right + window.scrollX - 220
-                                                        });
-                                                        setIsActionMenuOpen(isActionMenuOpen === s.id ? null : s.id);
-                                                    }}
-                                                    className="p-2 text-slate-500 hover:text-[#045c84] hover:bg-blue-50 rounded-xl transition-all"
-                                                >
-                                                    <MoreVertical size={20} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                         </div>
+                        )}
                         {students.filter(s => {
                             // Local class and group filtering
                             if (selectedClassId !== 'all' && s.metadata?.classId !== selectedClassId) return false;
@@ -2982,26 +4000,36 @@ export default function StudentManagementPage() {
                                                             </div>
                                                         ) : (
                                                             <>
-                                                                <div className="grid grid-cols-1 gap-4">
-                                                                    {renderField('studentId', true)}
-                                                                    {renderField('rollNumber', true)}
-                                                                    {renderField('studentPhone', true)}
-                                                                    {renderField('email')}
-                                                                    {renderField('password')}
+                                                                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-4">
+                                                                    <button 
+                                                                        type="button" 
+                                                                        onClick={() => setLoginType('student')} 
+                                                                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${loginType === 'student' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                    >
+                                                                        <User size={16} />
+                                                                        শিক্ষার্থীর লগইন
+                                                                    </button>
+                                                                    <button 
+                                                                        type="button" 
+                                                                        onClick={() => setLoginType('guardian')} 
+                                                                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${loginType === 'guardian' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                    >
+                                                                        <User size={16} />
+                                                                        অভিভাবকের লগইন
+                                                                    </button>
                                                                 </div>
 
-                                                                <div className="pt-4 space-y-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">অভিভাবকের লগইন</p>
+                                                                {loginType === 'student' ? (
+                                                                    <div className="grid grid-cols-1 gap-4 animate-fade-in">
+                                                                        {renderField('studentPhone', true)}
+                                                                        {renderField('password')}
                                                                     </div>
-                                                                    <div className="grid grid-cols-1 gap-4">
-                                                                        {renderField('guardianName', true)}
-                                                                        {renderField('guardianRelation', true)}
+                                                                ) : (
+                                                                    <div className="grid grid-cols-1 gap-4 animate-fade-in">
                                                                         {renderField('guardianPhone', true)}
                                                                         {renderField('guardianPassword')}
                                                                     </div>
-                                                                </div>
+                                                                )}
                                                             </>
                                                         )}
                                                     </div>
@@ -4045,6 +5073,95 @@ export default function StudentManagementPage() {
                     </div>
                 )}
             </Modal>
-        </div >
+            {/* Fee Collect Modal */}
+            {isFeeModalOpen && selectedStudentForFee && (
+                <FeeCollectModal
+                    student={selectedStudentForFee}
+                    onClose={() => {
+                        setIsFeeModalOpen(false);
+                        setSelectedStudentForFee(null);
+                    }}
+                    onSuccess={(msg) => {
+                        setIsFeeModalOpen(false);
+                        setToast({ message: msg, type: 'success' });
+                        fetchFeesData();
+                    }}
+                    onPrintReceipt={(txn) => {
+                        setSelectedTransactionForPrint(txn);
+                    }}
+                />
+            )}
+
+            {/* Print Receipt Modal */}
+            {selectedTransactionForPrint && (
+                <PrintReceiptModal
+                    transaction={selectedTransactionForPrint}
+                    onClose={() => setSelectedTransactionForPrint(null)}
+                />
+            )}
+
+            {/* Create Custom Field Modal */}
+            {isCustomFieldModalOpen && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setIsCustomFieldModalOpen(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md animate-slide-up overflow-hidden flex flex-col font-bengali">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-800">নতুন কাস্টম ফিল্ড</h2>
+                                <p className="text-xs text-slate-500 mt-1">টেবিলের জন্য নতুন কলাম তৈরি করুন</p>
+                            </div>
+                            <button onClick={() => setIsCustomFieldModalOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded-full transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">ফিল্ডের নাম</label>
+                                <input
+                                    type="text"
+                                    value={newCustomColumnLabel}
+                                    onChange={(e) => setNewCustomColumnLabel(e.target.value)}
+                                    placeholder="যেমন: রক্তের গ্রুপ, উচ্চতা..."
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] text-slate-800 placeholder:text-slate-400"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddCustomColumn();
+                                    }}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">ফিল্ডের ধরন</label>
+                                <select
+                                    value={newCustomColumnType}
+                                    onChange={(e) => setNewCustomColumnType(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] bg-white cursor-pointer text-slate-800"
+                                >
+                                    <option value="text">টেক্সট / ছোট লেখা</option>
+                                    <option value="number">নম্বর (বয়স, রোল)</option>
+                                    <option value="mobile">মোবাইল নম্বর</option>
+                                    <option value="date">তারিখ / ক্যালেন্ডার</option>
+                                    <option value="attachment">ছবি / ফাইল আপলোড</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
+                            <button
+                                onClick={() => setIsCustomFieldModalOpen(false)}
+                                className="flex-1 py-3 text-slate-600 font-bold bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                            >
+                                বাতিল
+                            </button>
+                            <button
+                                onClick={handleAddCustomColumn}
+                                disabled={!newCustomColumnLabel.trim()}
+                                className="flex-1 py-3 bg-[#045c84] text-white font-bold rounded-xl shadow-lg shadow-[#045c84]/20 hover:shadow-xl hover:bg-[#034664] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                তৈরি করুন
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

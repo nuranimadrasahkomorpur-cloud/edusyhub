@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { X, Printer, Receipt, CheckCircle2, MessageSquare, Share2 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
@@ -28,6 +29,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
         const dateStr = new Date(transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
         let text = `মানি রশিদ: ${transaction.receiptNo || 'N/A'}\n`;
         text += `শিক্ষার্থী: ${transaction.studentName || 'অজানা'}\n`;
+        if (transaction.className) text += `শ্রেণী: ${transaction.className}\n`;
         text += `তারিখ: ${dateStr}\n\n`;
         text += `বিবরণ:\n`;
         
@@ -54,9 +56,27 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
 
     const subTxns = transaction.subTransactions || [transaction];
     const groupedByCategory = subTxns.reduce((acc: any, t: any) => {
-        if (!acc[t.category]) acc[t.category] = { items: [], total: 0 };
-        acc[t.category].items.push(t);
-        acc[t.category].total += t.amount;
+        let rawCat = t.originalCategory || t.category;
+        let catKey = rawCat;
+        let subName = '';
+
+        if (typeof rawCat === 'string') {
+            if (rawCat.startsWith('__ADVANCE__')) {
+                catKey = 'অনির্ধারিত অগ্রিম জমা (Undefined Advance)';
+                subName = 'অগ্রিম জমা (অতিরিক্ত পরিশোধ)';
+            } else {
+                catKey = rawCat.replace(/\s*\(.*?\)\s*/g, '').trim();
+                const match = rawCat.match(/\((.*?)\)/);
+                if (match) {
+                    subName = match[1];
+                }
+            }
+        }
+
+        if (!acc[catKey]) acc[catKey] = { items: [], total: 0 };
+        // attach the parsed subName so we can use it during render
+        acc[catKey].items.push({ ...t, parsedSubName: subName });
+        acc[catKey].total += t.amount;
         return acc;
     }, {});
 
@@ -71,9 +91,9 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
             <div className="flex justify-between items-start mb-4 pb-3 border-b-2 border-slate-200">
                 <div className="flex items-center gap-4 mt-2">
                     {transaction.studentPhoto ? (
-                        <img src={transaction.studentPhoto} alt={transaction.studentName} className="w-24 h-24 rounded-xl object-cover border-2 border-slate-200 shadow-sm" />
+                        <img src={transaction.studentPhoto} alt={transaction.studentName} className="w-24 h-36 rounded-xl object-cover border-2 border-slate-200 shadow-sm" />
                     ) : (
-                        <div className="w-24 h-24 rounded-xl bg-slate-50 flex items-center justify-center border-2 border-slate-200 shadow-sm text-slate-300">
+                        <div className="w-24 h-36 rounded-xl bg-slate-50 flex items-center justify-center border-2 border-slate-200 shadow-sm text-slate-300">
                             <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                         </div>
                     )}
@@ -84,6 +104,9 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                             <p className="text-slate-600 font-bold text-[13px]">ID: <span className="font-black text-slate-800">{transaction.studentUniqueId || ''}</span></p>
                             <p className="text-slate-600 font-bold text-[13px]">পিতা: <span className="text-slate-800">{transaction.fatherName || ''}</span></p>
                             <p className="text-slate-600 font-bold text-[13px]">মোবাইল: <span className="text-slate-800">{transaction.mobileNumber || ''}</span></p>
+                            {transaction.className && (
+                                <p className="text-slate-600 font-bold text-[13px]">শ্রেণী: <span className="font-black text-[#045c84]">{transaction.className}</span></p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -117,13 +140,33 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                                     <td className="py-1"></td>
                                     <td className="py-1 px-2 text-slate-600 text-[12px] flex items-center gap-2">
                                         <div className="w-1 h-1 rounded-full bg-slate-400" /> {
-                                            cat.includes('মাসিক বেতন') 
-                                            ? (() => {
-                                                const monthYear = new Date(t.createdAt || t.date).toLocaleDateString('bn-BD', { month: 'long', year: 'numeric' });
-                                                if (!t.note || t.note === 'ফি প্রদান') return `${monthYear} এর ফি`;
-                                                return `${monthYear} এর ফি ${t.note.includes('(') ? t.note : `- ${t.note}`}`;
-                                            })()
-                                            : (t.note || 'ফি প্রদান')
+                                            t.parsedSubName 
+                                            ? t.parsedSubName 
+                                            : (cat.includes('মাসিক') || cat.includes('সাপ্তাহিক') || cat.includes('বার্ষিক') || cat.includes('সামাসিক'))
+                                                ? (() => {
+                                                    const d = new Date(t.date || t.createdAt);
+                                                    
+                                                    let dateStr = '';
+                                                    if (cat.includes('সাপ্তাহিক')) {
+                                                        dateStr = d.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+                                                    } else if (cat.includes('বার্ষিক')) {
+                                                        dateStr = d.toLocaleDateString('bn-BD', { year: 'numeric' });
+                                                    } else if (cat.includes('সামাসিক')) {
+                                                        const half = d.getMonth() < 6 ? '১ম' : '২য়';
+                                                        const y = d.toLocaleDateString('bn-BD', { year: 'numeric' });
+                                                        dateStr = `${half} সামাসিক - ${y}`;
+                                                    } else {
+                                                        const m = d.toLocaleDateString('bn-BD', { month: 'long' });
+                                                        const y = d.toLocaleDateString('bn-BD', { year: 'numeric' });
+                                                        dateStr = `${m} - ${y}`;
+                                                    }
+                                                    
+                                                    if (!t.note || t.note === 'ফি প্রদান' || t.note.includes('আংশিক') || t.note.includes('বকেয়া')) {
+                                                        return dateStr;
+                                                    }
+                                                    return `${dateStr} (${t.note})`;
+                                                })()
+                                                : (t.note || 'ফি প্রদান')
                                         }
                                     </td>
                                     <td className="py-1 px-2 text-slate-600 text-[12px] text-right">{t.amount.toLocaleString()}/-</td>
@@ -142,8 +185,16 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
         </PrintLayout>
     );
 
-    return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 font-bengali">
+    const [mounted, setMounted] = useState(false);
+    
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!transaction || !mounted) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 font-bengali">
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -227,6 +278,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                     </div>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 }

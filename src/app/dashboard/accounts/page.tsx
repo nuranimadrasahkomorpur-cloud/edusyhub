@@ -16,6 +16,7 @@ import {
     Plus,
     Calendar,
     Users,
+    GraduationCap,
     ChevronRight,
     ChevronDown,
     Check,
@@ -37,7 +38,19 @@ import AddTransactionModal from '@/components/AddTransactionModal';
 import FeeCollectModal from '@/components/FeeCollectModal';
 import PrintReceiptModal from '@/components/PrintReceiptModal';
 import Toast from '@/components/Toast';
+import { useUI } from '@/components/UIProvider';
+import { getCleanId } from '@/utils/digit-utils';
 
+const getShortCategory = (category: string) => {
+    if (!category) return 'অজানা';
+    const parts = category.split(', ');
+    if (parts.length > 1) {
+        const firstPart = parts[0].trim();
+        const baseName = firstPart.replace(/\s*\(.*?\)\s*/g, '').trim();
+        return `${baseName} (একাধিক)`;
+    }
+    return category;
+};
 
 export default function AccountsPage() {
     const { activeInstitute } = useSession();
@@ -50,7 +63,11 @@ export default function AccountsPage() {
         transactions: []
     });
     const [loading, setLoading] = useState(true);
+    const classTabsRef = React.useRef<HTMLDivElement>(null);
     const [dueGroupMode, setDueGroupMode] = useState<'person' | 'type'>('person');
+    const [transactionFilterMode, setTransactionFilterMode] = useState<'all' | 'person' | 'type' | 'class'>('all');
+    const [activeClassFilter, setActiveClassFilter] = useState<string | null>(null);
+    const [categoryFilterMode, setCategoryFilterMode] = useState<'all' | 'income' | 'expense' | 'archived'>('all');
     const [selectedStudentDetails, setSelectedStudentDetails] = useState<any | null>(null);
     const [selectedTypeDetails, setSelectedTypeDetails] = useState<any | null>(null);
     const [orphanedCategoryToDelete, setOrphanedCategoryToDelete] = useState<string | null>(null);
@@ -112,6 +129,30 @@ export default function AccountsPage() {
 
     useEffect(() => {
         fetchAccounts();
+        
+        // Auto-sync missing dues in the background
+        if (activeInstitute?.id) {
+            const syncKey = `sync_${activeInstitute.id}`;
+            if (sessionStorage.getItem(syncKey)) return;
+            sessionStorage.setItem(syncKey, 'true');
+
+            fetch('/api/admin/accounts/sync-dues', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ instituteId: activeInstitute.id })
+            }).then(res => res.json())
+              .then(data => {
+                  if (data.generatedCount && data.generatedCount > 0) {
+                      // Silently refetch to show newly generated dues
+                      fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&_cb=${Date.now()}`, { cache: 'no-store' })
+                          .then(res => res.json())
+                          .then(accData => setAccountData(accData));
+                  }
+              }).catch(err => {
+                  console.error('Failed to sync dues:', err);
+                  sessionStorage.removeItem(syncKey); // Allow retry on failure
+              });
+        }
     }, [activeInstitute?.id]);
 
     const handleDeleteOrphanedCategory = (categoryName: string) => {
@@ -150,6 +191,14 @@ export default function AccountsPage() {
             });
             if (res.ok) {
                 setToast({ message: 'লেনদেন সফলভাবে মুছে ফেলা হয়েছে', type: 'success' });
+                // Re-sync dues to recreate any PENDING dues that might have been affected
+                if (activeInstitute?.id) {
+                    await fetch('/api/admin/accounts/sync-dues', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ instituteId: activeInstitute.id })
+                    });
+                }
                 fetchAccounts();
                 setTransactionToDelete(null);
             } else {
@@ -184,7 +233,7 @@ export default function AccountsPage() {
                 { label: 'বর্তমান ব্যালেন্স', value: `৳ ${s?.balance?.toLocaleString() || '০'}`, change: s?.balanceChange || '+০%', trend: 'up', icon: Wallet, color: 'text-[#045c84]', bg: 'bg-blue-50' },
             ];
             if (s?.advanceBalance > 0) {
-                cards.push({ label: 'অগ্রিম জমা (শিক্ষার্থী)', value: `৳ ${s?.advanceBalance?.toLocaleString() || '০'}`, change: '+০%', trend: 'up', icon: PlusCircle, color: 'text-violet-600', bg: 'bg-violet-50' });
+                cards.push({ label: 'অগ্রিম জমা (ব্যক্তি)', value: `৳ ${s?.advanceBalance?.toLocaleString() || '০'}`, change: '+०%', trend: 'up', icon: PlusCircle, color: 'text-violet-600', bg: 'bg-violet-50' });
             }
             return cards;
         }
@@ -193,13 +242,14 @@ export default function AccountsPage() {
     const filteredTransactions = useMemo(() => {
         let txns = accountData.transactions || [];
         
-        // Always hide internal advance bookkeeping entries from the visible list
-        txns = txns.filter(t => !(typeof t.category === 'string' && t.category.startsWith('__ADVANCE__')));
+        // Don't filter out advance entries entirely, just format them later
+        // txns = txns.filter(t => !(typeof t.category === 'string' && t.category.startsWith('__ADVANCE__')));
         
         if (activeMainTab === 'overview') {
             if (activeSubTab === 'transactions') {
                 txns = txns.filter(t => t.status?.toUpperCase() === 'COMPLETED');
             } else if (activeSubTab === 'pending') {
+                // Show all outstanding/pending items (unpaid fees, unpaid bills)
                 txns = txns.filter(t => t.status?.toUpperCase() === 'PENDING');
             } else {
                 txns = [];
@@ -208,6 +258,7 @@ export default function AccountsPage() {
             if (activeSubTab === 'transactions') {
                 txns = txns.filter(t => t.type?.toUpperCase() === 'INCOME' && t.status?.toUpperCase() === 'COMPLETED');
             } else if (activeSubTab === 'pending') {
+                // Show all outstanding income (unpaid student fees, unpaid tuition, etc.)
                 txns = txns.filter(t => t.type?.toUpperCase() === 'INCOME' && t.status?.toUpperCase() === 'PENDING');
             } else {
                 txns = [];
@@ -215,6 +266,9 @@ export default function AccountsPage() {
         } else if (activeMainTab === 'expense') {
             if (activeSubTab === 'transactions') {
                 txns = txns.filter(t => t.type?.toUpperCase() === 'EXPENSE' && t.status?.toUpperCase() === 'COMPLETED');
+            } else if (activeSubTab === 'pending') {
+                // Show all outstanding expenses (unpaid bills, utilities, etc.)
+                txns = txns.filter(t => t.type?.toUpperCase() === 'EXPENSE' && t.status?.toUpperCase() === 'PENDING');
             } else {
                 txns = [];
             }
@@ -235,21 +289,30 @@ export default function AccountsPage() {
         const receiptMap = new Map<string, any>();
 
         for (const t of txns) {
-            if (t.status?.toUpperCase() === 'COMPLETED' && t.receiptNo) {
-                if (receiptMap.has(t.receiptNo)) {
-                    const existing = receiptMap.get(t.receiptNo);
-                    existing.amount += t.amount;
-                    if (!existing.category.includes(t.category)) {
-                        existing.category += `, ${t.category}`;
+            // Format advance category for display
+            let displayCategory = t.category;
+            if (typeof displayCategory === 'string' && displayCategory.startsWith('__ADVANCE__')) {
+                displayCategory = 'অনির্ধারিত অগ্রিম জমা';
+            }
+            
+            const formattedTxn = { ...t, category: displayCategory, originalCategory: t.category };
+
+            if (formattedTxn.status?.toUpperCase() === 'COMPLETED' && formattedTxn.receiptNo) {
+                const groupKey = `${formattedTxn.receiptNo}_${formattedTxn.studentId || 'unknown'}`;
+                if (receiptMap.has(groupKey)) {
+                    const existing = receiptMap.get(groupKey);
+                    existing.amount += formattedTxn.amount;
+                    if (!existing.category.includes(formattedTxn.category)) {
+                        existing.category += `, ${formattedTxn.category}`;
                     }
-                    existing.subTransactions.push(t);
+                    existing.subTransactions.push(formattedTxn);
                 } else {
-                    const copy = { ...t, subTransactions: [t] };
-                    receiptMap.set(t.receiptNo, copy);
+                    const copy = { ...formattedTxn, subTransactions: [formattedTxn] };
+                    receiptMap.set(groupKey, copy);
                     groupedTxns.push(copy);
                 }
             } else {
-                groupedTxns.push({ ...t, subTransactions: [t] });
+                groupedTxns.push({ ...formattedTxn, subTransactions: [formattedTxn] });
             }
         }
 
@@ -288,7 +351,7 @@ export default function AccountsPage() {
         const groups: Record<string, { category: string; originalCategory: string; items: any[]; totalAmount: number; categoryExists: boolean }> = {};
         
         pendingTxns.forEach(t => {
-            const key = t.category || 'অন্যান্য';
+            const key = t.originalCategory || t.category || 'অন্যান্য';
             if (!groups[key]) {
                 groups[key] = {
                     category: key,
@@ -305,7 +368,51 @@ export default function AccountsPage() {
         return Object.values(groups).sort((a, b) => b.totalAmount - a.totalAmount);
     }, [filteredTransactions, activeSubTab]);
 
+    const classWiseDues = useMemo(() => {
+        if (activeSubTab !== 'pending') return [];
+        const pendingTxns = filteredTransactions || [];
+        
+        const groups: Record<string, { className: string; items: any[]; totalAmount: number; uniqueStudents: Set<string> }> = {};
+        
+        pendingTxns.forEach(t => {
+            const key = t.className || 'শ্রেণী উল্লেখ নেই';
+            if (!groups[key]) {
+                groups[key] = {
+                    className: key,
+                    items: [],
+                    totalAmount: 0,
+                    uniqueStudents: new Set()
+                };
+            }
+            groups[key].items.push(t);
+            groups[key].totalAmount += t.amount || 0;
+            if (t.studentId) groups[key].uniqueStudents.add(t.studentId);
+        });
+        
+        return Object.values(groups).sort((a, b) => b.totalAmount - a.totalAmount);
+    }, [filteredTransactions, activeSubTab]);
 
+    useEffect(() => {
+        if (selectedStudentDetails) {
+            const updated = personWiseDues.find(s => s.studentId === selectedStudentDetails.studentId);
+            if (updated) {
+                setSelectedStudentDetails(updated);
+            } else {
+                setSelectedStudentDetails(null);
+            }
+        }
+    }, [personWiseDues]);
+
+    useEffect(() => {
+        if (selectedTypeDetails) {
+            const updated = typeWiseDues.find(s => s.category === selectedTypeDetails.category);
+            if (updated) {
+                setSelectedTypeDetails(updated);
+            } else {
+                setSelectedTypeDetails(null);
+            }
+        }
+    }, [typeWiseDues]);
 
     const renderStatus = (status: string) => {
         switch (status) {
@@ -326,11 +433,11 @@ export default function AccountsPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">আইডি</th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">আইডি</th>
                             <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">বিবরণ, খাত ও ব্যক্তি</th>
                             <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">অবস্থা</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell text-center">তারিখ</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">অবস্থা</th>
                             <th className="px-8 py-3"></th>
                         </tr>
                     </thead>
@@ -345,12 +452,12 @@ export default function AccountsPage() {
             );
         }
 
-        if (activeSubTab === 'pending' && dueGroupMode === 'person') {
+        if (activeSubTab === 'pending' && transactionFilterMode === 'person') {
             return (
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">শিক্ষার্থীর তথ্য</th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তির তথ্য</th>
                             <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">বকেয়া খাতের সংখ্যা</th>
                             <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">মোট বকেয়া পরিমাণ</th>
                             <th className="px-8 py-3"></th>
@@ -411,7 +518,7 @@ export default function AccountsPage() {
             );
         }
 
-        if (activeSubTab === 'pending' && dueGroupMode === 'type') {
+        if (activeSubTab === 'pending' && transactionFilterMode === 'type') {
             return (
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -451,7 +558,7 @@ export default function AccountsPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-center font-black text-xs text-slate-700">
-                                            {group.items.length} জন শিক্ষার্থী
+                                            {group.items.length} জন ব্যক্তি
                                         </td>
                                         <td className="px-6 py-4 text-right font-black text-xs text-amber-600">
                                             ৳ {group.totalAmount.toLocaleString()}
@@ -495,12 +602,493 @@ export default function AccountsPage() {
             );
         }
 
+        if (activeSubTab === 'pending' && transactionFilterMode === 'class') {
+            const handleClassSelect = (className: string, event: React.MouseEvent<HTMLButtonElement>) => {
+                setActiveClassFilter(className === activeClassFilter ? null : className);
+                
+                const container = classTabsRef.current;
+                const button = event.currentTarget;
+                if (container && button) {
+                    const containerWidth = container.offsetWidth;
+                    const buttonWidth = button.offsetWidth;
+                    const buttonOffset = button.offsetLeft;
+                    const scrollPos = buttonOffset - (containerWidth / 2) + (buttonWidth / 2);
+                    container.scrollTo({ left: scrollPos, behavior: 'smooth' });
+                }
+            };
+
+            const pendingTransactions = filteredTransactions.filter(t => t.status?.toUpperCase() === 'PENDING');
+            const classTxns = activeClassFilter 
+                ? pendingTransactions.filter(t => (t.className || 'শ্রেণী উল্লেখ নেই') === activeClassFilter)
+                : pendingTransactions;
+
+            return (
+                <div className="flex flex-col w-full">
+                    {classWiseDues.length > 0 && (
+                        <div 
+                            ref={classTabsRef}
+                            className="flex overflow-x-auto hide-scrollbar gap-2 px-6 py-4 bg-slate-50/50 border-b border-slate-100 scroll-smooth"
+                        >
+                            {classWiseDues.map((group) => (
+                                <button
+                                    key={group.className}
+                                    onClick={(e) => handleClassSelect(group.className, e)}
+                                    className={`px-4 py-2 rounded-xl whitespace-nowrap font-bold text-xs transition-all flex items-center gap-2 shrink-0 ${
+                                        activeClassFilter === group.className 
+                                            ? 'bg-[#045c84] text-white shadow-md' 
+                                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <GraduationCap size={14} className={activeClassFilter === group.className ? 'text-white' : 'text-slate-400'} />
+                                    {group.className} 
+                                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeClassFilter === group.className ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                        {group.items.length}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/50">
+                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">বকেয়া আইডি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত/ধরন</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
+                                <th className="px-8 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {classTxns.length > 0 ? (
+                                classTxns.map((txn) => (
+                                    <tr key={txn.id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                                        <td className="px-8 py-4">
+                                            <span className="font-mono text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg tracking-tighter border border-amber-100">
+                                                #{(txn.id || '').slice(-6).toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                {txn.studentPhoto ? (
+                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
+                                                        {txn.studentName?.[0] || 'S'}
+                                                    </div>
+                                                )}
+                                                <span className="font-black text-xs text-slate-800">{txn.studentName}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <p className="font-black text-xs text-slate-700">{txn.category}</p>
+                                        </td>
+                                        <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            ৳ {txn.amount?.toLocaleString()}
+                                        </td>
+                                        <td className="hidden md:table-cell px-6 py-4 text-center text-[10px] font-black text-slate-400">
+                                            {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                        </td>
+                                        <td className="px-8 py-4 text-right">
+                                            <button 
+                                                onClick={() => setTransactionToDelete(txn)}
+                                                className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={6} className="px-10 py-32 text-center">
+                                        <div className="flex flex-col items-center gap-4 opacity-40">
+                                            <Search size={48} className="text-slate-200" />
+                                            <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া পাওয়া যায়নি</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        if (activeSubTab === 'pending' && transactionFilterMode === 'all') {
+            const pendingTransactions = filteredTransactions.filter(t => t.status?.toUpperCase() === 'PENDING');
+
+            return (
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50/50">
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">বকেয়া আইডি</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তি</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত/ধরন</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
+                            <th className="px-8 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {pendingTransactions.length > 0 ? (
+                            pendingTransactions.map((txn) => (
+                                <tr key={txn.id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                                    <td className="px-8 py-4">
+                                        <span className="font-mono text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg tracking-tighter border border-amber-100">
+                                            #{(txn.id || '').slice(-6).toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            {txn.studentPhoto ? (
+                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
+                                            ) : (
+                                                <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
+                                                    {txn.studentName?.[0] || 'S'}
+                                                </div>
+                                            )}
+                                            <span className="font-black text-xs text-slate-800">{txn.studentName}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <p className="font-black text-xs text-slate-700">{txn.category}</p>
+                                    </td>
+                                    <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        ৳ {txn.amount?.toLocaleString()}
+                                    </td>
+                                    <td className="hidden md:table-cell px-6 py-4 text-center text-[10px] font-black text-slate-400">
+                                        {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                    </td>
+                                    <td className="px-8 py-4 text-right">
+                                        <button 
+                                            onClick={() => setTransactionToDelete(txn)}
+                                            className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={6} className="px-10 py-32 text-center">
+                                    <div className="flex flex-col items-center gap-4 opacity-40">
+                                        <Search size={48} className="text-slate-200" />
+                                        <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া পাওয়া যায়নি</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            );
+        }
+
+        // Transaction filters (Person-wise, Type-wise, Single)
+        if (activeSubTab === 'transactions' && transactionFilterMode === 'person') {
+            const completedTransactions = filteredTransactions.filter(t => t.status?.toUpperCase() === 'COMPLETED');
+            const personWiseTransactions: Record<string, any> = {};
+            
+            completedTransactions.forEach(t => {
+                const key = t.studentId || t.studentName || 'unknown';
+                if (!personWiseTransactions[key]) {
+                    personWiseTransactions[key] = {
+                        studentName: t.studentName || 'অজানা',
+                        studentId: t.studentId || 'N/A',
+                        studentUniqueId: t.studentUniqueId || t.studentId || 'N/A',
+                        studentPhoto: t.studentPhoto || null,
+                        items: [],
+                        totalAmount: 0
+                    };
+                }
+                personWiseTransactions[key].items.push(t);
+                personWiseTransactions[key].totalAmount += t.amount || 0;
+            });
+
+            const personList = Object.values(personWiseTransactions).sort((a, b) => b.totalAmount - a.totalAmount);
+
+            return (
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50/50">
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তির তথ্য</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">লেনদেন সংখ্যা</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">মোট পরিমাণ</th>
+                            <th className="px-8 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {personList.length > 0 ? (
+                            personList.map((student) => (
+                                <tr key={student.studentId} className="group cursor-pointer hover:bg-slate-50/50 transition-all duration-300">
+                                    <td className="px-8 py-4">
+                                        <div className="flex items-center gap-3">
+                                            {student.studentPhoto ? (
+                                                <img src={student.studentPhoto} alt={student.studentName} className="w-8 h-8 rounded-full object-cover" />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-xs">
+                                                    {student.studentName[0] || 'S'}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="font-black text-xs text-slate-800">{student.studentName}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 tracking-tight">ID: {student.studentUniqueId}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center font-black text-xs text-slate-700">
+                                        {student.items.length} টি লেনদেন
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-black text-xs text-emerald-600">
+                                        ৳ {student.totalAmount.toLocaleString()}
+                                    </td>
+                                    <td className="px-8 py-4 text-right">
+                                        <button className="w-8 h-8 bg-slate-50 text-slate-400 group-hover:text-[#045c84] group-hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center ml-auto">
+                                            <ChevronRight size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={4} className="px-10 py-32 text-center">
+                                    <div className="flex flex-col items-center gap-4 opacity-40">
+                                        <Search size={48} className="text-slate-200" />
+                                        <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            );
+        }
+
+        if (activeSubTab === 'transactions' && transactionFilterMode === 'type') {
+            const completedTransactions = filteredTransactions.filter(t => t.status?.toUpperCase() === 'COMPLETED');
+            const typeWiseTransactions: Record<string, any> = {};
+            
+            completedTransactions.forEach(t => {
+                const key = t.category || 'অন্যান্য';
+                if (!typeWiseTransactions[key]) {
+                    typeWiseTransactions[key] = {
+                        category: key,
+                        items: [],
+                        totalAmount: 0,
+                        type: t.type
+                    };
+                }
+                typeWiseTransactions[key].items.push(t);
+                typeWiseTransactions[key].totalAmount += t.amount || 0;
+            });
+
+            const typeList = Object.values(typeWiseTransactions).sort((a, b) => b.totalAmount - a.totalAmount);
+
+            return (
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50/50">
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত / ধরন</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">লেনদেন সংখ্যা</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">মোট পরিমাণ</th>
+                            <th className="px-8 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {typeList.length > 0 ? (
+                            typeList.map((group) => (
+                                <tr key={group.category} className="group cursor-pointer hover:bg-slate-50/50 transition-all duration-300">
+                                    <td className="px-8 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${group.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                <Receipt size={14} />
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-xs text-slate-800" title={group.category}>{getShortCategory(group.category)}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 tracking-tight">{group.type === 'INCOME' ? 'আয়' : 'ব্যয়'}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center font-black text-xs text-slate-700">
+                                        {group.items.length} টি লেনদেন
+                                    </td>
+                                    <td className={`px-6 py-4 text-right font-black text-xs ${group.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        ৳ {group.totalAmount.toLocaleString()}
+                                    </td>
+                                    <td className="px-8 py-4 text-right">
+                                        <button className="w-8 h-8 bg-slate-50 text-slate-400 group-hover:text-[#045c84] group-hover:bg-slate-100 rounded-lg transition-all flex items-center justify-center ml-auto">
+                                            <ChevronRight size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={4} className="px-10 py-32 text-center">
+                                    <div className="flex flex-col items-center gap-4 opacity-40">
+                                        <Search size={48} className="text-slate-200" />
+                                        <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            );
+        }
+
+        if (activeSubTab === 'transactions' && transactionFilterMode === 'class') {
+            const handleClassSelect = (className: string, event: React.MouseEvent<HTMLButtonElement>) => {
+                setActiveClassFilter(className === activeClassFilter ? null : className);
+                
+                const container = classTabsRef.current;
+                const button = event.currentTarget;
+                if (container && button) {
+                    const containerWidth = container.offsetWidth;
+                    const buttonWidth = button.offsetWidth;
+                    const buttonOffset = button.offsetLeft;
+                    const scrollPos = buttonOffset - (containerWidth / 2) + (buttonWidth / 2);
+                    container.scrollTo({ left: scrollPos, behavior: 'smooth' });
+                }
+            };
+
+            const completedTransactions = filteredTransactions.filter(t => t.status?.toUpperCase() === 'COMPLETED');
+            const classWiseTransactions: Record<string, any> = {};
+            
+            completedTransactions.forEach(t => {
+                const key = t.className || 'শ্রেণী উল্লেখ নেই';
+                if (!classWiseTransactions[key]) {
+                    classWiseTransactions[key] = {
+                        className: key,
+                        items: [],
+                        totalAmount: 0,
+                        uniqueStudents: new Set(),
+                        type: t.type
+                    };
+                }
+                classWiseTransactions[key].items.push(t);
+                classWiseTransactions[key].totalAmount += t.amount || 0;
+                if (t.studentId) classWiseTransactions[key].uniqueStudents.add(t.studentId);
+            });
+
+            const classList = Object.values(classWiseTransactions).sort((a, b) => b.totalAmount - a.totalAmount);
+            
+            const classTxns = activeClassFilter
+                ? completedTransactions.filter(t => (t.className || 'শ্রেণী উল্লেখ নেই') === activeClassFilter)
+                : completedTransactions;
+
+            return (
+                <div className="flex flex-col w-full">
+                    {classList.length > 0 && (
+                        <div 
+                            ref={classTabsRef}
+                            className="flex overflow-x-auto hide-scrollbar gap-2 px-6 py-4 bg-slate-50/50 border-b border-slate-100 scroll-smooth"
+                        >
+                            {classList.map((group) => (
+                                <button
+                                    key={group.className}
+                                    onClick={(e) => handleClassSelect(group.className, e)}
+                                    className={`px-4 py-2 rounded-xl whitespace-nowrap font-bold text-xs transition-all flex items-center gap-2 shrink-0 ${
+                                        activeClassFilter === group.className 
+                                            ? 'bg-[#045c84] text-white shadow-md' 
+                                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <GraduationCap size={14} className={activeClassFilter === group.className ? 'text-white' : 'text-slate-400'} />
+                                    {group.className} 
+                                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${activeClassFilter === group.className ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                        {group.items.length}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/50">
+                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">লেনদেন আইডি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত/ধরন</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
+                                <th className="px-8 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {classTxns.length > 0 ? (
+                                classTxns.map((txn) => (
+                                    <tr key={txn.id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                                        <td className="px-8 py-4">
+                                            <span className="font-mono text-[9px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg tracking-tighter border border-purple-100">
+                                                #{(txn.id || '').slice(-6).toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                {txn.studentPhoto ? (
+                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
+                                                        {txn.studentName?.[0] || 'S'}
+                                                    </div>
+                                                )}
+                                                <span className="font-black text-xs text-slate-800">{txn.studentName}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <p className="font-black text-xs text-slate-700" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                        </td>
+                                        <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            ৳ {txn.amount?.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
+                                            {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                        </td>
+                                        <td className="px-8 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button 
+                                                    onClick={() => setTransactionToDelete(txn)}
+                                                    className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                                {txn.receiptNo && txn.type === 'INCOME' && (
+                                                    <button 
+                                                        onClick={() => setSelectedTransactionForPrint(txn)}
+                                                        className="px-2 py-1.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white font-black text-[9px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                                    >
+                                                        <Receipt size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={6} className="px-10 py-32 text-center">
+                                        <div className="flex flex-col items-center gap-4 opacity-40">
+                                            <Search size={48} className="text-slate-200" />
+                                            <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
         // Default 'all' or other tabs
         return (
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50/50">
-                        <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">রশিদ/ভাউচার নং</th>
+                        <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">রশিদ/ভাউচার নং</th>
                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">বিবরণ, খাত ও ব্যক্তি</th>
                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
@@ -523,7 +1111,7 @@ export default function AccountsPage() {
                                             <Receipt size={14} />
                                         </div>
                                         <div>
-                                            <p className="font-black text-xs text-slate-800">{txn.category}</p>
+                                            <p className="font-black text-xs text-slate-800" title={txn.category}>{getShortCategory(txn.category)}</p>
                                             <p className="text-[9px] font-bold text-slate-400 tracking-tight">{txn.studentName || 'অজানা'}{txn.studentUniqueId ? ` (ID: ${txn.studentUniqueId})` : ''}</p>
                                         </div>
                                     </div>
@@ -693,13 +1281,13 @@ export default function AccountsPage() {
                     {/* Main Content Area (Table & Sub-tabs) */}
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[600px] flex flex-col transition-all">
                         {/* Sub-tab Navigation */}
-                        <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between bg-white">
-                            <div className="flex items-center gap-2 p-1.5 bg-slate-50 rounded-2xl w-fit">
-                                {['transactions', 'categories', ...((activeMainTab === 'income' || activeMainTab === 'overview') ? ['pending'] : [])].map((tab) => (
+                        <div className="px-6 sm:px-8 py-6 border-b border-slate-50 flex items-center justify-between bg-white">
+                            <div className="flex items-center gap-2 p-1.5 bg-slate-50 rounded-2xl w-fit flex-wrap">
+                                {['transactions', ...((activeMainTab === 'income' || activeMainTab === 'overview') ? ['pending'] : []), 'categories'].map((tab) => (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveSubTab(tab as any)}
-                                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === tab
+                                        className={`px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === tab
                                                 ? 'bg-white text-[#045c84] shadow-sm'
                                                 : 'text-slate-400 hover:text-slate-600'
                                             }`}
@@ -709,18 +1297,64 @@ export default function AccountsPage() {
                                     </button>
                                 ))}
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 flex-wrap">
                                 {activeSubTab === 'pending' && (
                                     <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50">
                                         {[
-                                            { id: 'person', label: 'শিক্ষার্থী ভিত্তিক' },
-                                            { id: 'type', label: 'ফি-এর ধরণ ভিত্তিক' }
+                                            { id: 'all', label: 'সব বকেয়া' },
+                                            { id: 'person', label: 'ব্যক্তি ভিত্তিক' },
+                                            { id: 'type', label: 'ধরন ভিত্তিক' },
+                                            { id: 'class', label: 'ক্লাস ভিত্তিক' }
                                         ].map(mode => (
                                             <button
                                                 key={mode.id}
-                                                onClick={() => setDueGroupMode(mode.id as any)}
+                                                onClick={() => { setTransactionFilterMode(mode.id as any); setActiveClassFilter(null); }}
                                                 className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
-                                                    dueGroupMode === mode.id
+                                                    transactionFilterMode === mode.id
+                                                        ? 'bg-[#045c84] text-white shadow-sm'
+                                                        : 'text-slate-400 hover:text-slate-600'
+                                                }`}
+                                            >
+                                                {mode.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {activeSubTab === 'transactions' && (
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50">
+                                        {[
+                                            { id: 'all', label: 'সব লেনদেন' },
+                                            { id: 'person', label: 'ব্যক্তি ভিত্তিক' },
+                                            { id: 'type', label: 'ধরন ভিত্তিক' },
+                                            { id: 'class', label: 'ক্লাস ভিত্তিক' }
+                                        ].map(mode => (
+                                            <button
+                                                key={mode.id}
+                                                onClick={() => { setTransactionFilterMode(mode.id as any); setActiveClassFilter(null); }}
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                    transactionFilterMode === mode.id
+                                                        ? 'bg-[#045c84] text-white shadow-sm'
+                                                        : 'text-slate-400 hover:text-slate-600'
+                                                }`}
+                                            >
+                                                {mode.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {activeSubTab === 'categories' && (
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50">
+                                        {[
+                                            { id: 'all', label: 'সব খাত' },
+                                            { id: 'income', label: 'আয়ের খাত' },
+                                            { id: 'expense', label: 'ব্যয়ের খাত' },
+                                            { id: 'archived', label: 'আর্কাইভ করা' }
+                                        ].map(mode => (
+                                            <button
+                                                key={mode.id}
+                                                onClick={() => setCategoryFilterMode(mode.id as any)}
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                    categoryFilterMode === mode.id
                                                         ? 'bg-[#045c84] text-white shadow-sm'
                                                         : 'text-slate-400 hover:text-slate-600'
                                                 }`}
@@ -733,9 +1367,9 @@ export default function AccountsPage() {
                                 <div className="text-right">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                         {activeSubTab === 'categories' ? '' :
-                                         activeSubTab === 'pending' && dueGroupMode === 'person' ? `${personWiseDues.length} জন` :
-                                         activeSubTab === 'pending' && dueGroupMode === 'type' ? `${typeWiseDues.length} টি খাত` :
-                                         `${filteredTransactions.length} টি লেনদেন`}
+                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'person' ? `${personWiseDues.length} জন` :
+                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'type' ? `${typeWiseDues.length} টি খাত` :
+                                         `${filteredTransactions.length} টি ${activeSubTab === 'pending' ? 'বকেয়া' : 'লেনদেন'}`}
                                     </p>
                                 </div>
                             </div>
@@ -747,13 +1381,15 @@ export default function AccountsPage() {
                                     externalSearchQuery={searchQuery} 
                                     addTrigger={addTrigger}
                                     forcedType={activeMainTab === 'overview' ? undefined : activeMainTab}
+                                    categoryFilterMode={categoryFilterMode}
+                                    setCategoryFilterMode={setCategoryFilterMode}
                                 />
                             </div>
                         ) : (
                             <>
                                 <AnimatePresence mode="wait">
                                     <motion.div
-                                        key={`${activeSubTab}_${activeSubTab === 'pending' ? dueGroupMode : 'all'}`}
+                                        key={`${activeSubTab}_${transactionFilterMode}`}
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -20 }}
@@ -939,7 +1575,7 @@ export default function AccountsPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50/50">
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-l-xl">শিক্ষার্থীর নাম</th>
+                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-l-xl">ব্যক্তির নাম</th>
                                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">আইডি</th>
                                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
                                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right rounded-r-xl">পরিমাণ</th>
@@ -1211,14 +1847,13 @@ export default function AccountsPage() {
     );
 }
 
-function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType }: { externalSearchQuery: string, addTrigger: number, forcedType?: 'income' | 'expense' }) {
+function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, categoryFilterMode, setCategoryFilterMode }: { externalSearchQuery: string, addTrigger: number, forcedType?: 'income' | 'expense', categoryFilterMode?: 'all' | 'income' | 'expense' | 'archived', setCategoryFilterMode?: (mode: 'all' | 'income' | 'expense' | 'archived') => void }) {
     const { activeInstitute } = useSession();
     const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<any>(null);
     const [categoryToDelete, setCategoryToDelete] = useState<any>(null);
-    const [deleteOption, setDeleteOption] = useState<'pending_only' | 'all'>('pending_only');
     const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'income' | 'expense'>('all');
     
     const [isDeletingProgress, setIsDeletingProgress] = useState<boolean>(false);
@@ -1262,13 +1897,23 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType }:
 
     const filteredCategories = useMemo(() => {
         let list = categories || [];
+        
+        // Use external categoryFilterMode if provided, otherwise use internal filter
+        const filterMode = categoryFilterMode || activeCategoryFilter;
+        
         if (forcedType) {
             list = list.filter(c => c.type?.toLowerCase() === forcedType);
         } else {
-            if (activeCategoryFilter === 'income') {
-                list = list.filter(c => c.type?.toUpperCase() === 'INCOME');
-            } else if (activeCategoryFilter === 'expense') {
-                list = list.filter(c => c.type?.toUpperCase() === 'EXPENSE');
+            if (filterMode === 'income') {
+                list = list.filter(c => c.type?.toUpperCase() === 'INCOME' && !c.isArchived);
+            } else if (filterMode === 'expense') {
+                list = list.filter(c => c.type?.toUpperCase() === 'EXPENSE' && !c.isArchived);
+            } else if (filterMode === 'archived') {
+                list = list.filter(c => c.isArchived === true);
+            }
+            // 'all' shows non-archived categories by default
+            else if (filterMode === 'all' && !forcedType) {
+                list = list.filter(c => !c.isArchived);
             }
         }
         if (externalSearchQuery) {
@@ -1276,7 +1921,7 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType }:
             list = list.filter(c => c.name.toLowerCase().includes(q));
         }
         return list;
-    }, [categories, activeCategoryFilter, externalSearchQuery]);
+    }, [categories, activeCategoryFilter, externalSearchQuery, categoryFilterMode, forcedType]);
 
     const fetchCategories = async () => {
         if (!activeInstitute?.id) return;
@@ -1310,7 +1955,7 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType }:
     const executeConfirmDelete = async () => {
         if (!categoryToDelete) return;
         try {
-            const res = await fetch(`/api/admin/accounts/categories?id=${categoryToDelete.id}&deletePaid=${deleteOption === 'all'}`, {
+            const res = await fetch(`/api/admin/accounts/categories?id=${categoryToDelete.id}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -1355,7 +2000,7 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType }:
     return (
         <div className="space-y-8">
             {/* Category Filter Navigation */}
-            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6 ${forcedType ? 'hidden' : ''}`}>
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6 ${forcedType || categoryFilterMode ? 'hidden' : ''}`}>
                 <div className="flex bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/50 w-fit">
                     {[
                         { id: 'all', label: 'সব খাত' },
@@ -1484,37 +2129,18 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType }:
                                     </p>
 
                                     <div className="space-y-4 mb-8">
-                                        <label className={`flex items-start gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${deleteOption === 'pending_only' ? 'border-[#045c84] bg-blue-50/50' : 'border-slate-100 hover:border-slate-200 bg-white'}`}>
-                                            <div className="mt-1">
-                                                <input 
-                                                    type="radio" 
-                                                    name="delete_type" 
-                                                    className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" 
-                                                    checked={deleteOption === 'pending_only'}
-                                                    onChange={() => setDeleteOption('pending_only')}
-                                                />
+                                        <div className="flex items-start gap-4 p-5 rounded-2xl border-2 border-rose-500 bg-rose-50/50">
+                                            <div className="mt-1 text-rose-500">
+                                                <AlertCircle size={20} />
                                             </div>
                                             <div>
-                                                <h4 className="font-black text-slate-800 mb-1 text-[15px]">শুধুমাত্র বকেয়া ফি মুছুন</h4>
-                                                <p className="text-xs font-bold text-slate-500 leading-relaxed">ভবিষ্যতে আর নতুন ফি যোগ হবে না, তবে আগের পরিশোধিত ফি থাকবে।</p>
+                                                <h4 className="font-black text-rose-600 mb-1 text-[15px]">বকেয়া ফি মুছুন</h4>
+                                                <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                                                    ভবিষ্যতে আর নতুন ফি যোগ হবে না এবং সমস্ত অপরিশোধিত (Pending) বকেয়া মুছে যাবে। 
+                                                    তবে হিসাবের সুরক্ষার জন্য আগের সমস্ত <span className="text-emerald-600">পরিশোধিত ফি (Paid)</span> অক্ষুণ্ন থাকবে।
+                                                </p>
                                             </div>
-                                        </label>
-
-                                        <label className={`flex items-start gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${deleteOption === 'all' ? 'border-rose-500 bg-rose-50/50' : 'border-slate-100 hover:border-slate-200 bg-white'}`}>
-                                            <div className="mt-1">
-                                                <input 
-                                                    type="radio" 
-                                                    name="delete_type" 
-                                                    className="w-4 h-4 text-rose-500 focus:ring-rose-500" 
-                                                    checked={deleteOption === 'all'}
-                                                    onChange={() => setDeleteOption('all')}
-                                                />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-black text-rose-600 mb-1 text-[15px]">সব মুছে ফেলুন (পরিশোধিত + বকেয়া)</h4>
-                                                <p className="text-xs font-bold text-slate-500 leading-relaxed">এই খাতের সমস্ত রেকর্ড এবং অতীতের পরিশোধিত ইতিহাস মুছে যাবে।</p>
-                                            </div>
-                                        </label>
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center gap-3">
@@ -1569,7 +2195,7 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType }:
                                     </div>
                                     <h2 className="text-xl font-black text-slate-800 mb-2 text-center">খাত মুছে ফেলা হচ্ছে...</h2>
                                     <p className="text-slate-500 text-sm font-bold mb-8 leading-relaxed text-center">
-                                        খাতটি {deleteOption === 'all' ? 'স্থায়ীভাবে মুছে ফেলা' : 'বকেয়া মুক্ত করা'} হচ্ছে। আপনি চাইলে এই ৫ সেকেন্ডের মধ্যে প্রক্রিয়াটি বাতিল করতে পারেন।
+                                        খাতটি বকেয়া মুক্ত করা হচ্ছে। আপনি চাইলে এই ৫ সেকেন্ডের মধ্যে প্রক্রিয়াটি বাতিল করতে পারেন।
                                     </p>
                                     <button 
                                         onClick={() => {
