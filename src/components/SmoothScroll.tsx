@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, ReactNode } from 'react';
+import { useEffect, ReactNode, useRef } from 'react';
 import Lenis from 'lenis';
 
 export default function SmoothScroll({ children }: { children: ReactNode }) {
+    const lenisRef = useRef<Lenis | null>(null);
+    const rafIdRef = useRef<number | null>(null);
+
     useEffect(() => {
         const lenis = new Lenis({
             duration: 1.2,
@@ -13,18 +16,34 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
             smoothWheel: true,
             wheelMultiplier: 1,
             touchMultiplier: 2,
-            lerp: 0.1, // Added for smoother momentum
+            lerp: 0.1,
         });
+
+        lenisRef.current = lenis;
 
         function raf(time: number) {
             lenis.raf(time);
-            requestAnimationFrame(raf);
+            rafIdRef.current = requestAnimationFrame(raf);
         }
 
-        requestAnimationFrame(raf);
+        rafIdRef.current = requestAnimationFrame(raf);
+
+        // Listen for modal open events to pause smooth scroll
+        const handleModalOpen = () => {
+            if (lenis) lenis.stop();
+        };
+        const handleModalClose = () => {
+            if (lenis) lenis.start();
+        };
+
+        window.addEventListener('modalOpen', handleModalOpen);
+        window.addEventListener('modalClose', handleModalClose);
 
         return () => {
             lenis.destroy();
+            if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+            window.removeEventListener('modalOpen', handleModalOpen);
+            window.removeEventListener('modalClose', handleModalClose);
         };
     }, []);
 

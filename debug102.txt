@@ -128,4 +128,55 @@
     "69db7ffcde1231afc4e2b7e4": 400,
     "69db7ffcde1231afc4e2b7e3": 500
   }
+}\n{
+  "student": "সামিয়া আক্তার রোজা",
+  "studentId": "102",
+  "classId": "69db7ffcde1231afc4e2b7e4",
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false,
+  "studentAmountType": "per-class",
+  "classAmounts": {
+    "69db7ffcde1231afc4e2b7e5": 100,
+    "69db7ffcde1231afc4e2b7e6": 200,
+    "69db7ffcde1231afc4e2b7e2": 300,
+    "69db7ffcde1231afc4e2b7e4": 400,
+    "69db7ffcde1231afc4e2b7e3": 500
+  }
+}\n{
+  "student": "সাদিয়া (মেহেরীন)",
+  "studentId": "103",
+  "classId": "69db7ffcde1231afc4e2b7e4",
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false,
+  "studentAmountType": "per-class",
+  "classAmounts": {
+    "69db7ffcde1231afc4e2b7e5": 100,
+    "69db7ffcde1231afc4e2b7e6": 200,
+    "69db7ffcde1231afc4e2b7e2": 300,
+    "69db7ffcde1231afc4e2b7e4": 400,
+    "69db7ffcde1231afc4e2b7e3": 500
+  }
+}\n{
+  "student": "তাহসিন আহমদ",
+  "studentId": "104",
+  "classId": "69db7ffcde1231afc4e2b7e4",
+  "normalizedAmount": 0,
+  "baseAmount": 0,
+  "tier": "full",
+  "waiver": 0,
+  "deselected": false,
+  "studentAmountType": "per-class",
+  "classAmounts": {
+    "69db7ffcde1231afc4e2b7e5": 100,
+    "69db7ffcde1231afc4e2b7e6": 200,
+    "69db7ffcde1231afc4e2b7e2": 300,
+    "69db7ffcde1231afc4e2b7e4": 400,
+    "69db7ffcde1231afc4e2b7e3": 500
+  }
 }\n

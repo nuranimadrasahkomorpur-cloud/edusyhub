@@ -30,6 +30,11 @@ export async function GET(req: Request) {
 
         // Support fetching a single user by ID
         if (id) {
+            // Validate that id looks like a MongoDB ObjectId
+            if (!/^[a-f0-9]{24}$/i.test(id)) {
+                return NextResponse.json({ message: 'Invalid user ID format' }, { status: 400 });
+            }
+
             const user = await prisma.user.findUnique({
                 where: { id },
                 include: {
@@ -216,15 +221,25 @@ export async function GET(req: Request) {
         // Apply search filter if provided
         if (search) {
             match.$and = match.$and || [];
-            match.$and.push({
-                $or: [
-                    { email: { $regex: search, $options: 'i' } },
-                    { name: { $regex: search, $options: 'i' } },
-                    { phone: { $regex: search, $options: 'i' } },
-                    { 'metadata.studentId': { $regex: search, $options: 'i' } },
-                    { 'metadata.rollNumber': { $regex: search, $options: 'i' } }
-                ]
-            });
+            
+            const searchOrFilters: any[] = [];
+            const isNumericSearch = /^\d+$/.test(search);
+            if (isNumericSearch) {
+                // Exact match on studentId as integer or string in metadata
+                searchOrFilters.push({ 'metadata.studentId': parseInt(search) });
+                searchOrFilters.push({ 'metadata.studentId': search });
+            } else {
+                // Non-numeric searches: exact match on metadata.studentId string or rollNumber
+                searchOrFilters.push({ 'metadata.studentId': search });
+                searchOrFilters.push({ 'metadata.rollNumber': search });
+            }
+
+            // If the searched value is a valid MongoDB ObjectId, allow direct user lookup too
+            if (/^[a-fA-F0-9]{24}$/.test(search)) {
+                searchOrFilters.push({ _id: { $oid: search } });
+            }
+
+            match.$and.push({ $or: searchOrFilters });
         }
 
         if (Object.keys(match).length > 0) {

@@ -27,7 +27,10 @@ import {
     AlertCircle,
     Wallet,
     Receipt,
-    PlusCircle
+    PlusCircle,
+    LayoutGrid,
+    List,
+    Scan
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { useMemo } from 'react';
@@ -40,6 +43,7 @@ import PrintReceiptModal from '@/components/PrintReceiptModal';
 import Toast from '@/components/Toast';
 import { useUI } from '@/components/UIProvider';
 import { getCleanId } from '@/utils/digit-utils';
+import QRBarcodeScanner from '@/components/QRBarcodeScanner';
 
 const getShortCategory = (category: string) => {
     if (!category) return 'অজানা';
@@ -57,6 +61,7 @@ export default function AccountsPage() {
     const [activeMainTab, setActiveMainTab] = useState<'overview' | 'income' | 'expense'>('overview'); 
     const [activeSubTab, setActiveSubTab] = useState<'transactions' | 'pending' | 'categories'>('transactions');
     const [searchQuery, setSearchQuery] = useState('');
+    const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
     const [addTrigger, setAddTrigger] = useState(0);
     const [accountData, setAccountData] = useState<{ summary: any, transactions: any[] }>({
         summary: null,
@@ -79,6 +84,9 @@ export default function AccountsPage() {
     const [transactionToDelete, setTransactionToDelete] = useState<any | null>(null);
     const [isDeletingTxn, setIsDeletingTxn] = useState(false);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+    const [showScanner, setShowScanner] = useState(false);
+    const [isScanningStudent, setIsScanningStudent] = useState(false);
+    const scanRequestInFlightRef = React.useRef(false);
 
     useEffect(() => {
         if (selectedStudentDetails || selectedTypeDetails || orphanedCategoryToDelete) {
@@ -155,6 +163,13 @@ export default function AccountsPage() {
         }
     }, [activeInstitute?.id]);
 
+    // Reset modal state on component mount and when institute changes
+    useEffect(() => {
+        setFeeCollectStudent(null);
+        setShowScanner(false);
+        setSelectedStudentDetails(null);
+    }, []);
+
     const handleDeleteOrphanedCategory = (categoryName: string) => {
         setOrphanedCategoryToDelete(categoryName);
     };
@@ -210,6 +225,73 @@ export default function AccountsPage() {
             setToast({ message: 'নেটওয়ার্ক সমস্যা', type: 'error' });
         } finally {
             setIsDeletingTxn(false);
+        }
+    };
+
+    const handleScanResult = async (scannedValue: string) => {
+        // Prevent concurrent scan requests
+        if (scanRequestInFlightRef.current) {
+            console.debug('Scan request already in flight, ignoring duplicate');
+            return;
+        }
+
+        const cleanedValue = scannedValue.trim();
+        scanRequestInFlightRef.current = true;
+        setIsScanningStudent(true);
+        try {
+            // Search for student by ID or studentId with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+            
+            // Search by student ID (not MongoDB user ID)
+            const res = await fetch(
+                `/api/admin/users?search=${encodeURIComponent(cleanedValue)}&role=STUDENT&instituteId=${activeInstitute?.id || ''}`,
+                { signal: controller.signal }
+            );
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+                const students = await res.json();
+                // Handle both array responses
+                const apiStudent = Array.isArray(students) ? students[0] : students;
+                
+                if (apiStudent && apiStudent.id) {
+                    const studentForFee = {
+                        studentId: apiStudent.id,
+                        studentName: apiStudent.name || '',
+                        studentUniqueId: apiStudent.metadata?.studentId || apiStudent.id,
+                        studentPhoto: null,
+                        scannedId: cleanedValue,
+                        email: apiStudent.email || '',
+                        phone: apiStudent.phone || '',
+                        items: [],
+                        totalAmount: 0,
+                        scannedAt: new Date().toISOString()
+                    };
+
+                    setFeeCollectStudent(studentForFee);
+                    setShowScanner(false);
+                    setToast({ message: 'ছাত্র পাওয়া গেছে - ফি সংগ্রহের জন্য প্রস্তুত', type: 'success' });
+                } else {
+                    setToast({ message: 'ছাত্র খুঁজে পাওয়া যায়নি', type: 'error' });
+                    setShowScanner(false);
+                }
+            } else {
+                console.error(`API returned ${res.status}: ${res.statusText}`);
+                setToast({ message: `সার্ভার ত্রুটি (${res.status}). আবার চেষ্টা করুন।`, type: 'error' });
+                setShowScanner(false);
+            }
+        } catch (error: any) {
+            console.error('Scan error:', error);
+            if (error.name === 'AbortError') {
+                setToast({ message: 'অনুসন্ধান সময় শেষ। আবার চেষ্টা করুন।', type: 'error' });
+            } else {
+                setToast({ message: 'স্ক্যান করতে সমস্যা হয়েছে', type: 'error' });
+            }
+            setShowScanner(false);
+        } finally {
+            setIsScanningStudent(false);
+            scanRequestInFlightRef.current = false;
         }
     };
 
@@ -429,6 +511,31 @@ export default function AccountsPage() {
 
     const renderTableContent = () => {
         if (loading) {
+            if (viewMode === 'card') {
+                return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        {[...Array(6)].map((_, i) => (
+                            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm animate-pulse space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <div className="h-4 bg-slate-100 rounded w-1/3" />
+                                    <div className="h-4 bg-slate-100 rounded-full w-1/4" />
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100" />
+                                    <div className="space-y-2 flex-1">
+                                        <div className="h-4 bg-slate-100 rounded w-2/3" />
+                                        <div className="h-3 bg-slate-100 rounded w-1/2" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center pt-2">
+                                    <div className="h-5 bg-slate-100 rounded w-1/4" />
+                                    <div className="h-8 bg-slate-100 rounded-lg w-1/3" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            }
             return (
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -453,6 +560,50 @@ export default function AccountsPage() {
         }
 
         if (activeSubTab === 'pending' && transactionFilterMode === 'person') {
+            if (viewMode === 'card') {
+                return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        {personWiseDues.length > 0 ? (
+                            personWiseDues.map((student) => (
+                                <div 
+                                    key={student.studentId}
+                                    onClick={() => setSelectedStudentDetails(student)}
+                                    className="group cursor-pointer bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {student.studentPhoto ? (
+                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                                {student.studentName[0] || 'S'}
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">ID: {student.studentUniqueId}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                        <div>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">বকেয়া ফি</p>
+                                            <p className="font-black text-xs text-slate-700">{student.items.length} টি খাত</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
+                                            <p className="font-black text-sm text-amber-600">৳ {student.totalAmount.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                                <Search size={48} className="text-slate-200" />
+                                <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া ফি পাওয়া যায়নি</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
             return (
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -519,6 +670,66 @@ export default function AccountsPage() {
         }
 
         if (activeSubTab === 'pending' && transactionFilterMode === 'type') {
+            if (viewMode === 'card') {
+                return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        {typeWiseDues.length > 0 ? (
+                            typeWiseDues.map((group) => (
+                                <div 
+                                    key={group.category}
+                                    onClick={() => setSelectedTypeDetails(group)}
+                                    className="group cursor-pointer bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                                                !group.categoryExists ? 'bg-rose-50 text-rose-600' : 'bg-purple-50 text-purple-600'
+                                            }`}>
+                                                <Receipt size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-sm text-slate-800 leading-tight">{group.category}</p>
+                                                {!group.categoryExists && (
+                                                    <span className="inline-block mt-1 px-2 py-0.5 text-[8px] font-black tracking-wider text-rose-600 bg-rose-50 rounded-full border border-rose-100">
+                                                        মুছে ফেলা খাত
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {!group.categoryExists && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteOrphanedCategory(group.category);
+                                                }}
+                                                className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center shrink-0"
+                                                title="বকেয়া ফি মুছুন"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                        <div>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">বকেয়া ব্যক্তি</p>
+                                            <p className="font-black text-xs text-slate-700">{group.items.length} জন</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
+                                            <p className="font-black text-sm text-amber-600">৳ {group.totalAmount.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                                <Search size={48} className="text-slate-200" />
+                                <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া ফি পাওয়া যায়নি</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
             return (
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -649,69 +860,123 @@ export default function AccountsPage() {
                         </div>
                     )}
                     
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50/50">
-                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">বকেয়া আইডি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ধরন</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
-                                <th className="px-8 py-3 whitespace-nowrap"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
+                    {viewMode === 'card' ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
                             {classTxns.length > 0 ? (
                                 classTxns.map((txn) => (
-                                    <tr key={txn.id} className="group hover:bg-slate-50/50 transition-all duration-300">
-                                        <td className="px-8 py-4">
+                                    <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                        <div className="flex items-start justify-between">
                                             <span className="font-mono text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg tracking-tighter border border-amber-100">
                                                 #{(txn.id || '').slice(-6).toUpperCase()}
                                             </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                {txn.studentPhoto ? (
-                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
-                                                ) : (
-                                                    <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
-                                                        {txn.studentName?.[0] || 'S'}
-                                                    </div>
-                                                )}
-                                                <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="font-black text-xs text-slate-700 whitespace-nowrap">{txn.category}</p>
-                                        </td>
-                                        <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            ৳ {txn.amount?.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
-                                            {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                                        </td>
-                                        <td className="px-8 py-4 text-right">
                                             <button 
                                                 onClick={() => setTransactionToDelete(txn)}
-                                                className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
+                                                className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center shrink-0"
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2 size={15} />
                                             </button>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            {txn.studentPhoto ? (
+                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                                    {txn.studentName?.[0] || 'S'}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{txn.category}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                            <div>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
+                                                <p className="font-bold text-xs text-slate-500">
+                                                    {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
+                                                <p className="font-black text-sm text-rose-600">
+                                                    ৳ {txn.amount?.toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ))
                             ) : (
-                                <tr>
-                                    <td colSpan={6} className="px-10 py-32 text-center">
-                                        <div className="flex flex-col items-center gap-4 opacity-40">
-                                            <Search size={48} className="text-slate-200" />
-                                            <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া পাওয়া যায়নি</p>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                                    <Search size={48} className="text-slate-200" />
+                                    <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া পাওয়া যায়নি</p>
+                                </div>
                             )}
-                        </tbody>
-                    </table>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50">
+                                    <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">বকেয়া আইডি</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তি</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ধরন</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
+                                    <th className="px-8 py-3 whitespace-nowrap"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {classTxns.length > 0 ? (
+                                    classTxns.map((txn) => (
+                                        <tr key={txn.id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                                            <td className="px-8 py-4">
+                                                <span className="font-mono text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg tracking-tighter border border-amber-100">
+                                                    #{(txn.id || '').slice(-6).toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    {txn.studentPhoto ? (
+                                                        <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
+                                                            {txn.studentName?.[0] || 'S'}
+                                                        </div>
+                                                    )}
+                                                    <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="font-black text-xs text-slate-700 whitespace-nowrap">{txn.category}</p>
+                                            </td>
+                                            <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                ৳ {txn.amount?.toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
+                                                {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                            </td>
+                                            <td className="px-8 py-4 text-right">
+                                                <button 
+                                                    onClick={() => setTransactionToDelete(txn)}
+                                                    className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={6} className="px-10 py-32 text-center">
+                                            <div className="flex flex-col items-center gap-4 opacity-40">
+                                                <Search size={48} className="text-slate-200" />
+                                                <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া পাওয়া যায়নি</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             );
         }
@@ -719,6 +984,61 @@ export default function AccountsPage() {
         if (activeSubTab === 'pending' && transactionFilterMode === 'all') {
             const pendingTransactions = filteredTransactions.filter(t => t.status?.toUpperCase() === 'PENDING');
 
+            if (viewMode === 'card') {
+                return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        {pendingTransactions.length > 0 ? (
+                            pendingTransactions.map((txn) => (
+                                <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                    <div className="flex items-start justify-between">
+                                        <span className="font-mono text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg tracking-tighter border border-amber-100">
+                                            #{(txn.id || '').slice(-6).toUpperCase()}
+                                        </span>
+                                        <button 
+                                            onClick={() => setTransactionToDelete(txn)}
+                                            className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center shrink-0"
+                                        >
+                                            <Trash2 size={15} />
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        {txn.studentPhoto ? (
+                                            <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                                {txn.studentName?.[0] || 'S'}
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{txn.category}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                        <div>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
+                                            <p className="font-bold text-xs text-slate-500">
+                                                {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
+                                            <p className="font-black text-sm text-rose-600">
+                                                ৳ {txn.amount?.toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                                <Search size={48} className="text-slate-200" />
+                                <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">বকেয়া পাওয়া যায়নি</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
             return (
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -809,6 +1129,47 @@ export default function AccountsPage() {
 
             const personList = Object.values(personWiseTransactions).sort((a, b) => b.totalAmount - a.totalAmount);
 
+            if (viewMode === 'card') {
+                return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        {personList.length > 0 ? (
+                            personList.map((student) => (
+                                <div key={student.studentId} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        {student.studentPhoto ? (
+                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                                {student.studentName[0] || 'S'}
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">ID: {student.studentUniqueId}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                        <div>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">লেনদেন সংখ্যা</p>
+                                            <p className="font-black text-xs text-slate-700">{student.items.length} টি লেনদেন</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
+                                            <p className="font-black text-sm text-emerald-600">৳ {student.totalAmount.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                                <Search size={48} className="text-slate-200" />
+                                <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
             return (
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -885,6 +1246,45 @@ export default function AccountsPage() {
             });
 
             const typeList = Object.values(typeWiseTransactions).sort((a, b) => b.totalAmount - a.totalAmount);
+
+            if (viewMode === 'card') {
+                return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        {typeList.length > 0 ? (
+                            typeList.map((group) => (
+                                <div key={group.category} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${group.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                            <Receipt size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-sm text-slate-800 leading-tight" title={group.category}>{getShortCategory(group.category)}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{group.type === 'INCOME' ? 'আয়' : 'ব্যয়'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                        <div>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">লেনদেন সংখ্যা</p>
+                                            <p className="font-black text-xs text-slate-700">{group.items.length} টি লেনদেন</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
+                                            <p className={`font-black text-sm ${group.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                ৳ {group.totalAmount.toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                                <Search size={48} className="text-slate-200" />
+                                <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
 
             return (
                 <table className="w-full text-left border-collapse">
@@ -1006,84 +1406,218 @@ export default function AccountsPage() {
                         </div>
                     )}
                     
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50/50">
-                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">লেনদেন আইডি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ধরন</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
-                                <th className="px-8 py-3 whitespace-nowrap"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
+                    {viewMode === 'card' ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
                             {classTxns.length > 0 ? (
                                 classTxns.map((txn) => (
-                                    <tr key={txn.id} className="group hover:bg-slate-50/50 transition-all duration-300">
-                                        <td className="px-8 py-4">
+                                    <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                        <div className="flex items-start justify-between">
                                             <span className="font-mono text-[9px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg tracking-tighter border border-purple-100">
                                                 #{(txn.id || '').slice(-6).toUpperCase()}
                                             </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                {txn.studentPhoto ? (
-                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
-                                                ) : (
-                                                    <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
-                                                        {txn.studentName?.[0] || 'S'}
-                                                    </div>
-                                                )}
-                                                <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="font-black text-xs text-slate-700 whitespace-nowrap" title={txn.category}>{getShortCategory(txn.category)}</p>
-                                        </td>
-                                        <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                            ৳ {txn.amount?.toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
-                                            {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                                        </td>
-                                        <td className="px-8 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                            <div className="flex items-center gap-1.5 shrink-0">
                                                 <button 
                                                     onClick={() => setTransactionToDelete(txn)}
                                                     className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
+                                                    title="মুছুন"
                                                 >
-                                                    <Trash2 size={16} />
+                                                    <Trash2 size={15} />
                                                 </button>
                                                 {txn.receiptNo && txn.type === 'INCOME' && (
                                                     <button 
                                                         onClick={() => setSelectedTransactionForPrint(txn)}
                                                         className="px-2 py-1.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white font-black text-[9px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                                        title="রশিদ প্রিন্ট"
                                                     >
                                                         <Receipt size={12} />
                                                     </button>
                                                 )}
                                             </div>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            {txn.studentPhoto ? (
+                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                                    {txn.studentName?.[0] || 'S'}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                            <div>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
+                                                <p className="font-bold text-xs text-slate-500">
+                                                    {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
+                                                <p className={`font-black text-sm ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    ৳ {txn.amount?.toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ))
                             ) : (
-                                <tr>
-                                    <td colSpan={6} className="px-10 py-32 text-center">
-                                        <div className="flex flex-col items-center gap-4 opacity-40">
-                                            <Search size={48} className="text-slate-200" />
-                                            <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                                    <Search size={48} className="text-slate-200" />
+                                    <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                                </div>
                             )}
-                        </tbody>
-                    </table>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50">
+                                    <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">লেনদেন আইডি</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তি</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ধরন</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
+                                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
+                                    <th className="px-8 py-3 whitespace-nowrap"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {classTxns.length > 0 ? (
+                                    classTxns.map((txn) => (
+                                        <tr key={txn.id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                                            <td className="px-8 py-4">
+                                                <span className="font-mono text-[9px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg tracking-tighter border border-purple-100">
+                                                    #{(txn.id || '').slice(-6).toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    {txn.studentPhoto ? (
+                                                        <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
+                                                            {txn.studentName?.[0] || 'S'}
+                                                        </div>
+                                                    )}
+                                                    <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="font-black text-xs text-slate-700 whitespace-nowrap" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                            </td>
+                                            <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                ৳ {txn.amount?.toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
+                                                {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                            </td>
+                                            <td className="px-8 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button 
+                                                        onClick={() => setTransactionToDelete(txn)}
+                                                        className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                    {txn.receiptNo && txn.type === 'INCOME' && (
+                                                        <button 
+                                                            onClick={() => setSelectedTransactionForPrint(txn)}
+                                                            className="px-2 py-1.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white font-black text-[9px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                                        >
+                                                            <Receipt size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={6} className="px-10 py-32 text-center">
+                                            <div className="flex flex-col items-center gap-4 opacity-40">
+                                                <Search size={48} className="text-slate-200" />
+                                                <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             );
         }
 
         // Default 'all' or other tabs
+        if (viewMode === 'card') {
+            return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    {filteredTransactions.length > 0 ? (
+                        filteredTransactions.map((txn: any) => (
+                            <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <span className="font-mono text-[9px] font-black text-[#045c84] bg-blue-50 px-2 py-1 rounded-lg tracking-tighter border border-blue-100">
+                                        {txn.receiptNo || `#${txn.id.slice(-6).toUpperCase()}`}
+                                    </span>
+                                    <div className="shrink-0">
+                                        {renderStatus(txn.status)}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${txn.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                        <Receipt size={16} />
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-sm text-slate-800 leading-tight" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate max-w-[150px]">
+                                            {txn.studentName || 'অজানা'}{txn.studentUniqueId ? ` (ID: ${txn.studentUniqueId})` : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                    <div>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
+                                        <p className="font-bold text-xs text-slate-500">
+                                            {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
+                                        <p className={`font-black text-sm ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            ৳ {txn.amount?.toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-50/50">
+                                    <button 
+                                        onClick={() => setTransactionToDelete(txn)}
+                                        className="px-3 py-1.5 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        title="মুছুন"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                    {txn.status?.toUpperCase() === 'COMPLETED' && txn.receiptNo && txn.type === 'INCOME' && (
+                                        <button 
+                                            onClick={() => setSelectedTransactionForPrint(txn)}
+                                            className="px-3 py-1.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+                                        >
+                                            <Receipt size={12} /> রশিদ প্রিন্ট
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 opacity-40">
+                            <Search size={48} className="text-slate-200" />
+                            <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">লেনদেন পাওয়া যায়নি</p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return (
             <table className="w-full text-left border-collapse">
                 <thead>
@@ -1177,10 +1711,10 @@ export default function AccountsPage() {
     return (
         <div className="p-6 space-y-6 animate-fade-in font-bengali min-h-screen bg-slate-50/50 pb-24">
             {/* Main Navigation Tabs */}
-            <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50 overflow-x-auto hide-scrollbar w-max">
+            <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50 w-full">
                 <button
                     onClick={() => { setActiveMainTab('overview'); setActiveSubTab('transactions'); }}
-                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
+                    className={`flex-1 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
                         ? 'bg-[#045c84] text-white shadow-lg'
                         : 'text-slate-400 hover:text-slate-600'
                     }`}
@@ -1189,7 +1723,7 @@ export default function AccountsPage() {
                 </button>
                 <button
                     onClick={() => { setActiveMainTab('income'); setActiveSubTab('transactions'); }}
-                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${activeMainTab === 'income'
+                    className={`flex-1 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'income'
                         ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
                         : 'text-slate-400 hover:text-slate-600'
                     }`}
@@ -1198,7 +1732,7 @@ export default function AccountsPage() {
                 </button>
                 <button
                     onClick={() => { setActiveMainTab('expense'); setActiveSubTab('transactions'); }}
-                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${activeMainTab === 'expense'
+                    className={`flex-1 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'expense'
                         ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
                         : 'text-slate-400 hover:text-slate-600'
                     }`}
@@ -1219,85 +1753,84 @@ export default function AccountsPage() {
                         stiffness: 200,
                         mass: 0.8
                     }}
-                    className="space-y-10"
+                    className="space-y-6"
                 >
+                    {/* Search & Actions Row */}
+                    <div className="flex items-center justify-between gap-3 w-full">
+                        <div className="relative group flex-1 max-w-md">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#045c84] transition-colors" size={18} />
+                            <input
+                                type="text"
+                                placeholder={activeSubTab === 'categories' ? "খাত খুঁজুন..." : "লেনদেন খুঁজুন..."}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-12 pr-10 py-3 bg-white border border-slate-100 shadow-sm rounded-2xl text-xs font-bold placeholder:text-slate-400 focus:ring-1 focus:ring-[#045c84]/10 w-full transition-all"
+                            />
+                            {searchQuery && (
+                                <button 
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors"
+                                >
+                                    <Plus className="rotate-45" size={16} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Actions (Filter, Download, Add Category) */}
+                        <div className="flex items-center gap-2 shrink-0">
+                            {activeSubTab === 'categories' ? (
+                                <button 
+                                    id="add-category-btn-global"
+                                    onClick={() => setAddTrigger(prev => prev + 1)}
+                                    className={`px-4 sm:px-6 py-2.5 sm:py-3 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
+                                        activeMainTab === 'income' ? 'bg-emerald-600 hover:shadow-emerald-100' : 
+                                        activeMainTab === 'expense' ? 'bg-rose-600 hover:shadow-rose-100' : 
+                                        'bg-[#045c84] hover:shadow-blue-100'
+                                    }`}
+                                >
+                                    <Plus size={16} /> <span className="hidden sm:inline">নতুন {activeMainTab === 'income' ? 'আয়ের ' : activeMainTab === 'expense' ? 'ব্যয়ের ' : ''}খাত</span>
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
+                                        <Filter size={18} />
+                                    </button>
+                                    <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
+                                        <Download size={18} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Quick Stats Scrollable Container */}
                     <div 
                         className="flex overflow-x-auto gap-3 sm:gap-4 pb-2 scroll-smooth custom-scrollbar" 
                         data-lenis-prevent="true"
                     >
                         {stats.map((stat, idx) => (
-                            <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden min-w-[240px] sm:min-w-[280px] flex-1 flex-shrink-0">
-                                <div className="flex flex-col gap-4">
+                            <div key={idx} className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden min-w-[170px] sm:min-w-[200px] flex-1 flex-shrink-0">
+                                <div className="flex flex-col gap-2 sm:gap-2.5">
                                     <div className="flex items-center justify-between">
-                                        <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center shadow-sm`}>
-                                            <stat.icon size={24} />
+                                        <div className={`w-9 h-9 sm:w-10 sm:h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center shadow-sm`}>
+                                            <stat.icon size={18} />
                                         </div>
-                                        <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black ${stat.trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                        <div className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black ${stat.trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                                             {stat.change}
-                                            {stat.trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                                            {stat.trend === 'up' ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
                                         </div>
                                     </div>
                                     <div>
-                                        <h3 className="text-slate-400 font-bold text-[9px] uppercase tracking-widest mb-0.5">{stat.label}</h3>
-                                        <p className="text-2xl font-black text-slate-800 tracking-tighter">{stat.value}</p>
+                                        <h3 className="text-slate-400 font-bold text-[8px] sm:text-[9px] uppercase tracking-widest mb-0.5">{stat.label}</h3>
+                                        <p className="text-lg sm:text-xl font-black text-slate-800 tracking-tighter">{stat.value}</p>
                                     </div>
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    <div className="space-y-6">
-                        {/* Search & Actions Row */}
-                        <div className="flex items-center justify-between gap-3 w-full">
-                            <div className="relative group flex-1 max-w-md">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#045c84] transition-colors" size={18} />
-                                <input
-                                    type="text"
-                                    placeholder={activeSubTab === 'categories' ? "খাত খুঁজুন..." : "লেনদেন খুঁজুন..."}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-12 pr-10 py-3 bg-white border border-slate-100 shadow-sm rounded-2xl text-xs font-bold placeholder:text-slate-400 focus:ring-1 focus:ring-[#045c84]/10 w-full transition-all"
-                                />
-                                {searchQuery && (
-                                    <button 
-                                        onClick={() => setSearchQuery('')}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors"
-                                    >
-                                        <Plus className="rotate-45" size={16} />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Actions (Filter, Download, Add Category) */}
-                            <div className="flex items-center gap-2 shrink-0">
-                                {activeSubTab === 'categories' ? (
-                                    <button 
-                                        id="add-category-btn-global"
-                                        onClick={() => setAddTrigger(prev => prev + 1)}
-                                        className={`px-4 sm:px-6 py-2.5 sm:py-3 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
-                                            activeMainTab === 'income' ? 'bg-emerald-600 hover:shadow-emerald-100' : 
-                                            activeMainTab === 'expense' ? 'bg-rose-600 hover:shadow-rose-100' : 
-                                            'bg-[#045c84] hover:shadow-blue-100'
-                                        }`}
-                                    >
-                                        <Plus size={16} /> <span className="hidden sm:inline">নতুন {activeMainTab === 'income' ? 'আয়ের ' : activeMainTab === 'expense' ? 'ব্যয়ের ' : ''}খাত</span>
-                                    </button>
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
-                                            <Filter size={18} />
-                                        </button>
-                                        <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
-                                            <Download size={18} />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Main Content Area (Table & Sub-tabs) */}
-                        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[600px] flex flex-col transition-all">
+                    {/* Main Content Area (Table & Sub-tabs) */}
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[600px] flex flex-col transition-all">
                         {/* Sub-tab Navigation */}
                         <div className="px-6 sm:px-8 py-4 sm:py-6 border-b border-slate-50 flex flex-col gap-4 bg-white">
                             {/* Top Row: Tabs and Count */}
@@ -1327,14 +1860,14 @@ export default function AccountsPage() {
                                 </div>
                             </div>
                             
-                            {/* Bottom Row: Filters */}
-                            <div className="flex items-center gap-4 w-full overflow-x-auto custom-scrollbar pb-1">
-                                {activeSubTab === 'pending' && (
+                            {/* Bottom Row: Filters & Toggle View */}
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                                {activeSubTab !== 'categories' && (
                                     <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50 w-max shrink-0">
                                         {[
-                                            { id: 'all', label: 'সব বকেয়া' },
+                                            { id: 'all', label: 'সব লেনদেন' },
                                             { id: 'person', label: 'ব্যক্তি ভিত্তিক' },
-                                            { id: 'type', label: 'ধরন ভিত্তিক' },
+                                            { id: 'type', label: 'ধরণ ভিত্তিক' },
                                             { id: 'class', label: 'ক্লাস ভিত্তিক' }
                                         ].map(mode => (
                                             <button
@@ -1351,26 +1884,32 @@ export default function AccountsPage() {
                                         ))}
                                     </div>
                                 )}
-                                {activeSubTab === 'transactions' && (
-                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50 w-max shrink-0">
-                                        {[
-                                            { id: 'all', label: 'সব লেনদেন' },
-                                            { id: 'person', label: 'ব্যক্তি ভিত্তিক' },
-                                            { id: 'type', label: 'ধরন ভিত্তিক' },
-                                            { id: 'class', label: 'ক্লাস ভিত্তিক' }
-                                        ].map(mode => (
-                                            <button
-                                                key={mode.id}
-                                                onClick={() => { setTransactionFilterMode(mode.id as any); setActiveClassFilter(null); }}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                                                    transactionFilterMode === mode.id
-                                                        ? 'bg-[#045c84] text-white shadow-sm'
-                                                        : 'text-slate-400 hover:text-slate-600'
-                                                }`}
-                                            >
-                                                {mode.label}
-                                            </button>
-                                        ))}
+
+                                {/* Card/Table View Mode Toggle Buttons */}
+                                {activeSubTab !== 'categories' && (
+                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/50 shrink-0 ml-auto">
+                                        <button
+                                            onClick={() => setViewMode('table')}
+                                            className={`p-1.5 rounded-lg transition-all ${
+                                                viewMode === 'table'
+                                                    ? 'bg-white text-[#045c84] shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                            title="টেবিল ভিউ"
+                                        >
+                                            <List size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode('card')}
+                                            className={`p-1.5 rounded-lg transition-all ${
+                                                viewMode === 'card'
+                                                    ? 'bg-white text-[#045c84] shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                            title="কার্ড ভিউ"
+                                        >
+                                            <LayoutGrid size={16} />
+                                        </button>
                                     </div>
                                 )}
                                 {activeSubTab === 'categories' && (
@@ -1435,7 +1974,6 @@ export default function AccountsPage() {
                                 )}
                             </>
                         )}
-                    </div>
                     </div>
                 </motion.div>
             </AnimatePresence>
@@ -1746,12 +2284,13 @@ export default function AccountsPage() {
 
             {/* Fee Collect Modal */}
             <AnimatePresence>
-                {feeCollectStudent && (
+                {feeCollectStudent && !showScanner && (
                     <FeeCollectModal
                         student={feeCollectStudent}
                         onClose={() => setFeeCollectStudent(null)}
                         onSuccess={(msg) => {
                             setToast({ message: msg, type: 'success' });
+                            setFeeCollectStudent(null);
                             fetchAccounts();
                         }}
                         onPrintReceipt={(txn) => {
@@ -1771,7 +2310,23 @@ export default function AccountsPage() {
                 )}
             </AnimatePresence>
 
-            {/* Floating Action Button */}
+            {/* Floating Action Buttons */}
+            <motion.button
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                    // Clear old fee data and open scanner immediately
+                    setFeeCollectStudent(null);
+                    setShowScanner(true);
+                }}
+                className="fixed bottom-24 right-8 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl z-40 bg-emerald-600 shadow-emerald-600/30 transition-colors"
+                title="স্ক্যান করুন"
+            >
+                <Scan size={28} />
+            </motion.button>
+
             <motion.button
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -1783,9 +2338,19 @@ export default function AccountsPage() {
                     activeMainTab === 'expense' ? 'bg-rose-600 shadow-rose-600/30' : 
                     'bg-[#045c84] shadow-blue-900/30'
                 }`}
+                title="লেনদেন যোগ করুন"
             >
                 <Plus size={28} />
             </motion.button>
+
+            {/* QR/Barcode Scanner Modal */}
+            <QRBarcodeScanner
+                isOpen={showScanner}
+                onClose={() => {
+                    setShowScanner(false);
+                }}
+                onScan={handleScanResult}
+            />
 
             {/* Add Transaction Modal */}
             <AddTransactionModal

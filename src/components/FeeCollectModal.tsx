@@ -17,6 +17,8 @@ interface FeeCollectModalProps {
         studentPhoto?: string | null;
         items: any[];
         totalAmount: number;
+        scannedAt?: string; // ISO timestamp when QR code was scanned
+        scannedId?: string; // The actual scanned QR/barcode value
     } | null;
     onClose: () => void;
     onSuccess: (msg: string) => void;
@@ -28,6 +30,16 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
 
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
+
+    // Emit modal open/close events to pause smooth scroll
+    useEffect(() => {
+        if (student && mounted) {
+            window.dispatchEvent(new Event('modalOpen'));
+            return () => {
+                window.dispatchEvent(new Event('modalClose'));
+            };
+        }
+    }, [student, mounted]);
 
     // Tab state
     const [activeTab, setActiveTab] = useState<'dues' | 'history'>('dues');
@@ -66,20 +78,24 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
         fetch(`/api/admin/accounts/collect-fee?studentId=${student.studentId}&instituteId=${activeInstitute.id}`)
             .then(r => r.json())
             .then(data => {
-                const fees = data.pendingFees || student.items;
+                const fees = data?.pendingFees || data?.items || [];
                 setPendingFees(fees);
-                setUpcomingFees(data.upcomingFees || []);
-                setAdvanceBalance(data.advanceBalance || 0);
-                const allIds = new Set<string>(fees.map((f: any) => f.id));
+                setUpcomingFees(data?.upcomingFees || []);
+                setAdvanceBalance(data?.advanceBalance || 0);
+                const allIds = new Set<string>(fees.map((f: any) => f.id).filter(Boolean));
                 setSelectedFeeIds(allIds);
                 // Auto-expand all category groups
-                const baseNames = new Set<string>(fees.map((f: any) => f.category.replace(/\s*\(.*?\)\s*/g, '').trim()));
+                const baseNames = new Set<string>(fees.map((f: any) => f.category?.replace(/\s*\(.*?\)\s*/g, '').trim()).filter(Boolean));
                 setExpandedGroups(baseNames);
             })
-            .catch(() => {
-                setPendingFees(student.items);
-                setSelectedFeeIds(new Set(student.items.map((f: any) => f.id)));
-                const baseNames = new Set<string>(student.items.map((f: any) => f.category.replace(/\s*\(.*?\)\s*/g, '').trim()));
+            .catch((err) => {
+                console.error('Error fetching fees:', err);
+                // Use fallback data from student.items if available
+                const fallbackFees = student.items || [];
+                setPendingFees(fallbackFees);
+                const allIds = new Set<string>(fallbackFees.map((f: any) => f?.id).filter(Boolean));
+                setSelectedFeeIds(allIds);
+                const baseNames = new Set<string>(fallbackFees.map((f: any) => f?.category?.replace(/\s*\(.*?\)\s*/g, '').trim()).filter(Boolean));
                 setExpandedGroups(baseNames);
             })
             .finally(() => setLoadingData(false));
@@ -297,7 +313,8 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
         finally { setIsSubmitting(false); }
     };
 
-    if (!student || !mounted) return null;
+    // Ensure modal only renders after successful scan
+    if (!student || !mounted || !student.studentId || !student.studentName) return null;
 
     return createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 font-bengali">
@@ -305,12 +322,15 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={onClose}
                 className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+                style={{ willChange: 'opacity' }}
             />
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ duration: 0.2, type: 'spring', bounce: 0.3 }}
                 className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] max-h-[85vh]"
+                style={{ willChange: 'transform, opacity' }}
             >
                 {/* Header */}
                 <div className="bg-gradient-to-r from-[#045c84] to-[#067ab0] px-6 py-5 text-white flex-shrink-0">
@@ -320,7 +340,7 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
                                 <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover ring-2 ring-white/30" />
                             ) : (
                                 <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg">
-                                    {student.studentName[0]}
+                                    {(student.studentName || 'S')[0]}
                                 </div>
                             )}
                             <div>

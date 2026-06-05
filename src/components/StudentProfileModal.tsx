@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, BookOpen, CreditCard, TrendingUp, ChevronRight, User, Edit, ChevronDown, ChevronUp, Printer, Trash2, Loader2, Check, Key, LogIn, Disc, ScanFace, Sparkles, AlertCircle, RefreshCw, Clock, History, Settings, Percent, Camera } from 'lucide-react';
+import { X, Calendar, BookOpen, CreditCard, TrendingUp, ChevronRight, User, Edit, ChevronDown, ChevronUp, Printer, Trash2, Loader2, Check, Key, LogIn, Disc, ScanFace, Sparkles, AlertCircle, RefreshCw, Clock, History, Settings, Percent, Camera, QrCode, Download, Barcode, Scan } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
+import JsBarcode from 'jsbarcode';
 import { useSession } from './SessionProvider';
 import { useUI } from './UIProvider';
 import dynamic from 'next/dynamic';
 import PrintLayout from './PrintLayout';
 import { getCleanId } from '@/utils/digit-utils';
+import QRBarcodeScanner from './QRBarcodeScanner';
 
 const FaceEnrollment = dynamic(() => import('./FaceEnrollment'), { ssr: false });
 
@@ -56,13 +59,13 @@ interface StudentProfileModalProps {
     student: any;
     onEdit?: (student: any, context?: any) => void;
     onUpdate?: () => void;
-    initialTab?: 'fees' | 'attendance' | 'assignments' | 'login' | 'face';
+    initialTab?: 'fees' | 'attendance' | 'assignments' | 'login' | 'face' | 'qr';
 }
 
 export default function StudentProfileModal({ isOpen, onClose, student, onEdit, onUpdate, initialTab }: StudentProfileModalProps) {
     const { activeInstitute, user: currentUser, activeRole, login } = useSession();
     const { alert, confirm } = useUI();
-    const [activeTab, setActiveTab] = useState<'fees' | 'attendance' | 'assignments' | 'login' | 'face'>(initialTab || 'fees');
+    const [activeTab, setActiveTab] = useState<'fees' | 'attendance' | 'assignments' | 'login' | 'face' | 'qr'>(initialTab || 'fees');
     const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
     const [showTierSettings, setShowTierSettings] = useState(false);
     const [showEnrollment, setShowEnrollment] = useState(false);
@@ -86,7 +89,11 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
     const [showSettlement, setShowSettlement] = useState(false);
     const [applyFrom, setApplyFrom] = useState<'admission' | 'now' | 'custom'>('now');
     const [customDate, setCustomDate] = useState(new Date().toISOString().split('T')[0]);
+    const [barcodeFormat, setBarcodeFormat] = useState<'qr' | 'barcode'>('qr');
+    const [showScanner, setShowScanner] = useState(false);
+    const [isSearchingStudent, setIsSearchingStudent] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
+    const barcodeRef = useRef<SVGSVGElement>(null);
     const tabButtonsRef = useRef<{ [key: string]: HTMLButtonElement | null }>({});
     const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -234,6 +241,48 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
 
     const guardianLoginPassword = (guardian: any) => {
         return guardian.password || 'নেই';
+    };
+
+    const handleScanResult = async (scannedValue: string) => {
+        const cleanedValue = scannedValue.trim();
+        setIsSearchingStudent(true);
+        try {
+            // Check if scanned value matches current student
+            const currentStudentId = String(student.metadata?.studentId || student.id);
+            if (cleanedValue === currentStudentId) {
+                // If it's the current student, open fee collection
+                onClose();
+                // Trigger fee collection for current student
+                setTimeout(() => {
+                    // This will be handled by parent component
+                    window.dispatchEvent(new CustomEvent('openFeeCollection', { detail: { studentId: cleanedValue } }));
+                }, 300);
+                return;
+            }
+
+            // Search for student by scanned ID
+            if (!activeInstitute?.id) return;
+            
+            const res = await fetch(`/api/admin/users?instituteId=${activeInstitute.id}&search=${encodeURIComponent(cleanedValue)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data) {
+                    // Close current modal and open fee collection for found student
+                    onClose();
+                    setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('openFeeCollection', { detail: { student: data, studentId: cleanedValue } }));
+                    }, 300);
+                    return;
+                }
+            }
+            
+            await alert(`শিক্ষার্থী নম্বর: ${cleanedValue} পাওয়া যায়নি`);
+        } catch (error) {
+            console.error('Error searching student:', error);
+            await alert('ছাত্র খুঁজতে একটি ত্রুটি হয়েছে।');
+        } finally {
+            setIsSearchingStudent(false);
+        }
     };
 
     const handleSaveTier = async () => {
@@ -449,6 +498,24 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
         };
     }, [isOpen]);
 
+    useEffect(() => {
+        if (student && barcodeFormat === 'barcode' && barcodeRef.current && activeTab === 'qr') {
+            const barcodeValue = student.metadata?.studentId || student.id || '';
+            try {
+                JsBarcode(barcodeRef.current, barcodeValue, {
+                    format: 'CODE128',
+                    width: 2,
+                    height: 80,
+                    displayValue: true,
+                    fontSize: 14,
+                    margin: 10,
+                });
+            } catch (error) {
+                console.error('Error generating barcode:', error);
+            }
+        }
+    }, [barcodeFormat, student?.id, student?.metadata?.studentId, activeTab]);
+
     const lastFetchedFees = useRef<string | null>(null);
     const lastFetchedAssignments = useRef<string | null>(null);
 
@@ -546,6 +613,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
         { id: 'fees', label: 'ফি', icon: CreditCard },
         { id: 'attendance', label: 'উপস্থিতি', icon: Calendar },
         { id: 'assignments', label: 'ক্লাস ডাইরি', icon: BookOpen },
+        { id: 'qr', label: 'কিউআর / বারকোড', icon: QrCode },
         ...(isAdmin ? [
             { id: 'login', label: 'লগইন তথ্য', icon: Key },
             { id: 'face', label: 'ফেস আইডি', icon: ScanFace }
@@ -674,9 +742,19 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                     <>
                                         <div className="flex items-center justify-between mb-8 px-2">
                                             <h4 className="text-xl font-black text-slate-800 font-bengali">বকেয়া ও লেনদেন বিবরণ</h4>
-                                            <button onClick={() => setShowTierSettings(!showTierSettings)} className={`p-2.5 rounded-xl transition-all ${showTierSettings ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
-                                                <Settings size={20} />
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => setShowScanner(true)}
+                                                    disabled={isSearchingStudent}
+                                                    className="p-2.5 rounded-xl transition-all bg-emerald-50 text-emerald-600 hover:bg-emerald-100 shadow-sm disabled:opacity-50"
+                                                    title="স্ক্যান করে অন্য শিক্ষার্থীর ফি সংগ্রহ করুন"
+                                                >
+                                                    <Scan size={20} />
+                                                </button>
+                                                <button onClick={() => setShowTierSettings(!showTierSettings)} className={`p-2.5 rounded-xl transition-all ${showTierSettings ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}>
+                                                    <Settings size={20} />
+                                                </button>
+                                            </div>
                                         </div>
 
                                         {/* Grand Total Summary Card - Moved to Top */}
@@ -955,6 +1033,147 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'qr' && (
+                            <div className="space-y-6 animate-fade-in">
+                                <div className="flex flex-col items-center py-12">
+                                    {/* Format Toggle Buttons */}
+                                    <div className="mb-6 flex gap-3 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                                        <button 
+                                            onClick={() => setBarcodeFormat('qr')}
+                                            className={`px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center gap-2 ${
+                                                barcodeFormat === 'qr' 
+                                                    ? 'bg-white text-[#045c84] shadow-sm' 
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                        >
+                                            <QrCode size={16} />
+                                            কিউআর কোড
+                                        </button>
+                                        <button 
+                                            onClick={() => setBarcodeFormat('barcode')}
+                                            className={`px-4 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center gap-2 ${
+                                                barcodeFormat === 'barcode' 
+                                                    ? 'bg-white text-[#045c84] shadow-sm' 
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                        >
+                                            <Barcode size={16} />
+                                            বারকোড
+                                        </button>
+                                    </div>
+
+                                    {/* Code Card */}
+                                    <div className="bg-white p-8 rounded-[32px] border-2 border-slate-100 shadow-lg hover:shadow-xl transition-all">
+                                        <div className="mb-6 text-center">
+                                            <h4 className="text-xl font-black text-slate-800 mb-2">
+                                                {barcodeFormat === 'qr' ? 'কিউআর কোড' : 'বারকোড (CODE128)'}
+                                            </h4>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">শিক্ষার্থী আইডি: {student.metadata?.studentId || student.id}</p>
+                                        </div>
+                                        
+                                        {/* QR Code Display */}
+                                        {barcodeFormat === 'qr' && (
+                                            <div data-qr-code className="bg-slate-50 p-6 rounded-2xl flex items-center justify-center border border-slate-100 mb-6">
+                                                <QRCodeCanvas 
+                                                    value={student.metadata?.studentId || student.id || ''} 
+                                                    size={256}
+                                                    level="H"
+                                                    includeMargin={true}
+                                                    fgColor="#000000"
+                                                    bgColor="#ffffff"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Barcode Display */}
+                                        {barcodeFormat === 'barcode' && (
+                                            <div className="bg-slate-50 p-8 rounded-2xl flex items-center justify-center border border-slate-100 mb-6 min-h-[160px]">
+                                                <svg ref={barcodeRef} />
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-3">
+                                            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                                                <p className="text-[11px] font-bold text-slate-700 mb-2">শিক্ষার্থীর তথ্য:</p>
+                                                <div className="space-y-1.5 text-[10px] font-bold text-slate-600">
+                                                    <p>নাম: <span className="text-slate-800 font-black">{student.name}</span></p>
+                                                    <p>আইডি: <span className="text-slate-800 font-black">{student.metadata?.studentId || student.id}</span></p>
+                                                    {student.metadata?.classId && (
+                                                        <p>ক্লাস: <span className="text-slate-800 font-black">{student.metadata.classId}</span></p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <button 
+                                                onClick={() => {
+                                                    const element = barcodeFormat === 'qr' 
+                                                        ? document.querySelector('[data-qr-code]')
+                                                        : barcodeRef.current?.parentElement;
+                                                    
+                                                    if (element) {
+                                                        const link = document.createElement('a');
+                                                        if (barcodeFormat === 'qr') {
+                                                            const canvas = element.querySelector('canvas');
+                                                            if (canvas) {
+                                                                link.href = canvas.toDataURL();
+                                                                link.download = `${student.name}-${student.metadata?.studentId || student.id}-QR.png`;
+                                                            }
+                                                        } else {
+                                                            const svg = element.querySelector('svg');
+                                                            if (svg) {
+                                                                const svgData = new XMLSerializer().serializeToString(svg);
+                                                                const canvas = document.createElement('canvas');
+                                                                const img = new Image();
+                                                                img.onload = () => {
+                                                                    canvas.width = img.width;
+                                                                    canvas.height = img.height;
+                                                                    const ctx = canvas.getContext('2d');
+                                                                    if (ctx) {
+                                                                        ctx.fillStyle = 'white';
+                                                                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                                                        ctx.drawImage(img, 0, 0);
+                                                                        link.href = canvas.toDataURL();
+                                                                        link.download = `${student.name}-${student.metadata?.studentId || student.id}-Barcode.png`;
+                                                                        link.click();
+                                                                    }
+                                                                };
+                                                                img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+                                                                return;
+                                                            }
+                                                        }
+                                                        if (link.href) link.click();
+                                                    }
+                                                }}
+                                                className="w-full py-3 bg-[#045c84] text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-[#034563] transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+                                            >
+                                                <Download size={16} />
+                                                ডাউনলোড করুন
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Instructions */}
+                                    <div className="mt-8 max-w-md bg-amber-50 p-6 rounded-2xl border border-amber-100">
+                                        <p className="text-[10px] font-black text-amber-900 uppercase tracking-widest mb-3">ব্যবহারের নির্দেশনা:</p>
+                                        <ul className="space-y-2 text-[10px] font-bold text-amber-800">
+                                            <li className="flex gap-2">
+                                                <span className="text-amber-600">•</span>
+                                                <span>স্মার্টফোনের ক্যামেরা দিয়ে কোড স্ক্যান করুন</span>
+                                            </li>
+                                            <li className="flex gap-2">
+                                                <span className="text-amber-600">•</span>
+                                                <span>শিক্ষার্থীর আইডি প্রদর্শনের জন্য ব্যবহার করুন</span>
+                                            </li>
+                                            <li className="flex gap-2">
+                                                <span className="text-amber-600">•</span>
+                                                <span>আইডি কার্ডে মুদ্রণ করার জন্য উপযুক্ত</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -1486,6 +1705,13 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                     </div>
                 </div>
             )}
+
+            {/* QR/Barcode Scanner */}
+            <QRBarcodeScanner
+                isOpen={showScanner}
+                onClose={() => setShowScanner(false)}
+                onScan={handleScanResult}
+            />
         </div>,
         document.body
     );
