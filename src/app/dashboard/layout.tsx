@@ -246,7 +246,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
         { name: 'হাজিরা', icon: Zap, href: '/dashboard/attendance/scan', roles: ['ADMIN', 'TEACHER'], section: 'দৈনন্দিন কার্যক্রম' },
         { name: 'হিসাব', icon: CreditCard, href: '/dashboard/accounts', section: 'দৈনন্দিন কার্যক্রম' },
-        { name: 'ক্লাস ডাইরি', icon: ClipboardList, href: '/dashboard/assignments', section: 'দৈনন্দিন কার্যক্রম' },
+        // { name: 'ক্লাস ডাইরি', icon: ClipboardList, href: '/dashboard/assignments', section: 'দৈনন্দিন কার্যক্রম' },
         { name: 'ক্লাস রুম', icon: Presentation, href: '/dashboard/classroom', section: 'দৈনন্দিন কার্যক্রম' },
 
         // একাডেমিক
@@ -286,10 +286,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             return allowed.includes(item.href);
         }
         if (activeRole === 'STUDENT') {
-            return ['/dashboard', '/dashboard/notices', '/dashboard/classroom', '/dashboard/library', '/dashboard/assignments'].includes(item.href);
+            return ['/dashboard', '/dashboard/notices', '/dashboard/classroom', '/dashboard/library'].includes(item.href);
         }
         if (activeRole === 'GUARDIAN') {
-            return ['/dashboard', '/dashboard/guardian/children', '/dashboard/assignments', '/dashboard/settings'].includes(item.href);
+            return ['/dashboard', '/dashboard/guardian/children', '/dashboard/settings'].includes(item.href);
         }
         if (activeRole === 'TEACHER') {
             if (item.href.startsWith('/dashboard/attendance') && !hasTeacherPermission('canTakeAttendance')) return false;

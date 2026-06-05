@@ -5,6 +5,7 @@ import * as faceapi from '@vladmandic/face-api';
 import { createPortal } from 'react-dom';
 import { useSession } from '@/components/SessionProvider';
 import { usePathname } from 'next/navigation';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 import {
     Users,
@@ -96,7 +97,7 @@ const EditableCell = ({ value, type, onSave, onClose, options }: { value: any, t
             }
 
             return () => {
-                document.body.style.overflow = 'auto';
+                document.body.style.overflow = '';
             };
         }
     }, [type]);
@@ -107,17 +108,57 @@ const EditableCell = ({ value, type, onSave, onClose, options }: { value: any, t
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
+        if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            const el = e.target as HTMLElement;
+            
+            e.preventDefault(); // Prevents page scroll and cursor movement
             handleBlur();
-            (e.target as HTMLElement).blur();
+
+            if (type === 'select' && onClose) {
+                 onClose();
+            }
+
+            const currentTd = el.closest('td');
+            if (!currentTd) return;
+
+            let targetTd: HTMLTableCellElement | null = null;
+            
+            if (e.key === 'ArrowLeft') {
+                targetTd = currentTd.previousElementSibling as HTMLTableCellElement;
+                while (targetTd && !targetTd.className.includes('cursor-cell')) {
+                    targetTd = targetTd.previousElementSibling as HTMLTableCellElement;
+                }
+            } else if (e.key === 'ArrowRight') {
+                targetTd = currentTd.nextElementSibling as HTMLTableCellElement;
+                while (targetTd && !targetTd.className.includes('cursor-cell')) {
+                    targetTd = targetTd.nextElementSibling as HTMLTableCellElement;
+                }
+            } else if (e.key === 'ArrowUp') {
+                const currentTr = currentTd.closest('tr');
+                const prevTr = currentTr?.previousElementSibling;
+                if (prevTr) {
+                    targetTd = prevTr.children[currentTd.cellIndex] as HTMLTableCellElement;
+                }
+            } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+                const currentTr = currentTd.closest('tr');
+                const nextTr = currentTr?.nextElementSibling;
+                if (nextTr) {
+                    targetTd = nextTr.children[currentTd.cellIndex] as HTMLTableCellElement;
+                }
+            }
+
+            if (targetTd) {
+                targetTd.click();
+            } else {
+                el.blur();
+            }
         }
     };
 
     if (type === 'select') {
         const closeDropdown = () => {
             handleBlur();
-            document.body.style.overflow = 'auto';
+            document.body.style.overflow = '';
             if (onClose) onClose();
         };
 
@@ -193,8 +234,8 @@ const EditableCell = ({ value, type, onSave, onClose, options }: { value: any, t
         ) : null;
 
         return (
-            <div ref={wrapperRef} className="w-full h-full flex items-center" onClick={(e) => e.stopPropagation()}>
-                <span className="text-slate-700 text-xs font-bold">
+            <div ref={wrapperRef} tabIndex={0} autoFocus onKeyDown={handleKeyDown} className="w-full h-full min-w-0 flex items-center bg-white px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded ring-2 ring-[#045c84] cursor-pointer outline-none" onClick={(e) => e.stopPropagation()} style={{ width: '0px', minWidth: '100%', maxWidth: '100%' }}>
+                <span className="text-slate-900 text-xs font-bold truncate">
                     {options?.find(o => o.id === tempValue)?.name || '-'}
                 </span>
                 {dropdownList}
@@ -210,9 +251,14 @@ const EditableCell = ({ value, type, onSave, onClose, options }: { value: any, t
             onChange={(e) => setTempValue(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full bg-transparent border-b border-dashed border-[#045c84] outline-none p-0 m-0 focus:ring-0 text-slate-900 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            style={{ textAlign: 'inherit' }}
+            className="w-full min-w-0 bg-white px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded ring-2 ring-[#045c84] border-none outline-none focus:ring-2 focus:ring-[#045c84] text-slate-900 font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            style={{ textAlign: 'inherit', width: '0px', minWidth: '100%', maxWidth: '100%' }}
             onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => {
+                if (type === 'number') {
+                    (e.target as HTMLElement).blur();
+                }
+            }}
         />
     );
 };
@@ -227,6 +273,15 @@ export default function StudentManagementPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const { fetchWithSync } = useOfflineSync({
+        onQueue: () => setToast({ message: 'ইন্টারনেট সংযোগ বিচ্ছিন্ন। তথ্য লোকালি সেভ করা হয়েছে এবং অনলাইনে সিঙ্ক হবে।', type: 'error' }),
+        onSyncSuccess: () => {
+            setToast({ message: 'অফলাইন ডেটা সার্ভারে সিঙ্ক করা হয়েছে!', type: 'success' });
+            fetchStudents();
+        }
+    });
+
     const [selectedClassId, setSelectedClassId] = useState<string>('all');
     const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
     const [isClassModalOpen, setIsClassModalOpen] = useState(false);
@@ -260,6 +315,41 @@ export default function StudentManagementPage() {
     // Direct Image Upload from Table
     const [uploadingStudentId, setUploadingStudentId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [startY, setStartY] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+    const [scrollTop, setScrollTop] = useState(0);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!tableContainerRef.current) return;
+        setIsDragging(true);
+        setStartX(e.pageX - tableContainerRef.current.offsetLeft);
+        setStartY(e.pageY - tableContainerRef.current.offsetTop);
+        setScrollLeft(tableContainerRef.current.scrollLeft);
+        setScrollTop(tableContainerRef.current.scrollTop);
+    };
+
+    const handleMouseLeave = () => {
+        setIsDragging(false);
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging || !tableContainerRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - tableContainerRef.current.offsetLeft;
+        const y = e.pageY - tableContainerRef.current.offsetTop;
+        const walkX = (x - startX) * 1.5;
+        const walkY = (y - startY) * 1.5;
+        tableContainerRef.current.scrollLeft = scrollLeft - walkX;
+        tableContainerRef.current.scrollTop = scrollTop - walkY;
+    };
 
     const handleDirectImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!uploadingStudentId) return;
@@ -459,7 +549,8 @@ export default function StudentManagementPage() {
         }
         return defaults;
     });
-    const [isTableEditMode, setIsTableEditMode] = useState(false);
+    const [isTableEditModeState, setIsTableEditMode] = useState(false);
+    const isTableEditMode = isTableEditModeState || viewMode === 'ADMISSION';
     const [editingCell, setEditingCell] = useState<{ studentId: string, fieldId: string } | null>(null);
     const [sortField, setSortField] = useState<string>(() => {
         if (typeof window !== 'undefined') return localStorage.getItem('students_sortField') || 'rollNumber';
@@ -515,7 +606,7 @@ export default function StudentManagementPage() {
 
     const saveCustomColumnsToDB = async (cols: { id: string, label: string, type: string }[]) => {
         if (!activeInstitute?.id) return;
-        await fetch('/api/admin/institutes/custom-columns', {
+        await fetchWithSync('/api/admin/institutes/custom-columns', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ instituteId: activeInstitute.id, customStudentColumns: cols })
@@ -1320,7 +1411,7 @@ export default function StudentManagementPage() {
             const url = '/api/admin/users';
             const method = editingStudent ? 'PATCH' : 'POST';
 
-            const res = await fetch(url, {
+            const res = await fetchWithSync(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -1393,7 +1484,7 @@ export default function StudentManagementPage() {
                 };
             }
 
-            const res = await fetch('/api/admin/users', {
+            const res = await fetchWithSync('/api/admin/users', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -1511,8 +1602,8 @@ export default function StudentManagementPage() {
     const handleDeleteStudent = async (id: string) => {
         if (!await confirm('আপনি কি এই শিক্ষার্থীকে ডিলিট করতে চান?')) return;
         try {
-            const res = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
-            if (res.ok) {
+            const res = await fetchWithSync(`/api/admin/users?id=${id}`, { method: 'DELETE' });
+            if (res.ok || (res as any).queued) {
                 setToast({ message: 'শিক্ষার্থী ডিলিট হয়েছে!', type: 'success' });
                 setStudents(prev => prev.filter(s => s.id !== id));
             }
@@ -1527,7 +1618,7 @@ export default function StudentManagementPage() {
             let res;
             if (status === 'APPROVED') {
                 const student = students.find(s => s.id === studentId);
-                res = await fetch(`/api/admin/users?id=${studentId}`, {
+                res = await fetchWithSync(`/api/admin/users?id=${studentId}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1537,7 +1628,7 @@ export default function StudentManagementPage() {
                 });
             } else {
                 // Reject means delete
-                res = await fetch(`/api/admin/users?id=${studentId}`, {
+                res = await fetchWithSync(`/api/admin/users?id=${studentId}`, {
                     method: 'DELETE'
                 });
             }
@@ -1567,7 +1658,7 @@ export default function StudentManagementPage() {
             const method = editingGroup ? 'PATCH' : 'POST';
             const url = editingGroup ? `/api/admin/groups/${editingGroup.id}` : '/api/admin/groups';
 
-            const res = await fetch(url, {
+            const res = await fetchWithSync(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...groupData, classId: selectedClassId })
@@ -1594,10 +1685,10 @@ export default function StudentManagementPage() {
         if (!await confirm(`আপনি কি নিশ্চিত যে "${name}" গ্রুপটি ডিলিট করতে চান?`)) return;
         setActionLoading(true);
         try {
-            const res = await fetch(`/api/admin/groups/${id}`, {
+            const res = await fetchWithSync(`/api/admin/groups/${id}`, {
                 method: 'DELETE'
             });
-            if (res.ok) {
+            if (res.ok || (res as any).queued) {
                 setToast({ message: 'গ্রুপ ডিলিট হয়েছে!', type: 'success' });
                 fetchGroups(selectedClassId);
                 if (selectedGroupId === id) setSelectedGroupId('all');
@@ -1776,7 +1867,7 @@ export default function StudentManagementPage() {
     }
 
     return (
-        <div className="p-3 sm:p-4 md:p-8 space-y-6 animate-fade-in-up font-bengali w-full min-w-0 overflow-x-hidden">
+        <div className="p-3 sm:p-4 md:p-8 space-y-3 sm:space-y-4 animate-fade-in-up font-bengali w-full min-w-0 overflow-x-hidden">
 
 
             {/* Utility Bar (Search, Action, Library, Public Link) */}
@@ -1784,7 +1875,7 @@ export default function StudentManagementPage() {
                 <div className="relative flex-1 min-w-0">
                     <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
-                        className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none text-slate-800 text-sm sm:text-base font-medium shadow-sm placeholder:text-slate-400"
+                        className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-3 sm:py-3.5 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none text-slate-800 text-sm sm:text-base font-medium shadow-sm placeholder:text-slate-400"
                         placeholder="খুঁজুন..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -1806,7 +1897,7 @@ export default function StudentManagementPage() {
                                     setViewMode(nextMode);
                                 });
                             }}
-                            className="flex items-center gap-1.5 sm:gap-2 bg-[#045c84]/5 border border-[#045c84]/20 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-[#045c84] shadow-sm cursor-pointer hover:bg-[#045c84]/10 transition-all focus:outline-none shrink-0"
+                            className="flex items-center gap-1.5 sm:gap-2 bg-[#045c84]/5 border border-[#045c84]/20 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-[#045c84] shadow-sm cursor-pointer hover:bg-[#045c84]/10 transition-all focus:outline-none shrink-0"
                             title="পরিবর্তন করতে ক্লিক করুন"
                         >
                             <span className="flex items-center gap-1.5">
@@ -1816,7 +1907,7 @@ export default function StudentManagementPage() {
 
                         {/* Status Filter Dropdown */}
                         <details className="relative shrink-0 group">
-                            <summary className="list-none flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none">
+                            <summary className="list-none flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none">
                                 <span className="flex items-center gap-1.5">
                                     {statusFilter === 'ACTIVE' && <><span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:inline-block"></span> সক্রিয়</>}
                                     {statusFilter === 'INACTIVE' && <><span className="w-2 h-2 rounded-full bg-rose-500 hidden sm:inline-block"></span> নিষ্ক্রিয়</>}
@@ -1940,124 +2031,115 @@ export default function StudentManagementPage() {
                 </div>
 
                 {/* Main Navigation Tabs */}
-                <div className="flex items-center justify-between gap-4 w-full">
-                    <div className="flex items-center gap-2 p-1 bg-slate-100/50 rounded-2xl w-fit shrink-0 overflow-x-auto custom-scrollbar">
-                        <button
-                            onClick={() => setActiveTab('students')}
-                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'students'
-                                ? 'bg-white text-[#045c84] shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            শিক্ষার্থী
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('books')}
-                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'books'
-                                ? 'bg-white text-[#045c84] shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            বই
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('teachers')}
-                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'teachers'
-                                ? 'bg-white text-[#045c84] shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            শিক্ষক
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('applications')}
-                            className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'applications'
-                                ? 'bg-white text-[#045c84] shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                        >
-                            <span>আবেদনসমূহ</span>
-                            <span className="bg-[#045c84]/10 text-[#045c84] px-2 py-0.5 rounded-lg text-[10px]">
-                                {pendingCount || 0}
-                            </span>
-                        </button>
-                    </div>
-
-                    {/* Column Visibility Dropdown */}
-                    {activeTab === 'students' && viewMode === 'ADMISSION' && (
-                        <div className="flex items-center gap-3 shrink-0 z-[200]">
+                <div className="w-full relative">
+                    <div className="flex items-center justify-between gap-4 w-full overflow-x-auto custom-scrollbar pb-1">
+                        <div className="flex items-center gap-2 p-1 bg-slate-100/50 rounded-2xl shrink-0 w-max">
                             <button
-                                onClick={() => {
-                                    setIsTableEditMode(!isTableEditMode);
-                                    setEditingCell(null);
-                                }}
-                                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold shadow-sm cursor-pointer transition-all focus:outline-none border ${isTableEditMode ? 'bg-[#045c84] text-white border-[#045c84]' : 'bg-white border-slate-200 text-slate-700 hover:border-[#045c84] hover:text-[#045c84]'}`}
+                                onClick={() => setActiveTab('students')}
+                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'students'
+                                    ? 'bg-white text-[#045c84] shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                    }`}
                             >
-                                <FileSpreadsheet size={16} />
-                                <span className="hidden sm:inline-block">এক্সেল এডিট মুড</span>
+                                শিক্ষার্থী
                             </button>
-                            <div className="relative shrink-0">
+                            <button
+                                onClick={() => setActiveTab('books')}
+                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'books'
+                                    ? 'bg-white text-[#045c84] shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                বই
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('teachers')}
+                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'teachers'
+                                    ? 'bg-white text-[#045c84] shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                শিক্ষক
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('applications')}
+                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'applications'
+                                    ? 'bg-white text-[#045c84] shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                            >
+                                <span>আবেদনসমূহ</span>
+                                <span className="bg-[#045c84]/10 text-[#045c84] px-2 py-0.5 rounded-lg text-[10px]">
+                                    {pendingCount || 0}
+                                </span>
+                            </button>
+                        </div>
+
+                        {/* Column Visibility Dropdown Button */}
+                        {activeTab === 'students' && viewMode === 'ADMISSION' && (
+                            <div className="shrink-0">
                                 <button 
                                     onClick={() => setIsColumnDropdownOpen(!isColumnDropdownOpen)}
-                                    className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
+                                    className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
                                 >
-                                <Settings2 size={16} />
-                                <span className="hidden sm:inline-block">কলাম</span>
-                                <ChevronDown size={16} className={`text-slate-400 transition-transform ${isColumnDropdownOpen ? 'rotate-180' : ''}`} />
-                            </button>
-                            
-                            {isColumnDropdownOpen && (
-                                <>
-                                    <div className="fixed inset-0 z-[205]" onClick={() => setIsColumnDropdownOpen(false)}></div>
-                                    <div className="absolute right-0 top-[calc(100%+0.5rem)] w-64 z-[210] animate-fade-in">
-                                        <div 
-                                            className="bg-white rounded-2xl shadow-xl border border-slate-100 p-2 flex flex-col gap-1 overflow-y-auto pointer-events-auto custom-scrollbar" 
-                                            style={{ maxHeight: '50vh' }}
-                                            onWheel={(e) => e.stopPropagation()}
-                                            onTouchMove={(e) => e.stopPropagation()}
-                                        >
-                                            {[
-                                                { id: 'sl', label: 'ক্র.নং' },
-                                                { id: 'rollNumber', label: 'রোল' },
-                                                { id: 'studentId', label: 'আইডি' },
-                                                { id: 'student', label: 'শিক্ষার্থী' },
-                                                { id: 'className', label: 'ক্লাস ও গ্রুপ' },
-                                                { id: 'contact', label: 'যোগাযোগ' },
-                                                ...POSSIBLE_FIELDS.filter(f => !['name', 'email', 'studentPhone', 'classId', 'groupId', 'rollNumber', 'studentId', 'studentPhoto', 'guardianPhone', 'guardianPassword', 'password', 'fathersPhone', 'mothersPhone'].includes(f.id)).map(f => ({ id: f.id, label: f.label })),
-                                                ...customColumns,
-                                                { id: 'action', label: 'অ্যাকশন' }
-                                            ].map((col) => (
-                                                <label key={col.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-xl cursor-pointer">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={(tableColumns as any)[col.id]}
-                                                        onChange={(e) => {
-                                                            setTableColumns(prev => ({ ...prev, [col.id]: e.target.checked }));
-                                                        }}
-                                                        className="w-4 h-4 rounded border-slate-300 text-[#045c84] focus:ring-[#045c84]"
-                                                    />
-                                                    <span className="text-sm font-medium text-slate-700">{col.label}</span>
-                                                </label>
-                                            ))}
-                                            
-                                            <div className="pt-2 mt-1 border-t border-slate-100 sticky bottom-0 bg-white z-10">
-                                                <button 
-                                                    onClick={() => {
-                                                        setIsCustomFieldModalOpen(true);
-                                                        setIsColumnDropdownOpen(false);
-                                                    }}
-                                                    className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-[#045c84] hover:bg-slate-50 rounded-lg transition-colors border border-dashed border-blue-200"
-                                                >
-                                                    <Plus size={14} />
-                                                    নতুন কাস্টম ফিল্ড
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                                    <Settings2 size={16} />
+                                    <span className="hidden sm:inline-block">কলাম</span>
+                                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${isColumnDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
                             </div>
-                        </div>
+                        )}
+                    </div>
+                    
+                    {/* Dropdown Menu - Extracted to prevent clipping */}
+                    {activeTab === 'students' && viewMode === 'ADMISSION' && isColumnDropdownOpen && (
+                        <>
+                            <div className="fixed inset-0 z-[205]" onClick={() => setIsColumnDropdownOpen(false)}></div>
+                            <div className="absolute right-0 top-full mt-2 w-64 z-[210] animate-fade-in">
+                                <div 
+                                    className="bg-white rounded-2xl shadow-xl border border-slate-100 p-2 flex flex-col gap-1 overflow-y-auto pointer-events-auto custom-scrollbar" 
+                                    style={{ maxHeight: '50vh' }}
+                                    onWheel={(e) => e.stopPropagation()}
+                                    onTouchMove={(e) => e.stopPropagation()}
+                                >
+                                    {[
+                                        { id: 'sl', label: 'ক্র.নং' },
+                                        { id: 'rollNumber', label: 'রোল' },
+                                        { id: 'studentId', label: 'আইডি' },
+                                        { id: 'student', label: 'শিক্ষার্থী' },
+                                        { id: 'className', label: 'ক্লাস ও গ্রুপ' },
+                                        { id: 'contact', label: 'যোগাযোগ' },
+                                        ...POSSIBLE_FIELDS.filter(f => !['name', 'email', 'studentPhone', 'classId', 'groupId', 'rollNumber', 'studentId', 'studentPhoto', 'guardianPhone', 'guardianPassword', 'password', 'fathersPhone', 'mothersPhone'].includes(f.id)).map(f => ({ id: f.id, label: f.label })),
+                                        ...customColumns,
+                                        { id: 'action', label: 'অ্যাকশন' }
+                                    ].map((col) => (
+                                        <label key={col.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-xl cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={(tableColumns as any)[col.id]}
+                                                onChange={(e) => {
+                                                    setTableColumns(prev => ({ ...prev, [col.id]: e.target.checked }));
+                                                }}
+                                                className="w-4 h-4 rounded border-slate-300 text-[#045c84] focus:ring-[#045c84]"
+                                            />
+                                            <span className="text-sm font-medium text-slate-700">{col.label}</span>
+                                        </label>
+                                    ))}
+                                    
+                                    <div className="pt-2 mt-1 border-t border-slate-100 sticky bottom-0 bg-white z-10">
+                                        <button 
+                                            onClick={() => {
+                                                setIsCustomFieldModalOpen(true);
+                                                setIsColumnDropdownOpen(false);
+                                            }}
+                                            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-[#045c84] hover:bg-slate-50 rounded-lg transition-colors border border-dashed border-blue-200"
+                                        >
+                                            <Plus size={14} />
+                                            নতুন কাস্টম ফিল্ড
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
 
@@ -2160,7 +2242,15 @@ export default function StudentManagementPage() {
                     ) : (
                         <>
                         {viewMode === 'ADMISSION' ? (
-                            <div className="overflow-auto w-full max-h-[calc(100vh-280px)] custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300 relative">
+                            <div 
+                                ref={tableContainerRef}
+                                onMouseDown={handleMouseDown}
+                                onMouseLeave={handleMouseLeave}
+                                onMouseUp={handleMouseUp}
+                                onMouseMove={handleMouseMove}
+                                data-lenis-prevent="true"
+                                className={`overflow-auto overscroll-none w-full max-h-[calc(100vh-280px)] custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300 relative ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+                            >
                                 <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleDirectImageUpload} />
                                 <table className="w-full text-left border-collapse bg-white rounded-2xl shadow-sm min-w-[800px] [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200">
                                     <thead className="bg-slate-50 sticky top-0 z-20 border-b border-[#045c84]/10 shadow-sm">
@@ -2171,7 +2261,7 @@ export default function StudentManagementPage() {
                                             {viewMode === 'ADMISSION' && <th className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap w-[1%] text-center select-none">ছবি</th>}
                                             {tableColumns.student && <th onClick={() => handleSort('name')} className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap w-[1%] text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">শিক্ষার্থী<SortIcon field="name" /></th>}
                                             {tableColumns.className && <th onClick={() => handleSort('classId')} className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">ক্লাস ও গ্রুপ<SortIcon field="classId" /></th>}
-                                            {tableColumns.contact && <th className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center select-none">যোগাযোগ</th>}
+                                            {tableColumns.contact && <th className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap min-w-[160px] text-center select-none">যোগাযোগ</th>}
                                             {POSSIBLE_FIELDS.filter(f => !['name', 'email', 'studentPhone', 'classId', 'groupId', 'rollNumber', 'studentId', 'studentPhoto', 'guardianPhone', 'guardianPassword', 'password', 'fathersPhone', 'mothersPhone'].includes(f.id)).map(f => tableColumns[f.id] && (
                                                 <th key={f.id} onClick={() => handleSort(f.id)} className="p-4 text-xs font-black text-[#045c84] whitespace-nowrap text-center cursor-pointer hover:bg-[#045c84]/10 transition-colors select-none">{f.label}<SortIcon field={f.id} /></th>
                                             ))}
@@ -2340,7 +2430,7 @@ export default function StudentManagementPage() {
                                                             </div>
                                                         </td>}
                                                         {tableColumns.className && <td 
-                                                            className={`p-4 ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                            className={`p-4 whitespace-nowrap ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
                                                             onClick={(e) => {
                                                                 if (isTableEditMode) {
                                                                     e.stopPropagation();
@@ -2368,7 +2458,7 @@ export default function StudentManagementPage() {
                                                             )}
                                                         </td>}
                                                         {tableColumns.contact && <td 
-                                                            className={`p-4 ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                            className={`p-4 whitespace-nowrap min-w-[160px] ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
                                                             onClick={(e) => {
                                                                 if (isTableEditMode) {
                                                                     e.stopPropagation();
@@ -2391,7 +2481,7 @@ export default function StudentManagementPage() {
                                                         {POSSIBLE_FIELDS.filter(f => !['name', 'email', 'studentPhone', 'classId', 'groupId', 'rollNumber', 'studentId', 'studentPhoto', 'guardianPhone', 'guardianPassword', 'password', 'fathersPhone', 'mothersPhone'].includes(f.id)).map(f => tableColumns[f.id] && (
                                                             <td 
                                                                 key={f.id} 
-                                                                className={`p-4 ${isTableEditMode && f.type !== 'attachment' ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                                className={`p-4 whitespace-nowrap ${isTableEditMode && f.type !== 'attachment' ? 'cursor-cell hover:bg-slate-100' : ''}`}
                                                                 onClick={(e) => {
                                                                     if (isTableEditMode && f.type !== 'attachment') {
                                                                         e.stopPropagation();
@@ -2420,7 +2510,7 @@ export default function StudentManagementPage() {
                                                         {customColumns.map(f => tableColumns[f.id] && (
                                                             <td 
                                                                 key={f.id} 
-                                                                className={`p-4 ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
+                                                                className={`p-4 whitespace-nowrap ${isTableEditMode ? 'cursor-cell hover:bg-slate-100' : ''}`}
                                                                 onClick={(e) => {
                                                                     if (isTableEditMode) {
                                                                         e.stopPropagation();
@@ -2544,7 +2634,8 @@ export default function StudentManagementPage() {
                                 </table>
                             </div>
                         ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-32">
+                        <div className="overflow-y-auto overscroll-none max-h-[calc(100vh-280px)] custom-scrollbar" data-lenis-prevent="true">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
                             {students
                                 .filter(s => {
                                     // Local class and group filtering
@@ -2770,6 +2861,7 @@ export default function StudentManagementPage() {
                                         </div>
                                     );
                                 })}
+                        </div>
                         </div>
                         )}
                         {students.filter(s => {

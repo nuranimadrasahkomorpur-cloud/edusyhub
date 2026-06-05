@@ -1256,7 +1256,7 @@ export default function AccountsPage() {
                     className="space-y-10"
                 >
                     {/* Quick Stats Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                         {stats.map((stat, idx) => (
                             <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden">
                                 <div className="flex flex-col gap-4">
