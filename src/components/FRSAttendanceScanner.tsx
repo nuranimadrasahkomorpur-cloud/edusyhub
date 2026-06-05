@@ -1414,7 +1414,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                             ))}
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-20 scroll-smooth custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-20 scroll-smooth custom-scrollbar" data-lenis-prevent="true">
                             <AnimatePresence mode="wait">
                                 {activeTab !== 'ABSENT' ? (
                                     <motion.div

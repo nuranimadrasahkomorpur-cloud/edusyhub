@@ -433,12 +433,12 @@ export default function AccountsPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">আইডি</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">বিবরণ, খাত ও ব্যক্তি</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell text-center">তারিখ</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">অবস্থা</th>
-                            <th className="px-8 py-3"></th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">আইডি</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ব্যক্তি</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell text-center whitespace-nowrap">তারিখ</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell whitespace-nowrap">অবস্থা</th>
+                            <th className="px-8 py-3 whitespace-nowrap"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -457,10 +457,10 @@ export default function AccountsPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তির তথ্য</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">বকেয়া খাতের সংখ্যা</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">মোট বকেয়া পরিমাণ</th>
-                            <th className="px-8 py-3"></th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তির তথ্য</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">বকেয়া খাতের সংখ্যা</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">মোট বকেয়া পরিমাণ</th>
+                            <th className="px-8 py-3 whitespace-nowrap"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -482,8 +482,8 @@ export default function AccountsPage() {
                                                     </div>
                                                 )}
                                                 <div>
-                                                    <p className="font-black text-xs text-slate-800">{student.studentName}</p>
-                                                    <p className="text-[9px] font-bold text-slate-400 tracking-tight">ID: {student.studentUniqueId}</p>
+                                                    <p className="font-black text-xs text-slate-800 whitespace-nowrap">{student.studentName}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 tracking-tight whitespace-nowrap">ID: {student.studentUniqueId}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -523,10 +523,10 @@ export default function AccountsPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ফি-এর ধরণ / খাত</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">বকেয়া শিক্ষার্থীর সংখ্যা</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">মোট বকেয়া পরিমাণ</th>
-                            <th className="px-8 py-3"></th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ফি-এর ধরণ / খাত</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">বকেয়া শিক্ষার্থীর সংখ্যা</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">মোট বকেয়া পরিমাণ</th>
+                            <th className="px-8 py-3 whitespace-nowrap"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -652,12 +652,12 @@ export default function AccountsPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50">
-                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">বকেয়া আইডি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত/ধরন</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
-                                <th className="px-8 py-3"></th>
+                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">বকেয়া আইডি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ধরন</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
+                                <th className="px-8 py-3 whitespace-nowrap"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -678,16 +678,16 @@ export default function AccountsPage() {
                                                         {txn.studentName?.[0] || 'S'}
                                                     </div>
                                                 )}
-                                                <span className="font-black text-xs text-slate-800">{txn.studentName}</span>
+                                                <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <p className="font-black text-xs text-slate-700">{txn.category}</p>
+                                            <p className="font-black text-xs text-slate-700 whitespace-nowrap">{txn.category}</p>
                                         </td>
                                         <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                             ৳ {txn.amount?.toLocaleString()}
                                         </td>
-                                        <td className="hidden md:table-cell px-6 py-4 text-center text-[10px] font-black text-slate-400">
+                                        <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
                                             {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
                                         </td>
                                         <td className="px-8 py-4 text-right">
@@ -723,12 +723,12 @@ export default function AccountsPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">বকেয়া আইডি</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তি</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত/ধরন</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
-                            <th className="px-8 py-3"></th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">বকেয়া আইডি</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তি</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ধরন</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
+                            <th className="px-8 py-3 whitespace-nowrap"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -753,12 +753,12 @@ export default function AccountsPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <p className="font-black text-xs text-slate-700">{txn.category}</p>
+                                        <p className="font-black text-xs text-slate-700 whitespace-nowrap">{txn.category}</p>
                                     </td>
                                     <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                         ৳ {txn.amount?.toLocaleString()}
                                     </td>
-                                    <td className="hidden md:table-cell px-6 py-4 text-center text-[10px] font-black text-slate-400">
+                                    <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
                                         {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
                                     </td>
                                     <td className="px-8 py-4 text-right">
@@ -813,10 +813,10 @@ export default function AccountsPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তির তথ্য</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">লেনদেন সংখ্যা</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">মোট পরিমাণ</th>
-                            <th className="px-8 py-3"></th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তির তথ্য</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">লেনদেন সংখ্যা</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">মোট পরিমাণ</th>
+                            <th className="px-8 py-3 whitespace-nowrap"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -833,8 +833,8 @@ export default function AccountsPage() {
                                                 </div>
                                             )}
                                             <div>
-                                                <p className="font-black text-xs text-slate-800">{student.studentName}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 tracking-tight">ID: {student.studentUniqueId}</p>
+                                                <p className="font-black text-xs text-slate-800 whitespace-nowrap">{student.studentName}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 tracking-tight whitespace-nowrap">ID: {student.studentUniqueId}</p>
                                             </div>
                                         </div>
                                     </td>
@@ -890,10 +890,10 @@ export default function AccountsPage() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50">
-                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত / ধরন</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">লেনদেন সংখ্যা</th>
-                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">মোট পরিমাণ</th>
-                            <th className="px-8 py-3"></th>
+                            <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত / ধরন</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">লেনদেন সংখ্যা</th>
+                            <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">মোট পরিমাণ</th>
+                            <th className="px-8 py-3 whitespace-nowrap"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -1009,12 +1009,12 @@ export default function AccountsPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50">
-                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">লেনদেন আইডি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ব্যক্তি</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">খাত/ধরন</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
-                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
-                                <th className="px-8 py-3"></th>
+                                <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">লেনদেন আইডি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ব্যক্তি</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ধরন</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
+                                <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
+                                <th className="px-8 py-3 whitespace-nowrap"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -1035,11 +1035,11 @@ export default function AccountsPage() {
                                                         {txn.studentName?.[0] || 'S'}
                                                     </div>
                                                 )}
-                                                <span className="font-black text-xs text-slate-800">{txn.studentName}</span>
+                                                <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <p className="font-black text-xs text-slate-700" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                            <p className="font-black text-xs text-slate-700 whitespace-nowrap" title={txn.category}>{getShortCategory(txn.category)}</p>
                                         </td>
                                         <td className={`px-6 py-4 text-right font-black text-xs ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                             ৳ {txn.amount?.toLocaleString()}
@@ -1088,12 +1088,12 @@ export default function AccountsPage() {
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-50/50">
-                        <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">রশিদ/ভাউচার নং</th>
-                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">বিবরণ, খাত ও ব্যক্তি</th>
-                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">পরিমাণ</th>
-                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
-                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">অবস্থা</th>
-                        <th className="px-8 py-3"></th>
+                        <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">রশিদ/ভাউচার নং</th>
+                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">খাত/ব্যক্তি</th>
+                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">পরিমাণ</th>
+                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
+                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">অবস্থা</th>
+                        <th className="px-8 py-3 whitespace-nowrap"></th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -1111,8 +1111,8 @@ export default function AccountsPage() {
                                             <Receipt size={14} />
                                         </div>
                                         <div>
-                                            <p className="font-black text-xs text-slate-800" title={txn.category}>{getShortCategory(txn.category)}</p>
-                                            <p className="text-[9px] font-bold text-slate-400 tracking-tight">{txn.studentName || 'অজানা'}{txn.studentUniqueId ? ` (ID: ${txn.studentUniqueId})` : ''}</p>
+                                            <p className="font-black text-xs text-slate-800 whitespace-nowrap" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                            <p className="text-[9px] font-bold text-slate-400 tracking-tight whitespace-nowrap">{txn.studentName || 'অজানা'}{txn.studentUniqueId ? ` (ID: ${txn.studentUniqueId})` : ''}</p>
                                         </div>
                                     </div>
                                 </td>
@@ -1161,84 +1161,50 @@ export default function AccountsPage() {
         );
     };
 
-    return (
-        <div className="p-6 space-y-6 animate-fade-in font-bengali min-h-screen bg-slate-50/50">
-            {/* Global Dashboard Header - Unified Navigation and Actions */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm transition-all duration-300">
-                {/* Main Navigation Tabs */}
-                <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50 overflow-x-auto hide-scrollbar">
-                    <button
-                        onClick={() => { setActiveMainTab('overview'); setActiveSubTab('transactions'); }}
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
-                            ? 'bg-[#045c84] text-white shadow-lg'
-                            : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                    >
-                        <Wallet size={14} /> ওভারভিউ
-                    </button>
-                    <button
-                        onClick={() => { setActiveMainTab('income'); setActiveSubTab('transactions'); }}
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${activeMainTab === 'income'
-                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                            : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                    >
-                        <TrendingUp size={14} /> আয় (Income)
-                    </button>
-                    <button
-                        onClick={() => { setActiveMainTab('expense'); setActiveSubTab('transactions'); }}
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${activeMainTab === 'expense'
-                            ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
-                            : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                    >
-                        <TrendingDown size={14} /> ব্যয় (Expense)
-                    </button>
-                </div>
+    const getDisplayedCount = () => {
+        if (activeSubTab === 'transactions') return filteredTransactions.length;
+        if (activeSubTab === 'pending') {
+            if (transactionFilterMode === 'person') return personWiseDues.length;
+            if (transactionFilterMode === 'type') return typeWiseDues.length;
+            if (transactionFilterMode === 'class') {
+                return classWiseDues.find(c => c.className === activeClassFilter)?.items.length || 0;
+            }
+            return filteredTransactions.filter(t => t.status?.toUpperCase() === 'PENDING').length;
+        }
+        return 0;
+    };
 
-                {/* Global Search and Actions */}
-                <div className="flex items-center gap-4 flex-1 lg:max-w-2xl justify-end">
-                    <div className="relative group flex-1 max-w-sm">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#045c84] transition-colors" size={18} />
-                        <input
-                            type="text"
-                            placeholder={activeSubTab === 'categories' ? "খাত খুঁজুন..." : "লেনদেন খুঁজুন..."}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-12 pr-6 py-2.5 bg-slate-50 border-none rounded-xl text-xs font-bold placeholder:text-slate-400 focus:ring-1 focus:ring-[#045c84]/10 w-full transition-all"
-                        />
-                        {searchQuery && (
-                            <button 
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors"
-                            >
-                                <Plus className="rotate-45" size={16} />
-                            </button>
-                        )}
-                    </div>
-                    {activeSubTab === 'categories' ? (
-                        <button 
-                            id="add-category-btn-global"
-                            onClick={() => setAddTrigger(prev => prev + 1)}
-                            className={`px-6 py-2.5 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
-                                activeMainTab === 'income' ? 'bg-emerald-600 hover:shadow-emerald-100' : 
-                                activeMainTab === 'expense' ? 'bg-rose-600 hover:shadow-rose-100' : 
-                                'bg-[#045c84] hover:shadow-blue-100'
-                            }`}
-                        >
-                            <Plus size={16} /> নতুন {activeMainTab === 'income' ? 'আয়ের ' : activeMainTab === 'expense' ? 'ব্যয়ের ' : ''}খাত
-                        </button>
-                    ) : (
-                        <div className="flex items-center gap-2">
-                            <button className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-600 hover:bg-slate-100 transition-all flex items-center justify-center">
-                                <Filter size={18} />
-                            </button>
-                            <button className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-600 hover:bg-slate-100 transition-all flex items-center justify-center">
-                                <Download size={18} />
-                            </button>
-                        </div>
-                    )}
-                </div>
+    return (
+        <div className="p-6 space-y-6 animate-fade-in font-bengali min-h-screen bg-slate-50/50 pb-24">
+            {/* Main Navigation Tabs */}
+            <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50 overflow-x-auto hide-scrollbar w-max">
+                <button
+                    onClick={() => { setActiveMainTab('overview'); setActiveSubTab('transactions'); }}
+                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
+                        ? 'bg-[#045c84] text-white shadow-lg'
+                        : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                >
+                    <Wallet size={14} /> ওভারভিউ
+                </button>
+                <button
+                    onClick={() => { setActiveMainTab('income'); setActiveSubTab('transactions'); }}
+                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${activeMainTab === 'income'
+                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                        : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                >
+                    <TrendingUp size={14} /> আয়
+                </button>
+                <button
+                    onClick={() => { setActiveMainTab('expense'); setActiveSubTab('transactions'); }}
+                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${activeMainTab === 'expense'
+                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
+                        : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                >
+                    <TrendingDown size={14} /> ব্যয়
+                </button>
             </div>
 
             <AnimatePresence mode="wait">
@@ -1255,10 +1221,13 @@ export default function AccountsPage() {
                     }}
                     className="space-y-10"
                 >
-                    {/* Quick Stats Grid */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                    {/* Quick Stats Scrollable Container */}
+                    <div 
+                        className="flex overflow-x-auto gap-3 sm:gap-4 pb-2 scroll-smooth custom-scrollbar" 
+                        data-lenis-prevent="true"
+                    >
                         {stats.map((stat, idx) => (
-                            <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden">
+                            <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden min-w-[240px] sm:min-w-[280px] flex-1 flex-shrink-0">
                                 <div className="flex flex-col gap-4">
                                     <div className="flex items-center justify-between">
                                         <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center shadow-sm`}>
@@ -1278,28 +1247,90 @@ export default function AccountsPage() {
                         ))}
                     </div>
 
-                    {/* Main Content Area (Table & Sub-tabs) */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[600px] flex flex-col transition-all">
-                        {/* Sub-tab Navigation */}
-                        <div className="px-6 sm:px-8 py-6 border-b border-slate-50 flex items-center justify-between bg-white">
-                            <div className="flex items-center gap-2 p-1.5 bg-slate-50 rounded-2xl w-fit flex-wrap">
-                                {['transactions', ...((activeMainTab === 'income' || activeMainTab === 'overview') ? ['pending'] : []), 'categories'].map((tab) => (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setActiveSubTab(tab as any)}
-                                        className={`px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === tab
-                                                ? 'bg-white text-[#045c84] shadow-sm'
-                                                : 'text-slate-400 hover:text-slate-600'
-                                            }`}
+                    <div className="space-y-6">
+                        {/* Search & Actions Row */}
+                        <div className="flex items-center justify-between gap-3 w-full">
+                            <div className="relative group flex-1 max-w-md">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#045c84] transition-colors" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder={activeSubTab === 'categories' ? "খাত খুঁজুন..." : "লেনদেন খুঁজুন..."}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-12 pr-10 py-3 bg-white border border-slate-100 shadow-sm rounded-2xl text-xs font-bold placeholder:text-slate-400 focus:ring-1 focus:ring-[#045c84]/10 w-full transition-all"
+                                />
+                                {searchQuery && (
+                                    <button 
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors"
                                     >
-                                        {tab === 'transactions' ? 'লেনদেন সমূহ' :
-                                         tab === 'categories' ? 'খাত সমূহ' : 'বকেয়া ফি'}
+                                        <Plus className="rotate-45" size={16} />
                                     </button>
-                                ))}
+                                )}
                             </div>
-                            <div className="flex items-center gap-4 flex-wrap">
+
+                            {/* Actions (Filter, Download, Add Category) */}
+                            <div className="flex items-center gap-2 shrink-0">
+                                {activeSubTab === 'categories' ? (
+                                    <button 
+                                        id="add-category-btn-global"
+                                        onClick={() => setAddTrigger(prev => prev + 1)}
+                                        className={`px-4 sm:px-6 py-2.5 sm:py-3 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
+                                            activeMainTab === 'income' ? 'bg-emerald-600 hover:shadow-emerald-100' : 
+                                            activeMainTab === 'expense' ? 'bg-rose-600 hover:shadow-rose-100' : 
+                                            'bg-[#045c84] hover:shadow-blue-100'
+                                        }`}
+                                    >
+                                        <Plus size={16} /> <span className="hidden sm:inline">নতুন {activeMainTab === 'income' ? 'আয়ের ' : activeMainTab === 'expense' ? 'ব্যয়ের ' : ''}খাত</span>
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
+                                            <Filter size={18} />
+                                        </button>
+                                        <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
+                                            <Download size={18} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Main Content Area (Table & Sub-tabs) */}
+                        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[600px] flex flex-col transition-all">
+                        {/* Sub-tab Navigation */}
+                        <div className="px-6 sm:px-8 py-4 sm:py-6 border-b border-slate-50 flex flex-col gap-4 bg-white">
+                            {/* Top Row: Tabs and Count */}
+                            <div className="flex items-center justify-between gap-4 w-full">
+                                <div className="flex items-center gap-2 p-1.5 bg-slate-50 rounded-2xl flex-1 overflow-x-auto custom-scrollbar">
+                                    {['transactions', ...((activeMainTab === 'income' || activeMainTab === 'overview') ? ['pending'] : []), 'categories'].map((tab) => (
+                                        <button
+                                            key={tab}
+                                            onClick={() => setActiveSubTab(tab as any)}
+                                            className={`flex-1 px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap text-center ${activeSubTab === tab
+                                                    ? 'bg-white text-[#045c84] shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                                }`}
+                                        >
+                                            {tab === 'transactions' ? 'লেনদেন সমূহ' :
+                                             tab === 'categories' ? 'খাত সমূহ' : 'বকেয়া ফি'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="text-right shrink-0 w-[75px] sm:w-[100px]">
+                                    <p className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap truncate">
+                                        {activeSubTab === 'categories' ? '' :
+                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'person' ? `${personWiseDues.length} জন` :
+                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'type' ? `${typeWiseDues.length} টি খাত` :
+                                         `${filteredTransactions.length} টি ${activeSubTab === 'pending' ? 'বকেয়া' : 'লেনদেন'}`}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {/* Bottom Row: Filters */}
+                            <div className="flex items-center gap-4 w-full overflow-x-auto custom-scrollbar pb-1">
                                 {activeSubTab === 'pending' && (
-                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50">
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50 w-max shrink-0">
                                         {[
                                             { id: 'all', label: 'সব বকেয়া' },
                                             { id: 'person', label: 'ব্যক্তি ভিত্তিক' },
@@ -1309,7 +1340,7 @@ export default function AccountsPage() {
                                             <button
                                                 key={mode.id}
                                                 onClick={() => { setTransactionFilterMode(mode.id as any); setActiveClassFilter(null); }}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
                                                     transactionFilterMode === mode.id
                                                         ? 'bg-[#045c84] text-white shadow-sm'
                                                         : 'text-slate-400 hover:text-slate-600'
@@ -1321,7 +1352,7 @@ export default function AccountsPage() {
                                     </div>
                                 )}
                                 {activeSubTab === 'transactions' && (
-                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50">
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50 w-max shrink-0">
                                         {[
                                             { id: 'all', label: 'সব লেনদেন' },
                                             { id: 'person', label: 'ব্যক্তি ভিত্তিক' },
@@ -1331,7 +1362,7 @@ export default function AccountsPage() {
                                             <button
                                                 key={mode.id}
                                                 onClick={() => { setTransactionFilterMode(mode.id as any); setActiveClassFilter(null); }}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
                                                     transactionFilterMode === mode.id
                                                         ? 'bg-[#045c84] text-white shadow-sm'
                                                         : 'text-slate-400 hover:text-slate-600'
@@ -1343,7 +1374,7 @@ export default function AccountsPage() {
                                     </div>
                                 )}
                                 {activeSubTab === 'categories' && (
-                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50">
+                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50 w-max shrink-0">
                                         {[
                                             { id: 'all', label: 'সব খাত' },
                                             { id: 'income', label: 'আয়ের খাত' },
@@ -1353,7 +1384,7 @@ export default function AccountsPage() {
                                             <button
                                                 key={mode.id}
                                                 onClick={() => setCategoryFilterMode(mode.id as any)}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
                                                     categoryFilterMode === mode.id
                                                         ? 'bg-[#045c84] text-white shadow-sm'
                                                         : 'text-slate-400 hover:text-slate-600'
@@ -1364,14 +1395,6 @@ export default function AccountsPage() {
                                         ))}
                                     </div>
                                 )}
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        {activeSubTab === 'categories' ? '' :
-                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'person' ? `${personWiseDues.length} জন` :
-                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'type' ? `${typeWiseDues.length} টি খাত` :
-                                         `${filteredTransactions.length} টি ${activeSubTab === 'pending' ? 'বকেয়া' : 'লেনদেন'}`}
-                                    </p>
-                                </div>
                             </div>
                         </div>
 
@@ -1401,39 +1424,22 @@ export default function AccountsPage() {
                                 </AnimatePresence>
 
                                 {/* Enhanced Pagination Controls */}
-                                <div className="px-8 py-4 border-t border-slate-50 flex items-center justify-between bg-white mt-auto">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">১-৫ (মোট ২,৪৫০টি)</p>
-                                    <div className="flex items-center gap-3">
-                                        <button className="px-4 py-2 rounded-xl bg-slate-50 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all">পূর্ববর্তী</button>
-                                        <button className="px-4 py-2 rounded-xl bg-[#045c84] text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 hover:scale-105 transition-all">পরবর্তী</button>
+                                {((activeSubTab === 'transactions' && filteredTransactions.length > 0) || (activeSubTab === 'pending' && filteredTransactions.some(t => t.status?.toUpperCase() === 'PENDING'))) && (
+                                    <div className="px-8 py-4 border-t border-slate-50 flex items-center justify-between bg-white mt-auto">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">১-{Math.min(5, getDisplayedCount()).toLocaleString('bn-BD')} (মোট {getDisplayedCount().toLocaleString('bn-BD')}টি)</p>
+                                        <div className="flex items-center gap-3">
+                                            <button className="px-4 py-2 rounded-xl bg-slate-50 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all">পূর্ববর্তী</button>
+                                            <button className="px-4 py-2 rounded-xl bg-[#045c84] text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 hover:scale-105 transition-all">পরবর্তী</button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </>
                         )}
+                    </div>
                     </div>
                 </motion.div>
             </AnimatePresence>
 
-            {/* Bottom Insight Banner */}
-            <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden group">
-                <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
-                    <div className="max-w-xl text-center lg:text-left">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 rounded-full text-blue-300 text-[10px] font-black uppercase tracking-widest mb-3">
-                            <TrendingUp size={12} /> AI এনালিটিক্স
-                        </div>
-                        <h2 className="text-xl font-black uppercase tracking-tighter mb-2 leading-tight">
-                            আপনার প্রতিষ্ঠানের ফিন্যান্সিয়াল <br />
-                            <span className="text-blue-400">রিপোর্ট তৈরি হচ্ছে</span>
-                        </h2>
-                        <p className="text-slate-400 font-bold leading-relaxed text-[11px]">
-                            ভুল বা অসামঞ্জস্যপূর্ণ লেনদেন শনাক্ত করতে স্মার্ট অ্যালগরিদম কাজ করছে।
-                        </p>
-                    </div>
-                    <button className="px-6 py-3 bg-white text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-[0.3em] shadow-xl hover:bg-blue-50 transition-all">
-                        অডিট রিপোর্ট দেখুন
-                    </button>
-                </div>
-            </div>
 
             {/* Student Dues Details Modal */}
             {selectedStudentDetails && (
@@ -1474,10 +1480,10 @@ export default function AccountsPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50/50">
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-l-xl">আইডি</th>
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">ফি-এর ধরণ / খাত</th>
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">তারিখ</th>
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right rounded-r-xl">পরিমাণ</th>
+                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-l-xl whitespace-nowrap">আইডি</th>
+                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ফি-এর ধরণ / খাত</th>
+                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
+                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right rounded-r-xl whitespace-nowrap">পরিমাণ</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
