@@ -102,44 +102,69 @@ export async function getNextStudentId(instituteId: string): Promise<string> {
 
 /**
  * Calculates the next available Roll Number for a class within an institute.
- * Returns a string representing the number (e.g., "1", "12").
+ * Returns a string representing the number (e.g., "01", "S-01").
  */
-export async function getNextRollNumber(instituteId: string, classId: string): Promise<string> {
-    if (!classId) return "1";
+export async function getNextRollNumber(instituteId: string, classId: string, groupId?: string | null): Promise<string> {
+    if (!classId) return "01";
+
+    let counterId = `${instituteId}_${classId}_rollNumber`;
+    let prefix = "";
+
+    if (groupId && groupId !== 'all') {
+        counterId = `${instituteId}_${classId}_${groupId}_rollNumber`;
+        const group = await prisma.group.findUnique({ where: { id: groupId } });
+        if (group && group.name) {
+            // Find first english character or default to first char
+            const englishMatch = group.name.match(/[a-zA-Z]/);
+            if (englishMatch) {
+                prefix = englishMatch[0].toUpperCase() + "-";
+            } else {
+                prefix = group.name.charAt(0) + "-";
+            }
+        }
+    }
 
     let result = await (prisma as any).$runCommandRaw({
         findAndModify: 'Counter',
-        query: { _id: `${instituteId}_${classId}_rollNumber` },
+        query: { _id: counterId },
         update: { $inc: { seq: 1 } },
         new: true
     });
 
+    let seqVal = 0;
     if (result?.value?.seq) {
-        return result.value.seq.toString();
-    }
-
-    const maxRoll = await getMaxMetadataValue(instituteId, { 'metadata.classId': classId }, 'rollNumber');
-    const startValue = maxRoll + 1;
-
-    result = await (prisma as any).$runCommandRaw({
-        findAndModify: 'Counter',
-        query: { _id: `${instituteId}_${classId}_rollNumber` },
-        update: { 
-            $setOnInsert: { seq: startValue } 
-        },
-        new: true,
-        upsert: true
-    });
-
-    if (result?.lastErrorObject?.updatedExisting === false) {
-        return startValue.toString();
+        seqVal = result.value.seq;
     } else {
+        // Fallback: try to get max if no counter exists
+        let maxRoll = 0;
+        try {
+            maxRoll = await getMaxMetadataValue(instituteId, { 'metadata.classId': classId }, 'rollNumber');
+        } catch(e) {}
+        
+        const startValue = maxRoll + 1;
+
         result = await (prisma as any).$runCommandRaw({
             findAndModify: 'Counter',
-            query: { _id: `${instituteId}_${classId}_rollNumber` },
-            update: { $inc: { seq: 1 } },
-            new: true
+            query: { _id: counterId },
+            update: { 
+                $setOnInsert: { seq: startValue } 
+            },
+            new: true,
+            upsert: true
         });
-        return result.value.seq.toString();
+
+        if (result?.lastErrorObject?.updatedExisting === false) {
+            seqVal = startValue;
+        } else {
+            result = await (prisma as any).$runCommandRaw({
+                findAndModify: 'Counter',
+                query: { _id: counterId },
+                update: { $inc: { seq: 1 } },
+                new: true
+            });
+            seqVal = result.value.seq;
+        }
     }
+
+    return prefix + seqVal.toString().padStart(2, '0');
 }

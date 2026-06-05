@@ -91,11 +91,20 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [activeTab, setActiveTab] = useState<'PRESENT' | 'LATE' | 'LEAVE' | 'ABSENT'>('ABSENT');
     const [isPaused, setIsPaused] = useState(false);
+    const isPausedRef = useRef(false);
+    useEffect(() => {
+        isPausedRef.current = isPaused;
+    }, [isPaused]);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
     const [toast, setToast] = useState<{ message: string, type: 'SUCCESS' | 'ERROR' | 'INFO' } | null>(null);
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
     const { isLowCapacity } = usePerformance();
+
+    const markedStudentsRef = useRef<Set<string>>(markedStudents);
+    useEffect(() => {
+        markedStudentsRef.current = markedStudents;
+    }, [markedStudents]);
 
     const showToast = (message: string, type: 'SUCCESS' | 'ERROR' | 'INFO' = 'SUCCESS') => {
         setToast({ message, type });
@@ -201,7 +210,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             const fetchClassId = targetClassId || 'all';
 
             const [studentsRes, attendanceRes, statsRes] = await Promise.all([
-                fetch(`/api/admin/users?role=STUDENT&instituteId=${activeInstitute.id}&classId=${fetchClassId}`),
+                fetch(`/api/admin/users?role=STUDENT&instituteId=${activeInstitute.id}&classId=${fetchClassId}&includeFaceData=true`),
                 fetch(`/api/attendance/list?instituteId=${activeInstitute.id}&date=${today}&classId=${fetchClassId}`),
                 fetch(`/api/attendance/stats?instituteId=${activeInstitute.id}&classId=${fetchClassId}`)
             ]);
@@ -575,6 +584,11 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
         }
     };
 
+    const markAttendanceRef = useRef(markAttendance);
+    useEffect(() => {
+        markAttendanceRef.current = markAttendance;
+    });
+
     const unmarkAttendance = async (studentId: string) => {
         try {
             const dateString = selectedDate || new Date().toISOString().split('T')[0];
@@ -699,7 +713,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             let currentStudents = students;
 
             if (isTestMode) {
-                const res = await fetch(`/api/admin/users?role=STUDENT&instituteId=${activeInstitute.id}`);
+                const res = await fetch(`/api/admin/users?role=STUDENT&instituteId=${activeInstitute.id}&includeFaceData=true`);
                 if (res.ok) {
                     const data = await res.json();
                     const enrolled = data
@@ -804,13 +818,13 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
         let isProcessing = false;
 
         const processFrame = async () => {
-            if (status !== 'SCANNING' || !videoRef.current || videoRef.current.readyState < 2 || !faceMatcher || !isCameraActive || isProcessing || isPaused) {
-                if (isPaused && canvasRef.current) {
+            if (status !== 'SCANNING' || !videoRef.current || videoRef.current.readyState < 2 || !isCameraActive || isProcessing || isPausedRef.current) {
+                if (isPausedRef.current && canvasRef.current) {
                     const ctx = canvasRef.current.getContext('2d');
                     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
                 }
-                if (status === 'SCANNING' && !isPaused) requestRef.current = requestAnimationFrame(processFrame);
-                else if (isPaused) {
+                if (status === 'SCANNING' && !isPausedRef.current) requestRef.current = requestAnimationFrame(processFrame);
+                else if (isPausedRef.current) {
                     // When paused, we still want to be able to resume later
                     // The useEffect will handle restarting the loop when isPaused changes
                 }
@@ -828,11 +842,19 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
 
             isProcessing = true;
             try {
-                // Increased inputSize for better accuracy and strict score threshold
+                // Use more lenient thresholds for real-time detection
                 const detections = await faceapi
-                    .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
+                    .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
                     .withFaceLandmarks()
                     .withFaceDescriptors();
+
+                if (isPausedRef.current) {
+                    if (canvasRef.current) {
+                        const ctx = canvasRef.current.getContext('2d');
+                        ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                    }
+                    return;
+                }
 
                 if (detections.length > 0 && canvasRef.current) {
                     const displaySize = { width: videoRef.current.videoWidth, height: videoRef.current.videoHeight };
@@ -880,7 +902,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                         hasMultiAngle = false;
                                     }
 
-                                    if (minDistance <= 0.38) {
+                                    if (minDistance <= 0.45) {
                                         candidates.push({ student: s, distance: minDistance, matchedAngleIndex, hasMultiAngle });
                                     }
                                 }
@@ -912,7 +934,15 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                 }
                             }
 
-                            const drawBox = new faceapi.draw.DrawBox(box, {
+                            const isMirrored = facingMode === 'user';
+                            const mirroredBox = isMirrored ? {
+                                x: displaySize.width - box.x - box.width,
+                                y: box.y,
+                                width: box.width,
+                                height: box.height
+                            } : box;
+
+                            const drawBox = new faceapi.draw.DrawBox(mirroredBox as any, {
                                 label: student ? student.name : 'অচেনা',
                                 boxColor: student ? '#10b981' : '#f43f5e'
                             });
@@ -932,7 +962,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                 hasMatchingCandidate = true;
 
                                 // Check if already marked present
-                                if (markedStudents.has(student.id)) {
+                                if (markedStudentsRef.current.has(student.id)) {
                                     const lastWarningTime = alreadyWarningCooldown.current[student.id] || 0;
                                     if (now - lastWarningTime > 15000) { // 15 seconds cooldown for duplicate warnings
                                         alreadyWarningCooldown.current[student.id] = now;
@@ -942,6 +972,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                         locallyLocked = true;
                                         
                                         // Add to recent matches as already marked
+                                        // Using a callback or keeping a ref for attendanceRecords would be ideal, but for now we'll just check if it's there
                                         const existingRecord = attendanceRecords[student.id];
                                         const newMatch = {
                                             id: student.id,
@@ -974,11 +1005,9 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                 consensusTracker.current[student.id].angles.add(candidate.matchedAngleIndex);
                                 
                                 const tracker = consensusTracker.current[student.id];
-                                const requiredAngles = candidate.hasMultiAngle ? 2 : 1;
-
-                                // Require minimum 3 frames total, AND at least 2 distinct angles matched
-                                if (tracker.frames >= 3 && tracker.angles.size >= requiredAngles) {
-                                    markAttendance(student.id, student.name, student.classId);
+                                // Require minimum 2 frames total
+                                if (tracker.frames >= 2) {
+                                    markAttendanceRef.current(student.id, student.name, student.classId);
                                     delete consensusTracker.current[student.id];
                                     
                                     setMatchingState({ status: 'MATCHED', studentName: student.name });
@@ -1075,8 +1104,8 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                         )}
 
                         <div className="relative aspect-video">
-                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full scale-x-[-1]" />
+                            <video ref={videoRef} autoPlay muted playsInline className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} />
+                            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
                             <AnimatePresence mode="wait">
                                 {(status === 'IDLE' || (status as string) === 'ERROR') && !isCameraActive && (
@@ -1365,7 +1394,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                 </div>
 
                 <div className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 flex flex-col shadow-sm h-[calc(100vh-220px)] overflow-hidden">
+                    <div className="bg-white rounded-2xl border border-slate-200 flex flex-col shadow-sm h-[450px] lg:h-[600px] overflow-hidden">
                         {/* Tab Header */}
                         <div className="flex bg-slate-50 border-b border-slate-100 p-1.5 gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
                             {[
@@ -1385,7 +1414,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                             ))}
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar pb-20">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-20 scroll-smooth custom-scrollbar">
                             <AnimatePresence mode="wait">
                                 {activeTab !== 'ABSENT' ? (
                                     <motion.div
@@ -1499,8 +1528,10 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             </div>
 
             <style jsx global>{`
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
             `}</style>
 
             {/* Glassmorphism Toast */}

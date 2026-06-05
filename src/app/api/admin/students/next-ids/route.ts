@@ -6,13 +6,14 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url);
         const instituteId = searchParams.get('instituteId');
         const classId = searchParams.get('classId');
+        const groupId = searchParams.get('groupId');
 
         if (!instituteId) {
             return NextResponse.json({ message: 'Institute ID is required' }, { status: 400 });
         }
 
         const nextId = await getNextStudentId(instituteId);
-        const nextRoll = await getNextRollNumber(instituteId, classId || '');
+        const nextRoll = await getNextRollNumber(instituteId, classId || '', groupId);
 
         return NextResponse.json({
             nextStudentId: nextId,

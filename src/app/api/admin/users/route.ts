@@ -17,6 +17,7 @@ export async function GET(req: Request) {
         const status = searchParams.get('status');
         const feeTier = searchParams.get('feeTier');
         const activeRoleQuery = searchParams.get('activeRole');
+        const includeFaceData = searchParams.get('includeFaceData') === 'true';
 
         const session = await getServerSession();
         if (!session) {
@@ -42,17 +43,22 @@ export async function GET(req: Request) {
                 return NextResponse.json({ message: 'User not found' }, { status: 404 });
             }
 
+            const metadata = (user.metadata as any) || {};
+            const faceDescriptor = (user as any).faceDescriptor || [];
             const formattedUser = {
                 id: user.id,
                 name: user.name || '',
                 email: user.email || '',
                 phone: user.phone || '',
-                password: (user.metadata as any)?.originalPassword || user.password || '',
+                password: metadata.originalPassword || user.password || '',
                 role: user.role || 'USER',
                 createdAt: user.createdAt,
                 institute: user.institutes?.[0] ? { name: (user.institutes[0] as any).name } : null,
-                metadata: user.metadata || {},
-                faceDescriptor: (user as any).faceDescriptor || []
+                metadata: {
+                    ...metadata,
+                    hasFaceId: metadata.hasFaceId || (Array.isArray(faceDescriptor) && faceDescriptor.length > 0)
+                },
+                faceDescriptor
             };
 
             return NextResponse.json(formattedUser);
@@ -249,16 +255,24 @@ export async function GET(req: Request) {
             },
             {
                 $addFields: {
-                    institute: { $arrayElemAt: ['$institutes', 0] }
-                }
-            },
-            {
-                $project: {
-                    faceDescriptor: 0,
-                    institutes: 0
+                    institute: { $arrayElemAt: ['$institutes', 0] },
+                    hasFaceId: {
+                        $gt: [{ $size: { $ifNull: ["$faceDescriptor", []] } }, 0]
+                    }
                 }
             }
         );
+
+        
+        const projectStage: any = {
+            institutes: 0
+        };
+
+        if (!includeFaceData) {
+            projectStage.faceDescriptor = 0;
+        }
+
+        pipeline.push({ $project: projectStage });
 
         const usersRaw = await (prisma as any).$runCommandRaw({
             aggregate: 'User',
@@ -276,8 +290,11 @@ export async function GET(req: Request) {
             createdAt: user.createdAt?.$date || user.createdAt,
             updatedAt: user.updatedAt?.$date || user.updatedAt,
             institute: user.institute ? { name: user.institute.name } : null,
-            metadata: user.metadata || {},
-            faceDescriptor: [] // Ensure array is returned so frontend doesn't crash
+            metadata: {
+                ...(user.metadata || {}),
+                hasFaceId: user.hasFaceId || user.metadata?.hasFaceId || false
+            },
+            faceDescriptor: user.faceDescriptor || []
         }));
 
         // --- Server-side Class/Group Name Resolution ---
@@ -371,6 +388,9 @@ export async function POST(req: Request) {
 
         // Store original password in metadata for superadmin visibility
         finalMetadata.originalPassword = password;
+        if (Array.isArray(faceDescriptor) && faceDescriptor.length > 0) {
+            finalMetadata.hasFaceId = true;
+        }
 
         const userDoc: any = {
             name: name || '',
@@ -570,7 +590,14 @@ export async function PATCH(req: Request) {
             };
         }
         if (phone) set.phone = phone;
-        if (faceDescriptor && Array.isArray(faceDescriptor) && faceDescriptor.length > 0) set.faceDescriptor = faceDescriptor;
+        if (faceDescriptor && Array.isArray(faceDescriptor) && faceDescriptor.length > 0) {
+            set.faceDescriptor = faceDescriptor;
+            if (set.metadata) {
+                set.metadata.hasFaceId = true;
+            } else {
+                set['metadata.hasFaceId'] = true;
+            }
+        }
 
         await (prisma as any).$runCommandRaw({
             update: 'User',

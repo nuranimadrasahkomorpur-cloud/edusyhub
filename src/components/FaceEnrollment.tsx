@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as faceapi from '@vladmandic/face-api';
 import { Camera, RefreshCw, CheckCircle2, XCircle, Loader2, Sparkles, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { usePerformance } from '../hooks/usePerformance';
 
 const getFaceOrientation = (landmarks: faceapi.FaceLandmarks68) => {
@@ -19,9 +20,10 @@ const getFaceOrientation = (landmarks: faceapi.FaceLandmarks68) => {
     if (distRight === 0) return 'UNKNOWN';
     const ratio = distLeft / distRight;
     
-    if (ratio >= 0.75 && ratio <= 1.35) {
+    // More lenient ratio for 'MIDDLE' so it's easier to capture front face
+    if (ratio >= 0.65 && ratio <= 1.55) {
         return 'MIDDLE';
-    } else if (ratio < 0.75) {
+    } else if (ratio < 0.65) {
         return 'RIGHT';
     } else {
         return 'LEFT';
@@ -29,13 +31,20 @@ const getFaceOrientation = (landmarks: faceapi.FaceLandmarks68) => {
 };
 
 interface FaceEnrollmentProps {
-    studentId: string;
-    studentName: string;
+    studentId?: string;
+    studentName?: string;
     onSuccess?: () => void;
     onClose: () => void;
+    onCaptureOffline?: (data: {
+        descriptors: number[][];
+        middleImageBase64?: string;
+        previewLeft?: string;
+        previewMiddle?: string;
+        previewRight?: string;
+    }) => void;
 }
 
-export default function FaceEnrollment({ studentId, studentName, onSuccess, onClose }: FaceEnrollmentProps) {
+export default function FaceEnrollment({ studentId, studentName, onSuccess, onClose, onCaptureOffline }: FaceEnrollmentProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -118,8 +127,13 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
             });
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                // Important: wait for video to start playing to hide fallback
-                videoRef.current.onplaying = () => setIsCameraActive(true);
+                videoRef.current.onplaying = () => {
+                    setIsCameraActive(true);
+                    // Auto-start scanning when camera is active!
+                    if (status !== 'ERROR' && status !== 'CAPTURING') {
+                        handleEnroll();
+                    }
+                };
             }
         } catch (err: any) {
             console.error('Error accessing camera:', err);
@@ -511,6 +525,28 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     const saveFaceDescriptors = async (descriptors: number[][], middleImageBase64Override?: string) => {
         try {
             setStatus('SAVING');
+
+            if (onCaptureOffline) {
+                onCaptureOffline({
+                    descriptors,
+                    middleImageBase64: middleImageBase64Override || capturedMiddleImageBase64 || undefined,
+                    previewLeft: previewsRef.current.left || undefined,
+                    previewMiddle: previewsRef.current.middle || undefined,
+                    previewRight: previewsRef.current.right || undefined
+                });
+                setProgress(100);
+                setStatus('SUCCESS');
+                if (onSuccess) onSuccess();
+                setTimeout(() => {
+                    onClose();
+                }, 2000);
+                return;
+            }
+
+            if (!studentId) {
+                throw new Error('Student ID is missing');
+            }
+
             const response = await fetch(`/api/students/${studentId}/face`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -654,7 +690,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                     }
                 }
 
-                if (detections && detections.detection.score >= 0.65) {
+                if (detections && detections.detection.score >= 0.50) {
                     const orientation = getFaceOrientation(detections.landmarks);
                     setDetectedOrientation(orientation);
                     
@@ -672,7 +708,12 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                             const dist = faceapi.euclideanDistance(capturedLeft, Array.from(detections.descriptor));
                             if (dist > 0.6) {
                                 setError('ভিন্ন ব্যক্তি সনাক্ত হয়েছে! অনুগ্রহ করে একই ব্যক্তির ছবি স্ক্যান করুন।');
-                                setStatus('READY');
+                                setTimeout(() => setError(null), 3000);
+                                setDetectedOrientation(null);
+                                // Skip capturing this frame, let loop continue
+                                if (active && status === 'CAPTURING') {
+                                    timerId = setTimeout(scanFrame, 200);
+                                }
                                 return;
                             }
                         }
@@ -688,7 +729,11 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                 const checkData = await checkRes.json();
                                 if (checkData.isDuplicate && checkData.studentId !== studentId) {
                                     setError(`এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে।`);
-                                    setStatus('READY');
+                                    setTimeout(() => setError(null), 3000);
+                                    setDetectedOrientation(null);
+                                    if (active && status === 'CAPTURING') {
+                                        timerId = setTimeout(scanFrame, 200);
+                                    }
                                     return;
                                 }
                             }
@@ -783,20 +828,25 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                        'প্রক্রিয়া করা হচ্ছে...';
             }
             if (detectedOrientation && detectedOrientation !== 'UNKNOWN' && detectedOrientation !== currentStep) {
-                if (currentStep === 'LEFT') return 'ভুল দিক! দয়া করে বামে ঘোরান...';
+                if (currentStep === 'LEFT') return 'ভুল দিক! দয়া করে বাম দিকে ঘোরান...';
                 if (currentStep === 'MIDDLE') return 'ভুল দিক! দয়া করে সামনে সোজা তাকান...';
-                if (currentStep === 'RIGHT') return 'ভুল দিক! দয়া করে ডানে ঘোরান...';
+                if (currentStep === 'RIGHT') return 'ভুল দিক! দয়া করে ডান দিকে ঘোরান...';
             }
-            if (currentStep === 'LEFT') return 'মাথা হালকা বামে ঘোরান...';
+            if (currentStep === 'LEFT') return 'মাথা হালকা বাম দিকে ঘোরান...';
             if (currentStep === 'MIDDLE') return 'সামনে সোজা তাকান...';
-            if (currentStep === 'RIGHT') return 'মাথা হালকা ডানে ঘোরান...';
+            if (currentStep === 'RIGHT') return 'মাথা হালকা ডান দিকে ঘোরান...';
             if (currentStep === 'DONE') return 'সম্পূর্ণ হচ্ছে...';
         }
         return '';
     };
 
-    return (
-        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
+    if (!mounted) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[999999] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -1111,7 +1161,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                             </motion.div>
                         )}
 
-                        {mode === 'CAMERA' && (error || ((status === 'READY' || status === 'CAPTURING') && !isCameraActive)) && (
+                        {mode === 'CAMERA' && !isCameraActive && status !== 'SUCCESS' && status !== 'LOADING_MODELS' && (
                             <motion.div key="camera-fallback-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                                 className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center text-white text-center p-6 backdrop-blur-md z-30">
                                 <div className={`w-24 h-24 border-4 border-dashed rounded-full flex items-center justify-center ${!isLowCapacity ? 'animate-[spin_20s_linear_infinite]' : 'border-white/20'}`}>
@@ -1140,7 +1190,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center border font-black text-[12px] transition-all duration-300 ${capturedLeft ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/20' : currentStep === 'LEFT' ? 'bg-[#045c84] border-white text-white scale-110 ring-4 ring-[#045c84]/30' : 'bg-slate-900/60 border-slate-700 text-slate-400'}`}>
                                         {capturedLeft ? <CheckCircle2 size={16} strokeWidth={3} /> : '১'}
                                     </div>
-                                    <span className="text-[9px] font-black tracking-wider text-slate-300 mt-1.5">বাম</span>
+                                    <span className="text-[9px] font-black tracking-wider text-slate-300 mt-1.5">বাম দিক</span>
                                 </div>
 
                                 {/* Connector Line 1 */}
@@ -1166,7 +1216,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center border font-black text-[12px] transition-all duration-300 ${capturedRight ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/20' : currentStep === 'RIGHT' ? 'bg-[#045c84] border-white text-white scale-110 ring-4 ring-[#045c84]/30' : 'bg-slate-900/60 border-slate-700 text-slate-400'}`}>
                                         {capturedRight ? <CheckCircle2 size={16} strokeWidth={3} /> : '৩'}
                                     </div>
-                                    <span className="text-[9px] font-black tracking-wider text-slate-300 mt-1.5">ডান</span>
+                                    <span className="text-[9px] font-black tracking-wider text-slate-300 mt-1.5">ডান দিক</span>
                                 </div>
                             </div>
                         </div>
@@ -1187,6 +1237,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                 </div>
 
             </motion.div>
-        </div>
+        </div>,
+        document.body
     );
 }

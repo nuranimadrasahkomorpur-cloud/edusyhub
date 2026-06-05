@@ -15,6 +15,7 @@ import {
     Building2,
     Loader2,
     X,
+    XCircle,
     Save,
     Trash2,
     Edit,
@@ -48,13 +49,16 @@ import {
     Info,
     Key,
     History,
-    Wallet
+    Wallet,
+    FileUp,
+    Camera
 } from 'lucide-react';
 import { ScrollableTabs } from '@/components/ui/ScrollableTabs';
 import Toast from '@/components/Toast';
 import Modal from '@/components/Modal';
 import FieldLibrary, { FieldDefinition, POSSIBLE_FIELDS } from '@/components/FieldLibrary';
 import StudentProfileModal from '@/components/StudentProfileModal';
+import FaceEnrollment from '@/components/FaceEnrollment';
 import TeacherCard from '@/components/TeacherCard';
 import BookCard from '@/components/BookCard';
 import BookDetailsModal from '@/components/BookDetailsModal';
@@ -239,6 +243,7 @@ export default function StudentManagementPage() {
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [editingStudent, setEditingStudent] = useState<any>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isFaceEnrollmentModalOpen, setIsFaceEnrollmentModalOpen] = useState(false);
     const [isClassDropdownOpen, setIsClassDropdownOpen] = useState(false);
     const [isClassManagementModalOpen, setIsClassManagementModalOpen] = useState(false);
     const [managedClasses, setManagedClasses] = useState<any[]>([]);
@@ -341,6 +346,36 @@ export default function StudentManagementPage() {
         }
     }, [formData.phone, formData.metadata?.fathersPhone, formData.metadata?.mothersPhone, isAddModalOpen]);
 
+    // Auto-generate IDs when classId or groupId changes
+    useEffect(() => {
+        if (!isAddModalOpen || !activeInstitute?.id) return;
+        
+        const classId = formData.metadata?.classId;
+        const groupId = formData.metadata?.groupId;
+
+        if (classId) {
+            const generate = async () => {
+                try {
+                    const res = await fetch(`/api/admin/students/next-ids?instituteId=${activeInstitute.id}&classId=${classId}${groupId ? `&groupId=${groupId}` : ''}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setFormData((prev: any) => ({
+                            ...prev,
+                            metadata: {
+                                ...prev.metadata,
+                                studentId: prev.metadata.studentId || data.nextStudentId,
+                                rollNumber: prev.metadata.rollNumber || data.nextRollNumber
+                            }
+                        }));
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch next IDs", error);
+                }
+            };
+            generate();
+        }
+    }, [formData.metadata?.classId, formData.metadata?.groupId, isAddModalOpen, activeInstitute?.id]);
+
     const [formConfig, setFormConfig] = useState<FieldDefinition[]>([]);
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
@@ -352,7 +387,7 @@ export default function StudentManagementPage() {
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [activeTab, setActiveTab] = useState<'students' | 'applications' | 'books' | 'teachers'>('students');
-    const [activeFormTab, setActiveFormTab] = useState<'profile' | 'account'>('profile');
+    const [activeFormTab, setActiveFormTab] = useState<'student' | 'guardian' | 'academic' | 'fees' | 'documents'>('student');
 
     const [teachers, setTeachers] = useState<any[]>([]);
     const [permissionModalData, setPermissionModalData] = useState<any>(null);
@@ -373,6 +408,11 @@ export default function StudentManagementPage() {
     const [importFails, setImportFails] = useState<any[]>([]);
     const [isImportSummaryOpen, setIsImportSummaryOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const [isProcessingFace, setIsProcessingFace] = useState(false);
     const [processingFieldId, setProcessingFieldId] = useState<string | null>(null);
     const [isFaceModelLoaded, setIsFaceModelLoaded] = useState(false);
@@ -1034,8 +1074,9 @@ export default function StudentManagementPage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Auto-extract face if it's a student photo (middle, left, or right)
-        if ((fieldId === 'studentPhoto' || fieldId === 'studentPhotoLeft' || fieldId === 'studentPhotoRight') && isFaceModelLoaded) {
+        // Auto-extract face if it's explicitly a face capture photo (left or right).
+        // Profile image ('studentPhoto') manual upload should not override face data.
+        if ((fieldId === 'studentPhotoLeft' || fieldId === 'studentPhotoRight') && isFaceModelLoaded) {
             extractFaceDescriptor(file, fieldId);
         }
 
@@ -1081,6 +1122,32 @@ export default function StudentManagementPage() {
         } finally {
             setActionLoading(false);
         }
+    };
+
+    const handleOfflineFaceCapture = async (data: { descriptors: number[][], middleImageBase64?: string, previewLeft?: string, previewMiddle?: string, previewRight?: string }) => {
+        // Save descriptors temporarily so we can send them when saving the student
+        setFormData((prev: any) => ({
+            ...prev,
+            metadata: {
+                ...prev.metadata,
+                faceDescriptors: data.descriptors
+            }
+        }));
+        
+        // Function to upload base64
+        const uploadBase64 = async (base64: string, fieldId: string) => {
+            try {
+                const res = await fetch(base64);
+                const blob = await res.blob();
+                const file = new File([blob], `${fieldId}.jpg`, { type: 'image/jpeg' });
+                const fakeEvent = { target: { files: [file] } } as any;
+                await handleFileUpload(fakeEvent, fieldId);
+            } catch(e) { console.error('Failed to upload captured face', e); }
+        };
+
+        if (data.previewLeft) await uploadBase64(data.previewLeft, 'studentPhotoLeft');
+        if (data.previewMiddle || data.middleImageBase64) await uploadBase64(data.previewMiddle || data.middleImageBase64!, 'studentPhoto');
+        if (data.previewRight) await uploadBase64(data.previewRight, 'studentPhotoRight');
     };
 
     const extractFaceDescriptor = async (file: File, fieldId: string) => {
@@ -1202,7 +1269,11 @@ export default function StudentManagementPage() {
 
             // Build the final faceDescriptor payload
             let finalFaceDescriptor = formData.faceDescriptor || [];
-            if (formData.faceDescriptorMiddle || formData.faceDescriptorLeft || formData.faceDescriptorRight) {
+            
+            // Prefer explicitly captured descriptors from OfflineFaceCapture
+            if (formData.metadata?.faceDescriptors && formData.metadata.faceDescriptors.length > 0) {
+                finalFaceDescriptor = formData.metadata.faceDescriptors;
+            } else if (formData.faceDescriptorMiddle || formData.faceDescriptorLeft || formData.faceDescriptorRight) {
                 const descs: number[][] = [];
                 if (formData.faceDescriptorMiddle) descs.push(formData.faceDescriptorMiddle);
                 else if (formData.faceDescriptor) {
@@ -2992,34 +3063,14 @@ export default function StudentManagementPage() {
                     setIsAddModalOpen(false);
                     setEditingStudent(null);
                     setFormData({ name: '', email: '', password: '', metadata: {} });
-                    setActiveFormTab('profile');
+                    setActiveFormTab('student');
                 }}
                 title={editingStudent ? "শিক্ষার্থীর তথ্য আপডেট করুন" : "নতুন শিক্ষার্থী যুক্ত করুন"}
                 maxWidth="max-w-3xl"
             >
-                <div className="flex border-b border-slate-100 bg-slate-50/50">
-                    <button
-                        onClick={() => setActiveFormTab('profile')}
-                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${activeFormTab === 'profile'
-                            ? 'border-[#045c84] text-[#045c84] bg-white'
-                            : 'border-transparent text-slate-400 hover:text-slate-600'
-                            }`}
-                    >
-                        প্রোফাইল তথ্য (Profile)
-                    </button>
-                    <button
-                        onClick={() => setActiveFormTab('account')}
-                        className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${activeFormTab === 'account'
-                            ? 'border-[#045c84] text-[#045c84] bg-white'
-                            : 'border-transparent text-slate-400 hover:text-slate-600'
-                            }`}
-                    >
-                        অ্যাকাউন্ট সেটআপ (Account)
-                    </button>
-                </div>
                 <form onSubmit={handleFormSubmit} className="p-5 md:p-8 space-y-6">
                     {/* Quick Action Toolbar */}
-                    {activeFormTab === 'profile' && !editingStudent && (
+                    {activeFormTab === 'student' && !editingStudent && (
                         <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
                             {activeInstitute?.id && (
                                 <button
@@ -3515,7 +3566,7 @@ export default function StudentManagementPage() {
                         <>
                             <div className="space-y-4">
                                 {(() => {
-                                    const LOGIN_FIELD_IDS = ['classId', 'groupId', 'studentId', 'rollNumber', 'email', 'password', 'studentPhone', 'guardianPhone', 'guardianPassword', 'guardianName', 'guardianRelation'];
+                                    const LOGIN_FIELD_IDS = ['email', 'password', 'studentPhone', 'guardianPhone', 'guardianPassword'];
                                     const alwaysShowFields = ['studentId', 'rollNumber'];
                                     const effectiveFields = (editingStudent
                                         ? [
@@ -3610,125 +3661,6 @@ export default function StudentManagementPage() {
                                                         </div>
                                                     </div>
                                                 ) : field.type === 'attachment' ? (
-                                                    field.id === 'studentPhoto' ? (
-                                                        <div className="space-y-4 w-full">
-                                                            <div className="grid grid-cols-3 gap-4">
-                                                                {/* Left Face Photo Box */}
-                                                                {(() => {
-                                                                    const subFieldId = 'studentPhotoLeft';
-                                                                    const subFieldValue = formData.metadata[subFieldId];
-                                                                    const isProcessing = processingFieldId === subFieldId;
-                                                                    return (
-                                                                        <div className="relative group/attachment flex flex-col items-center gap-1.5 w-full">
-                                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">বাম পাশ (Left)</span>
-                                                                            <div className={`relative w-full aspect-[2/3] max-w-[120px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${subFieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
-                                                                                <input
-                                                                                    type="file"
-                                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                                                                                    onChange={(e) => handleFileUpload(e, subFieldId)}
-                                                                                />
-                                                                                {subFieldValue ? (
-                                                                                    <div className="absolute inset-0 w-full h-full">
-                                                                                        <img src={subFieldValue} alt="Left Profile" className="w-full h-full object-cover group-hover/attachment:scale-105 transition-transform" />
-                                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
-                                                                                            <CloudUpload size={16} className="text-white mb-1" />
-                                                                                            <span className="text-white text-[8px] font-black uppercase tracking-wider text-center">পরিবর্তন</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-slate-50/50">
-                                                                                        <CloudUpload size={18} className="text-slate-400 group-hover/attachment:text-[#045c84] transition-colors" />
-                                                                                    </div>
-                                                                                )}
-                                                                                {isProcessing && (
-                                                                                    <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-1">
-                                                                                        <div className="w-5 h-5 rounded-full border border-[#045c84] border-t-transparent animate-spin" />
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })()}
-
-                                                                {/* Middle Face Photo Box (Required) */}
-                                                                {(() => {
-                                                                    const subFieldId = 'studentPhoto';
-                                                                    const subFieldValue = formData.metadata[subFieldId];
-                                                                    const isProcessing = processingFieldId === subFieldId;
-                                                                    return (
-                                                                        <div className="relative group/attachment flex flex-col items-center gap-1.5 w-full">
-                                                                            <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-0.5">
-                                                                                সামনে (Middle) <span className="text-red-500 font-bold">*</span>
-                                                                            </span>
-                                                                            <div className={`relative w-full aspect-[2/3] max-w-[120px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${subFieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
-                                                                                <input
-                                                                                    type="file"
-                                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                                                                                    onChange={(e) => handleFileUpload(e, subFieldId)}
-                                                                                    required={isRequired && !subFieldValue && !isOptionalLogin}
-                                                                                />
-                                                                                {subFieldValue ? (
-                                                                                    <div className="absolute inset-0 w-full h-full">
-                                                                                        <img src={subFieldValue} alt="Front Profile" className="w-full h-full object-cover group-hover/attachment:scale-105 transition-transform" />
-                                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
-                                                                                            <CloudUpload size={16} className="text-white mb-1" />
-                                                                                            <span className="text-white text-[8px] font-black uppercase tracking-wider text-center">পরিবর্তন</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-slate-50/50">
-                                                                                        <CloudUpload size={18} className="text-[#045c84] group-hover/attachment:scale-105 transition-all" />
-                                                                                    </div>
-                                                                                )}
-                                                                                {isProcessing && (
-                                                                                    <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-1">
-                                                                                        <div className="w-5 h-5 rounded-full border border-[#045c84] border-t-transparent animate-spin" />
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })()}
-
-                                                                {/* Right Face Photo Box */}
-                                                                {(() => {
-                                                                    const subFieldId = 'studentPhotoRight';
-                                                                    const subFieldValue = formData.metadata[subFieldId];
-                                                                    const isProcessing = processingFieldId === subFieldId;
-                                                                    return (
-                                                                        <div className="relative group/attachment flex flex-col items-center gap-1.5 w-full">
-                                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">ডান পাশ (Right)</span>
-                                                                            <div className={`relative w-full aspect-[2/3] max-w-[120px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${subFieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
-                                                                                <input
-                                                                                    type="file"
-                                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                                                                                    onChange={(e) => handleFileUpload(e, subFieldId)}
-                                                                                />
-                                                                                {subFieldValue ? (
-                                                                                    <div className="absolute inset-0 w-full h-full">
-                                                                                        <img src={subFieldValue} alt="Right Profile" className="w-full h-full object-cover group-hover/attachment:scale-105 transition-transform" />
-                                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
-                                                                                            <CloudUpload size={16} className="text-white mb-1" />
-                                                                                            <span className="text-white text-[8px] font-black uppercase tracking-wider text-center">পরিবর্তন</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-slate-50/50">
-                                                                                        <CloudUpload size={18} className="text-slate-400 group-hover/attachment:text-[#045c84] transition-colors" />
-                                                                                    </div>
-                                                                                )}
-                                                                                {isProcessing && (
-                                                                                    <div className="absolute inset-0 z-30 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center gap-1">
-                                                                                        <div className="w-5 h-5 rounded-full border border-[#045c84] border-t-transparent animate-spin" />
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })()}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
                                                         <div className="relative group/attachment">
                                                             <div className={`relative w-[120px] h-[180px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${fieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
                                                                 <input
@@ -3770,8 +3702,41 @@ export default function StudentManagementPage() {
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                            {field.id === 'studentPhoto' && (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        setIsFaceEnrollmentModalOpen(true);
+                                                                    }}
+                                                                    className={`mt-3 flex items-center justify-between p-2 border rounded-[16px] w-[120px] transition-all group ${
+                                                                        formData.metadata?.faceDescriptors 
+                                                                            ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                                                                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex flex-col items-start gap-0.5">
+                                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Face Data</span>
+                                                                        {formData.metadata?.faceDescriptors ? (
+                                                                            <span className="flex items-center gap-1 text-[10px] font-black text-green-600">
+                                                                                <CheckCircle2 size={12} />
+                                                                                Added
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="flex items-center gap-1 text-[10px] font-black text-slate-400">
+                                                                                <XCircle size={12} />
+                                                                                Pending
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                                                                        formData.metadata?.faceDescriptors ? 'bg-green-200 text-green-700' : 'bg-white shadow-sm border border-slate-200 text-[#045c84] group-hover:bg-[#045c84] group-hover:border-[#045c84] group-hover:text-white'
+                                                                    }`}>
+                                                                        <Camera size={12} />
+                                                                    </div>
+                                                                </button>
+                                                            )}
                                                         </div>
-                                                    )
                                                 ) : field.type === 'class-lookup' ? (
                                                     <div className="relative">
                                                         <select
@@ -3857,17 +3822,99 @@ export default function StudentManagementPage() {
 
                                     return (
                                         <div className="space-y-8">
-                                            {activeFormTab === 'profile' ? (
-                                                <div className="space-y-8">
-                                                    {/* Name (Fixed at top) */}
-                                                    {renderField('name')}
+                                            {/* Form Tabs */}
+                                            <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-2xl mb-8 sticky top-0 z-40 shrink-0 overflow-x-auto custom-scrollbar">
+                                                {[
+                                                    { id: 'student', label: 'শিক্ষার্থীর তথ্য', icon: User },
+                                                    { id: 'academic', label: 'একাডেমিক তথ্য', icon: BookOpen },
+                                                    { id: 'guardian', label: 'অভিভাবকের তথ্য', icon: Users },
+                                                    { id: 'documents', label: 'নথিপত্র', icon: FileUp },
+                                                    { id: 'fees', label: 'ফি ও লগইন', icon: Key },
+                                                ].map(tab => (
+                                                    <button
+                                                        key={tab.id}
+                                                        type="button"
+                                                        onClick={() => setActiveFormTab(tab.id as any)}
+                                                        className={`flex-1 min-w-[120px] py-2.5 px-4 text-xs font-bold rounded-xl transition-all flex justify-center items-center gap-2 ${activeFormTab === tab.id ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50/50'}`}
+                                                    >
+                                                        <tab.icon size={16} />
+                                                        <span className="whitespace-nowrap">{tab.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
 
-                                                    {/* Default Academic Fields */}
+                                            {activeFormTab === 'student' && (
+                                                <div className="space-y-8">
+                                                    {renderField('name')}
+                                                    {renderField('studentPhoto')}
+                                                    {effectiveFields.filter(f => f.type !== 'attachment' && f.id !== 'studentPhoto' && !['classId', 'groupId', 'studentId', 'rollNumber', 'session', 'admissionDate', 'previousSchool', 'previousResult', 'guardianName', 'guardianPhone', 'guardianRelation', 'guardianOccupation', 'yearlyIncome', 'guardianNid', 'fathersName', 'fathersPhone', 'mothersName', 'mothersPhone'].includes(f.id)).map(f => renderField(f.id))}
+                                                </div>
+                                            )}
+
+                                            {activeFormTab === 'academic' && (
+                                                <div className="space-y-8">
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         {renderField('classId', true)}
                                                         {renderField('groupId')}
+                                                        {renderField('studentId')}
+                                                        {renderField('rollNumber')}
                                                     </div>
+                                                    {effectiveFields.filter(f => ['session', 'admissionDate', 'previousSchool', 'previousResult'].includes(f.id)).map(f => renderField(f.id))}
+                                                </div>
+                                            )}
 
+                                            {activeFormTab === 'guardian' && (
+                                                <div className="space-y-8">
+                                                    <div className="grid grid-cols-1 gap-4">
+                                                        {effectiveFields.filter(f => ['guardianName', 'guardianPhone', 'guardianRelation', 'guardianOccupation', 'yearlyIncome', 'guardianNid', 'fathersName', 'fathersPhone', 'mothersName', 'mothersPhone'].includes(f.id)).map((field) => (
+                                                            <React.Fragment key={field.id}>
+                                                                {field.id === 'guardianName' && (
+                                                                    <div className="md:col-span-2 flex gap-2 mb-2">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                if (formData.metadata.fathersName || formData.metadata.fathersPhone) {
+                                                                                    setFormData({
+                                                                                        ...formData,
+                                                                                        metadata: { ...formData.metadata, guardianName: formData.metadata.fathersName || formData.metadata.guardianName, guardianPhone: formData.metadata.fathersPhone || formData.metadata.guardianPhone, guardianRelation: 'বাবা' }
+                                                                                    });
+                                                                                } else setToast({ message: 'পিতার তথ্য আগে পূরণ করুন।', type: 'error' });
+                                                                            }}
+                                                                            className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                                                                        >
+                                                                            অভিভাবক হিসেবে পিতা
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                if (formData.metadata.mothersName || formData.metadata.mothersPhone) {
+                                                                                    setFormData({
+                                                                                        ...formData,
+                                                                                        metadata: { ...formData.metadata, guardianName: formData.metadata.mothersName || formData.metadata.guardianName, guardianPhone: formData.metadata.mothersPhone || formData.metadata.guardianPhone, guardianRelation: 'মা' }
+                                                                                    });
+                                                                                } else setToast({ message: 'মাতার তথ্য আগে পূরণ করুন।', type: 'error' });
+                                                                            }}
+                                                                            className="px-3 py-1 bg-pink-50 text-pink-600 rounded-lg text-xs font-bold hover:bg-pink-100 transition-colors"
+                                                                        >
+                                                                            অভিভাবক হিসেবে মাতা
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {renderField(field.id)}
+                                                            </React.Fragment>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {activeFormTab === 'documents' && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    {effectiveFields.filter(f => f.type === 'attachment' && f.id !== 'studentPhoto').map(f => renderField(f.id))}
+                                                </div>
+                                            )}
+
+                                            {activeFormTab === 'fees' && (
+                                                <div className="space-y-8">
                                                     {/* Fee Tier Selector */}
                                                     <div className="space-y-3">
                                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
@@ -3896,74 +3943,6 @@ export default function StudentManagementPage() {
                                                             })}
                                                         </div>
                                                     </div>
-
-                                                    {/* Dynamic Profile Fields Section */}
-                                                    {effectiveFields.length > 0 && (
-                                                        <div className="space-y-6">
-                                                            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                                                                <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                                                                    <User size={18} />
-                                                                </div>
-                                                                <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest">প্রোফাইল তথ্য (Profile Data)</h4>
-                                                            </div>
-                                                            <div className="grid grid-cols-1 gap-4">
-                                                                {effectiveFields.map((field) => (
-                                                                    <React.Fragment key={field.id}>
-                                                                        {field.id === 'guardianName' && (
-                                                                            <div className="md:col-span-2 flex gap-2 mb-2">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        if (formData.metadata.fathersName || formData.metadata.fathersPhone) {
-                                                                                            setFormData({
-                                                                                                ...formData,
-                                                                                                metadata: {
-                                                                                                    ...formData.metadata,
-                                                                                                    guardianName: formData.metadata.fathersName || formData.metadata.guardianName,
-                                                                                                    guardianPhone: formData.metadata.fathersPhone || formData.metadata.guardianPhone,
-                                                                                                    guardianRelation: 'বাবা'
-                                                                                                }
-                                                                                            });
-                                                                                        } else {
-                                                                                            setToast({ message: 'পিতার তথ্য আগে পূরণ করুন।', type: 'error' });
-                                                                                        }
-                                                                                    }}
-                                                                                    className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
-                                                                                >
-                                                                                    অভিভাবক হিসেবে পিতা
-                                                                                </button>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => {
-                                                                                        if (formData.metadata.mothersName || formData.metadata.mothersPhone) {
-                                                                                            setFormData({
-                                                                                                ...formData,
-                                                                                                metadata: {
-                                                                                                    ...formData.metadata,
-                                                                                                    guardianName: formData.metadata.mothersName || formData.metadata.guardianName,
-                                                                                                    guardianPhone: formData.metadata.mothersPhone || formData.metadata.guardianPhone,
-                                                                                                    guardianRelation: 'মা'
-                                                                                                }
-                                                                                            });
-                                                                                        } else {
-                                                                                            setToast({ message: 'মাতার তথ্য আগে পূরণ করুন।', type: 'error' });
-                                                                                        }
-                                                                                    }}
-                                                                                    className="px-3 py-1 bg-pink-50 text-pink-600 rounded-lg text-xs font-bold hover:bg-pink-100 transition-colors"
-                                                                                >
-                                                                                    অভিভাবক হিসেবে মাতা
-                                                                                </button>
-                                                                            </div>
-                                                                        )}
-                                                                        {renderField(field.id)}
-                                                                    </React.Fragment>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-8">
                                                     {/* Login Credentials Section */}
                                                     <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-6">
                                                         <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
@@ -4041,25 +4020,36 @@ export default function StudentManagementPage() {
                             </div>
 
                             <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
-                                {activeFormTab === 'profile' ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveFormTab('account')}
-                                        className="px-8 py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-2"
-                                    >
-                                        <span>পরবর্তী (Next)</span>
-                                        <ChevronRight size={20} />
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveFormTab('profile')}
-                                        className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all active:scale-95 flex items-center gap-2"
-                                    >
-                                        <ChevronLeft size={20} />
-                                        <span>পূর্ববর্তী (Back)</span>
-                                    </button>
-                                )}
+                                {(() => {
+                                    const tabs: ('student' | 'academic' | 'guardian' | 'documents' | 'fees')[] = ['student', 'academic', 'guardian', 'documents', 'fees'];
+                                    const currentIndex = tabs.indexOf(activeFormTab as any);
+                                    const handleNext = () => setActiveFormTab(tabs[currentIndex + 1]);
+                                    const handleBack = () => setActiveFormTab(tabs[currentIndex - 1]);
+                                    return (
+                                        <>
+                                            {currentIndex > 0 ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleBack}
+                                                    className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all active:scale-95 flex items-center gap-2"
+                                                >
+                                                    <ChevronLeft size={20} />
+                                                    <span>পূর্ববর্তী (Back)</span>
+                                                </button>
+                                            ) : <div />}
+                                            {currentIndex < tabs.length - 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleNext}
+                                                    className="px-8 py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-2 ml-auto mr-4"
+                                                >
+                                                    <span>পরবর্তী (Next)</span>
+                                                    <ChevronRight size={20} />
+                                                </button>
+                                            )}
+                                        </>
+                                    );
+                                })()}
 
                                 <button
                                     type="submit"
@@ -5161,6 +5151,14 @@ export default function StudentManagementPage() {
                         </div>
                     </div>
                 </div>
+            )}
+            {/* Face Enrollment Modal in Add Student Form */}
+            {isFaceEnrollmentModalOpen && (
+                <FaceEnrollment
+                    studentName={formData.name || 'New Student'}
+                    onClose={() => setIsFaceEnrollmentModalOpen(false)}
+                    onCaptureOffline={handleOfflineFaceCapture}
+                />
             )}
         </div>
     );
