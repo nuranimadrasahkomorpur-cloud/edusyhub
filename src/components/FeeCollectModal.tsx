@@ -206,21 +206,26 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
         let remaining = numeric + (useAdv ? advanceBalance : 0);
         
         const newSelected = new Set<string>();
-        // First try to satisfy pending fees
-        for (const fee of pendingFees) {
-            const amt = getFeeAmount(fee);
-            if (remaining >= amt) {
-                newSelected.add(fee.id);
-                remaining -= amt;
-            }
-        }
-        // Then apply to upcoming fees if enabled and not returning change
-        if (autoAllocate && keepAsAdvance) {
-            for (const fee of upcomingFees) {
+        // Allow paying partial amounts - if amount > 0, select at least the first pending fee
+        if (numeric > 0 || (useAdv && advanceBalance > 0)) {
+            // First try to satisfy pending fees
+            for (const fee of pendingFees) {
                 const amt = getFeeAmount(fee);
-                if (remaining >= amt) {
+                if (remaining > 0) {
                     newSelected.add(fee.id);
                     remaining -= amt;
+                    if (remaining <= 0) break; // Stop when we've allocated all amount
+                }
+            }
+            // Then apply to upcoming fees if enabled and not returning change
+            if (autoAllocate && keepAsAdvance && remaining > 0) {
+                for (const fee of upcomingFees) {
+                    const amt = getFeeAmount(fee);
+                    if (remaining > 0) {
+                        newSelected.add(fee.id);
+                        remaining -= amt;
+                        if (remaining <= 0) break; // Stop when we've allocated all amount
+                    }
                 }
             }
         }
@@ -728,29 +733,35 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
                                     </button>
                                 )}
                             </div>
+                            {advanceBalance > 0 && (
+                                <div className="flex justify-between items-center text-emerald-600 text-[10px] font-bold bg-emerald-50/50 px-3 py-2 rounded-xl border border-emerald-100">
+                                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={useAdvanceBalance} 
+                                            onChange={(e) => setUseAdvanceBalance(e.target.checked)} 
+                                            className="w-3.5 h-3.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-600 bg-white" 
+                                        />
+                                        <span>অগ্রিম ব্যবহার করুন</span>
+                                    </label>
+                                    <span className="font-black">৳ {advanceBalance.toLocaleString()}</span>
+                                </div>
+                            )}
                             {selectedFees.length > 0 && (
-                                <div className="space-y-1 text-xs font-bold">
-                                    <div className="flex justify-between text-slate-500">
-                                        <span>নির্বাচিত ({selectedFees.length} টি)</span>
-                                        <span>৳ {selectedTotal.toLocaleString()}</span>
-                                    </div>
-                                    {advanceBalance > 0 && (
-                                        <div className="flex justify-between items-center text-emerald-600">
-                                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={useAdvanceBalance} 
-                                                    onChange={(e) => setUseAdvanceBalance(e.target.checked)} 
-                                                    className="w-3.5 h-3.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-600 bg-white" 
-                                                />
-                                                <span>পূর্বের অগ্রিম ব্যবহার করুন</span>
-                                            </label>
-                                            <span>+ ৳ {advanceBalance.toLocaleString()}</span>
-                                        </div>
-                                    )}
-                                    <div className="border-t border-slate-200 pt-2 mt-2">
-                                        {shortfall > 0 && numericPaid > 0 && <div className="flex justify-between text-amber-600 font-black mb-1"><span className="flex items-center gap-1"><AlertTriangle size={12} /> বাকি থাকবে</span><span>৳ {shortfall.toLocaleString()}</span></div>}
-                                        {isExactOrUnder && !isOverpaying && numericPaid > 0 && <div className="flex justify-between text-[#045c84] font-black"><span className="flex items-center gap-1"><CheckCircle2 size={12} /> মোট পরিশোধ</span><span>৳ {totalAvailable.toLocaleString()}</span></div>}
+                                <div className="space-y-2 text-[10px] font-bold">
+                                    <div className="border-t border-slate-200 pt-2 space-y-1">
+                                        {numericPaid > 0 && numericPaid < selectedTotal && (
+                                            <div className="flex justify-between text-blue-600">
+                                                <span>আরও প্রয়োজন</span>
+                                                <span>৳ {(selectedTotal - numericPaid).toLocaleString()}</span>
+                                            </div>
+                                        )}
+                                        {numericPaid > 0 && (
+                                            <div className="flex justify-between text-purple-600">
+                                                <span>পরবর্তী বাকি</span>
+                                                <span>৳ {Math.max(0, pendingTotal - totalAvailable).toLocaleString()}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
