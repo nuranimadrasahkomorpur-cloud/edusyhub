@@ -387,7 +387,29 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
                         console.error('❌ Error with start button:', err);
                     }
                 } else {
-                    console.error('❌ Start button not found in scanner UI');
+                    console.warn('⚠️ Start button not found in scanner UI - using fallback to ensure video plays');
+                    try {
+                        const video = container.querySelector('video') as HTMLVideoElement | null;
+                        if (video) {
+                            if (video.paused) {
+                                video.play().then(() => {
+                                    console.log('✅ Video play invoked via fallback');
+                                    setIsScanning(true);
+                                }).catch((err: any) => {
+                                    console.debug('⏳ Video play fallback failed:', err);
+                                    setIsScanning(true);
+                                });
+                            } else {
+                                setIsScanning(true);
+                            }
+                        } else {
+                            console.warn('⚠️ Video element not found in fallback; showing scanner UI anyway');
+                            setIsScanning(true);
+                        }
+                    } catch (err) {
+                        console.error('❌ Error in fallback start logic:', err);
+                        setIsScanning(true);
+                    }
                 }
                 
                 // Hide unwanted elements (don't remove, just hide)

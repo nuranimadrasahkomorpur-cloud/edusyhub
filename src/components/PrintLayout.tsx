@@ -14,8 +14,10 @@ interface PrintLayoutProps {
 
 export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false }: PrintLayoutProps) {
     const isA5 = pageSize === 'A5';
+    const baseClass = `${previewOnly ? '' : 'print-area'} bg-white p-4 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 flex flex-col`;
+    const sizeClass = previewOnly ? (isA5 ? 'min-h-[210mm] max-w-[148mm] mx-auto text-[16px]' : 'min-h-[10.5in] text-[16px]') : (isA5 ? 'max-w-[210mm] text-[16px]' : 'max-w-[210mm] text-[16px]');
     return (
-        <div className={`${previewOnly ? '' : 'print-area'} bg-white p-5 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 ${isA5 ? 'min-h-[210mm] max-w-[148mm] mx-auto text-[16px]' : 'min-h-[10.5in] text-[16px]'}`}>
+        <div className={`${baseClass} ${sizeClass}`}>
             {/* Institute Header */}
             <div className="flex justify-center mb-0 border-b-2 border-slate-800 pb-4 relative">
                 <div className="flex items-center gap-3">
@@ -38,8 +40,8 @@ export default function PrintLayout({ title, institute, children, date = new Dat
             </div>
 
             {/* Document Title overlapping the break line */}
-            <div className="flex justify-center mb-4" style={{ marginTop: '-18px' }}>
-                <div className="inline-block bg-slate-900 text-white px-6 py-1 rounded-full font-black text-[18px] uppercase tracking-widest relative z-10 border-[6px] border-white">
+            <div className="flex justify-center mb-3" style={{ marginTop: '-12px' }}>
+                <div className="inline-block bg-slate-900 text-white px-4 py-1 rounded-full font-black text-[16px] uppercase tracking-widest relative z-10 border-[6px] border-white">
                     {title}
                 </div>
             </div>
@@ -48,7 +50,7 @@ export default function PrintLayout({ title, institute, children, date = new Dat
             {date && (
                 <div className="flex justify-end mb-4">
                     <div className="text-right">
-                        <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">তারিখ (Date)</p>
+                        <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">তারিখ</p>
                         <p className="text-[16px] font-black text-slate-800">{date}</p>
                     </div>
                 </div>
@@ -60,7 +62,7 @@ export default function PrintLayout({ title, institute, children, date = new Dat
             </div>
 
             {/* Signature Area */}
-            <div className="mt-10 pt-6 grid grid-cols-3 gap-6 text-center items-end">
+            <div className={`${previewOnly ? 'mt-auto pt-6' : 'pt-6'} grid grid-cols-3 gap-6 text-center items-end signature-area`}>
                 <div className="space-y-1 border-t border-slate-300 pt-2">
                     <p className="text-[14px] font-bold text-slate-600 uppercase tracking-widest">অভিভাবকের স্বাক্ষর</p>
                     <p className="text-[10px] text-slate-400">(Guardian's Signature)</p>
@@ -75,11 +77,7 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                 </div>
             </div>
 
-            {/* Footer Notice */}
-            <div className="mt-6 text-center text-[10px] text-slate-500 italic">
-                <p>This is an electronically generated official document from {institute?.name || 'Edusy'}.</p>
-                <p>Powered by Edusy - Software for Educational Institutions</p>
-            </div>
+            {/* Footer Notice removed per request */}
 
             <style jsx global>{`
                 @media print {
@@ -90,19 +88,30 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                     body * {
                         visibility: hidden;
                     }
+                    html, body { height: auto !important; }
                     .print-area, .print-area * {
                         visibility: visible;
+                        box-sizing: border-box;
                     }
                     .print-area {
                         position: absolute;
                         left: 0;
                         top: 0;
-                        width: 100%;
-                        height: 100%;
+                        width: 100% !important;
+                        max-width: none !important;
+                        height: auto;
                         margin: 0;
                         padding: 10mm;
                         border: none;
+                        display: flex;
+                        flex-direction: column;
+                        box-sizing: border-box;
+                        transform: none;
                     }
+                    .print-area table { width: 100% !important; border-collapse: collapse; }
+                    .print-area img { max-width: 100% !important; height: auto !important; }
+                    /* avoid forcing signature to bottom when printing to prevent extra blank space */
+                    .signature-area { page-break-inside: avoid; }
                     .no-print {
                         display: none !important;
                     }

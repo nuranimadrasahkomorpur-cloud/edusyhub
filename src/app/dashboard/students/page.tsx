@@ -52,8 +52,10 @@ import {
     History,
     Wallet,
     FileUp,
-    Camera
+    Camera,
+    Scan
 } from 'lucide-react';
+import QRBarcodeScanner from '@/components/QRBarcodeScanner';
 import { ScrollableTabs } from '@/components/ui/ScrollableTabs';
 import Toast from '@/components/Toast';
 import Modal from '@/components/Modal';
@@ -527,6 +529,8 @@ export default function StudentManagementPage() {
     const [visibleCount, setVisibleCount] = useState(50);
     const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
     const [selectedStudentForFee, setSelectedStudentForFee] = useState<any>(null);
+    const [showScanner, setShowScanner] = useState(false);
+    const [isSearchingStudent, setIsSearchingStudent] = useState(false);
     const [selectedTransactionForPrint, setSelectedTransactionForPrint] = useState<any>(null);
     const [feesData, setFeesData] = useState<{ [studentId: string]: { totalPaid: number, totalDue: number, advance: number } } | null>(null);
     const [loadingFees, setLoadingFees] = useState(false);
@@ -691,6 +695,86 @@ export default function StudentManagementPage() {
             }
         }
     }, [viewMode, activeInstitute?.id]);
+
+    // Handle scanner results and external scan events (from StudentProfileModal)
+    const handleScanResult = async (scannedValue: string) => {
+        const cleanedValue = scannedValue.trim();
+        setIsSearchingStudent(true);
+        try {
+            // Try local list first
+            const local = students.find(s => String(s.metadata?.studentId || s.id) === cleanedValue);
+            if (local) {
+                setSelectedStudentForFee({
+                    studentId: local.id,
+                    studentName: local.name,
+                    studentUniqueId: local.metadata?.studentId || local.id,
+                    studentPhoto: local.metadata?.studentPhoto || local.metadata?.photo || null,
+                    items: [],
+                    totalAmount: 0
+                });
+                setIsFeeModalOpen(true);
+                setShowScanner(false);
+                return;
+            }
+
+            if (!activeInstitute?.id) {
+                await alert('প্রতিষ্ঠান সিলেক্ট করা নেই।');
+                return;
+            }
+
+            const res = await fetch(`/api/admin/users?instituteId=${activeInstitute.id}&search=${encodeURIComponent(cleanedValue)}`);
+            if (res.ok) {
+                const data = await res.json();
+                const s = Array.isArray(data) ? data[0] : data;
+                if (s) {
+                    setSelectedStudentForFee({
+                        studentId: s.id,
+                        studentName: s.name,
+                        studentUniqueId: s.metadata?.studentId || s.id,
+                        studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
+                        items: [],
+                        totalAmount: 0
+                    });
+                    setIsFeeModalOpen(true);
+                    setShowScanner(false);
+                    return;
+                }
+            }
+
+            await alert(`শিক্ষার্থী নম্বর: ${cleanedValue} পাওয়া যায়নি`);
+        } catch (error) {
+            console.error('Error searching student:', error);
+            await alert('ছাত্র খুঁজতে একটি ত্রুটি হয়েছে।');
+        } finally {
+            setIsSearchingStudent(false);
+            setShowScanner(false);
+        }
+    };
+
+    useEffect(() => {
+        const handler = (evt: any) => {
+            const detail = evt?.detail || {};
+            if (detail.student) {
+                const s = detail.student;
+                setSelectedStudentForFee({
+                    studentId: s.id,
+                    studentName: s.name,
+                    studentUniqueId: s.metadata?.studentId || s.id,
+                    studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
+                    items: [],
+                    totalAmount: 0
+                });
+                setIsFeeModalOpen(true);
+                return;
+            }
+            if (detail.studentId) {
+                // Delegate to scanner handler
+                handleScanResult(String(detail.studentId));
+            }
+        };
+        window.addEventListener('openFeeCollection', handler as EventListener);
+        return () => window.removeEventListener('openFeeCollection', handler as EventListener);
+    }, [students, activeInstitute?.id]);
 
     useEffect(() => {
         loadFaceModels();
@@ -4987,7 +5071,7 @@ export default function StudentManagementPage() {
 
             {/* Dynamic FAB System */}
             {
-                mounted && pathname?.includes('/dashboard/students') && (
+                mounted && pathname?.includes('/dashboard/students') && viewMode !== 'FEES_COLLECT' && (
                     (activeTab === 'students' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (selectedClassId !== 'all' ? canManageClass(selectedClassId) : classes.some(c => canManageClass(c.id))))) ||
                     (activeTab === 'books' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN')) ||
                     (activeTab === 'applications' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (selectedClassId !== 'all' ? canManageClass(selectedClassId) : classes.some(c => canManageClass(c.id)))))
@@ -5155,6 +5239,26 @@ export default function StudentManagementPage() {
                     </div>
                 )}
             </Modal>
+            {/* Floating Scanner Button (visible in fee-collect mode) */}
+            {viewMode === 'FEES_COLLECT' && (
+                <>
+                    <div className="fixed bottom-20 right-6 z-[9998]">
+                        <button
+                            onClick={() => setShowScanner(true)}
+                            title="স্ক্যান"
+                            className="w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
+                        >
+                            <Scan size={24} />
+                        </button>
+                    </div>
+                    <QRBarcodeScanner
+                        isOpen={showScanner}
+                        onClose={() => setShowScanner(false)}
+                        onScan={handleScanResult}
+                    />
+                </>
+            )}
+
             {/* Fee Collect Modal */}
             {isFeeModalOpen && selectedStudentForFee && (
                 <FeeCollectModal

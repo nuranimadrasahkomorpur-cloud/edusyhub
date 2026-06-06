@@ -25,7 +25,7 @@ interface FeeCollectModalProps {
     onPrintReceipt?: (txn: any) => void;
 }
 
-export default function FeeCollectModal({ student, onClose, onSuccess, onPrintReceipt }: FeeCollectModalProps) {
+const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onSuccess, onPrintReceipt }) => {
     const { activeInstitute } = useSession();
 
     const [mounted, setMounted] = useState(false);
@@ -67,6 +67,7 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
     const [localWaivers, setLocalWaivers] = useState<Record<string, { amount: number, applyToFuture: boolean }>>({});
     const [activeWaiverId, setActiveWaiverId] = useState<string | null>(null);
+    const [activeCategory, setActiveCategory] = useState<string | null>(null);
     
     // Helper to get effective fee amount
     const getFeeAmount = (fee: any) => Math.max(0, (fee.amount || 0) - (localWaivers[fee.id]?.amount || 0));
@@ -77,8 +78,9 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
         setLoadingData(true);
         fetch(`/api/admin/accounts/collect-fee?studentId=${student.studentId}&instituteId=${activeInstitute.id}`)
             .then(r => r.json())
-            .then(data => {
+                .then(data => {
                 const fees = data?.pendingFees || data?.items || [];
+                console.debug('collect-fee.pendingFees', fees);
                 setPendingFees(fees);
                 setUpcomingFees(data?.upcomingFees || []);
                 setAdvanceBalance(data?.advanceBalance || 0);
@@ -136,6 +138,7 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
                     } else {
                         groupedTxns.push({ ...t, subTransactions: [t] });
                     }
+
                 }
 
                 // Sort newest first
@@ -144,197 +147,193 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
             })
             .catch(() => setHistoryTxns([]))
             .finally(() => setLoadingHistory(false));
-    }, [activeTab, student?.studentId, activeInstitute?.id]);
+        }, [activeTab, student, activeInstitute?.id]);
 
-    // Totals
-    const allFees = useMemo(() => [...pendingFees, ...upcomingFees], [pendingFees, upcomingFees]);
-    const selectedFees = useMemo(() => allFees.filter(f => selectedFeeIds.has(f.id)), [allFees, selectedFeeIds]);
-    const selectedTotal = useMemo(() => selectedFees.reduce((sum, f) => sum + getFeeAmount(f), 0), [selectedFees, localWaivers]);
-    const pendingTotal = useMemo(() => pendingFees.reduce((sum, f) => sum + getFeeAmount(f), 0), [pendingFees, localWaivers]);
-    const numericPaid = parseFloat(paidAmount) || 0;
-    const totalAvailable = numericPaid + (useAdvanceBalance ? advanceBalance : 0);
+        // Totals and derived state
+        const allFees = useMemo(() => [...pendingFees, ...upcomingFees], [pendingFees, upcomingFees]);
+        const selectedFees = useMemo(() => allFees.filter((f: any) => selectedFeeIds.has(f.id)), [allFees, selectedFeeIds]);
+        const selectedTotal = useMemo(() => selectedFees.reduce((sum: number, f: any) => sum + getFeeAmount(f), 0), [selectedFees, localWaivers]);
+        const pendingTotal = useMemo(() => pendingFees.reduce((sum: number, f: any) => sum + getFeeAmount(f), 0), [pendingFees, localWaivers]);
+        const numericPaid = parseFloat(paidAmount) || 0;
+        const totalAvailable = numericPaid + (useAdvanceBalance ? advanceBalance : 0);
 
-    const visibleUpcomingFees = useMemo(() => {
-        let remaining = Math.max(0, totalAvailable - pendingTotal);
-        const visible = [];
-        for (const fee of upcomingFees) {
-            if (remaining > 0) {
-                visible.push(fee);
-                remaining -= fee.amount;
-            } else {
-                break;
+        const visibleUpcomingFees = useMemo(() => {
+            let remaining = Math.max(0, totalAvailable - pendingTotal);
+            const visible: any[] = [];
+            for (const fee of upcomingFees) {
+                if (remaining > 0) {
+                    visible.push(fee);
+                    remaining -= fee.amount || 0;
+                } else {
+                    break;
+                }
             }
-        }
-        return visible;
-    }, [totalAvailable, pendingTotal, upcomingFees]);
+            return visible;
+        }, [totalAvailable, pendingTotal, upcomingFees]);
 
-    const advanceToStore = Math.max(0, totalAvailable - selectedTotal);
-    const shortfall = Math.max(0, selectedTotal - totalAvailable);
-    const isOverpaying = totalAvailable > selectedTotal;
-    const isExactOrUnder = totalAvailable <= selectedTotal && totalAvailable > 0;
+        const advanceToStore = Math.max(0, totalAvailable - selectedTotal);
+        const shortfall = Math.max(0, selectedTotal - totalAvailable);
+        const isOverpaying = totalAvailable > selectedTotal;
+        const isExactOrUnder = totalAvailable <= selectedTotal && totalAvailable > 0;
+        const totalPaid = useMemo(() => historyTxns.reduce((sum: number, t: any) => sum + (t.amount || 0), 0), [historyTxns]);
 
-    const totalPaid = useMemo(() => historyTxns.reduce((sum, t) => sum + t.amount, 0), [historyTxns]);
+        const toggleFee = (id: string) => {
+            setSelectedFeeIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                // Auto-update paid amount to match new selected total
+                const newTotal = allFees.filter((f: any) => next.has(f.id)).reduce((sum: number, f: any) => sum + getFeeAmount(f), 0);
+                const netAmount = Math.max(0, newTotal - (useAdvanceBalance ? advanceBalance : 0));
+                setPaidAmount(netAmount > 0 ? String(netAmount) : '0');
+                return next;
+            });
+        };
 
-    const toggleFee = (id: string) => {
-        setSelectedFeeIds(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id); else next.add(id);
-            // Auto-update paid amount to match new selected total
-            const newTotal = allFees.filter(f => next.has(f.id)).reduce((sum, f) => sum + getFeeAmount(f), 0);
-            const netAmount = Math.max(0, newTotal - (useAdvanceBalance ? advanceBalance : 0));
-            setPaidAmount(netAmount > 0 ? String(netAmount) : '0');
-            return next;
-        });
-    };
+        const handleSelectAll = () => {
+            if (selectedFeeIds.size === pendingFees.length) {
+                setSelectedFeeIds(new Set());
+                setPaidAmount('0');
+            } else {
+                const allPendingIds = new Set(pendingFees.map((f: any) => f.id));
+                setSelectedFeeIds(allPendingIds);
+                const total = pendingFees.reduce((sum: number, f: any) => sum + getFeeAmount(f), 0);
+                const netAmount = Math.max(0, total - (useAdvanceBalance ? advanceBalance : 0));
+                setPaidAmount(netAmount > 0 ? String(netAmount) : '0');
+            }
+        };
 
-    const handleSelectAll = () => {
-        if (selectedFeeIds.size === pendingFees.length) {
-            setSelectedFeeIds(new Set());
-            setPaidAmount('0');
-        } else {
-            const allPendingIds = new Set(pendingFees.map(f => f.id));
-            setSelectedFeeIds(allPendingIds);
-            const total = pendingFees.reduce((sum, f) => sum + getFeeAmount(f), 0);
-            const netAmount = Math.max(0, total - (useAdvanceBalance ? advanceBalance : 0));
-            setPaidAmount(netAmount > 0 ? String(netAmount) : '0');
-        }
-    };
-
-    const handleAmountChange = (val: string, autoAllocate = autoAllocateUpcoming, useAdv = useAdvanceBalance) => {
-        setPaidAmount(val);
-        const numeric = parseFloat(val) || 0;
-        let remaining = numeric + (useAdv ? advanceBalance : 0);
-        
-        const newSelected = new Set<string>();
-        // Allow paying partial amounts - if amount > 0, select at least the first pending fee
-        if (numeric > 0 || (useAdv && advanceBalance > 0)) {
+        const handleAmountChange = (val: string, autoAllocate = autoAllocateUpcoming, useAdv = useAdvanceBalance) => {
+            setPaidAmount(val);
+            const numeric = parseFloat(val) || 0;
+            let remaining = numeric + (useAdv ? advanceBalance : 0);
+            const newSelected = new Set<string>();
             // First try to satisfy pending fees
             for (const fee of pendingFees) {
                 const amt = getFeeAmount(fee);
-                if (remaining > 0) {
+                if (remaining >= amt) {
                     newSelected.add(fee.id);
                     remaining -= amt;
-                    if (remaining <= 0) break; // Stop when we've allocated all amount
                 }
             }
-            // Then apply to upcoming fees if enabled and not returning change
-            if (autoAllocate && keepAsAdvance && remaining > 0) {
+            // Then apply to upcoming fees if enabled and keepAsAdvance is true
+            if (autoAllocate && keepAsAdvance) {
                 for (const fee of upcomingFees) {
                     const amt = getFeeAmount(fee);
-                    if (remaining > 0) {
+                    if (remaining >= amt) {
                         newSelected.add(fee.id);
                         remaining -= amt;
-                        if (remaining <= 0) break; // Stop when we've allocated all amount
                     }
                 }
             }
-        }
-        setSelectedFeeIds(newSelected);
-    };
+            setSelectedFeeIds(newSelected);
+        };
 
-    // Recalculate auto-allocation when toggles change
-    useEffect(() => {
-        if (paidAmount) handleAmountChange(paidAmount, autoAllocateUpcoming, useAdvanceBalance);
-    }, [autoAllocateUpcoming, useAdvanceBalance, keepAsAdvance]);
+        // Recalculate auto-allocation when toggles change
+        useEffect(() => {
+            if (paidAmount) handleAmountChange(paidAmount, autoAllocateUpcoming, useAdvanceBalance);
+        }, [autoAllocateUpcoming, useAdvanceBalance, keepAsAdvance]);
 
-    const handleSetFullAmount = () => {
-        setPaidAmount(Math.max(0, selectedTotal - (useAdvanceBalance ? advanceBalance : 0)).toString());
-    };
+        const handleSetFullAmount = () => {
+            setPaidAmount(Math.max(0, selectedTotal - (useAdvanceBalance ? advanceBalance : 0)).toString());
+        };
 
-    const handleSubmit = async () => {
-        if (!student || !activeInstitute?.id) return;
-        if (selectedFeeIds.size === 0 || (numericPaid <= 0 && advanceBalance <= 0)) return;
-        setIsSubmitting(true);
-        
-        const actualPaidAmount = keepAsAdvance ? numericPaid : Math.max(0, numericPaid - advanceToStore);
-        
-        try {
-            const res = await fetch('/api/admin/accounts/collect-fee', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    instituteId: activeInstitute.id,
-                    studentId: student.studentId,
-                    studentName: student.studentName,
-                    paidAmount: actualPaidAmount,
-                    selectedFeeIds: Array.from(selectedFeeIds).filter(id => !id.startsWith('future_')),
-                    futureFeesToCreate: selectedFees.filter(f => f.status === 'PREDICTED'),
-                    paymentNote,
-                    applyAdvanceTo: applyAdvanceTo || undefined,
-                    useAdvance: useAdvanceBalance,
-                    appliedWaivers: Object.entries(localWaivers).map(([feeId, data]) => ({
-                        feeId,
-                        amount: data.amount,
-                        applyToFuture: data.applyToFuture,
-                        categoryId: pendingFees.find(f => f.id === feeId)?.categoryId || ''
-                    }))
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setResult(data);
-                if (data.advanceAmount > 0 && !applyAdvanceTo) {
-                    const newPending = pendingFees.filter(f => !selectedFeeIds.has(f.id));
-                    if (newPending.length > 0) {
-                        setStep('advance');
-                        setPendingFees(newPending);
+        const handleSubmit = async () => {
+            if (!student || !activeInstitute?.id) return;
+            if (selectedFeeIds.size === 0 || (numericPaid <= 0 && advanceBalance <= 0)) return;
+            setIsSubmitting(true);
+            const actualPaidAmount = keepAsAdvance ? numericPaid : Math.max(0, numericPaid - advanceToStore);
+            try {
+                const res = await fetch('/api/admin/accounts/collect-fee', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instituteId: activeInstitute.id,
+                        studentId: student.studentId,
+                        studentName: student.studentName,
+                        paidAmount: actualPaidAmount,
+                        selectedFeeIds: Array.from(selectedFeeIds).filter((id) => !id.startsWith('future_')),
+                        futureFeesToCreate: selectedFees.filter((f: any) => f.status === 'PREDICTED'),
+                        paymentNote,
+                        applyAdvanceTo: applyAdvanceTo || undefined,
+                        useAdvance: useAdvanceBalance,
+                        appliedWaivers: Object.entries(localWaivers).map(([feeId, data]) => ({
+                            feeId,
+                            amount: data.amount,
+                            applyToFuture: data.applyToFuture,
+                            categoryId: pendingFees.find((f: any) => f.id === feeId)?.categoryId || ''
+                        }))
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    setResult(data);
+                    if (data.advanceAmount > 0 && !applyAdvanceTo) {
+                        const newPending = pendingFees.filter((f: any) => !selectedFeeIds.has(f.id));
+                        if (newPending.length > 0) {
+                            setStep('advance');
+                            setPendingFees(newPending);
+                        } else {
+                            if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
+                            onSuccess(data.message);
+                            onClose();
+                        }
                     } else {
                         if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                        onSuccess(data.message); onClose();
+                        onSuccess(data.message);
+                        onClose();
                     }
                 } else {
-                    if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                    onSuccess(data.message); onClose();
+                    alert(data.message || 'ত্রুটি হয়েছে');
                 }
-            } else {
-                alert(data.message || 'ত্রুটি হয়েছে');
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsSubmitting(false);
             }
-        } catch (err) { console.error(err); }
-        finally { setIsSubmitting(false); }
-    };
+        };
 
-    const handleApplyAdvance = async () => {
-        if (!student || !activeInstitute?.id || !applyAdvanceTo) return;
-        setIsSubmitting(true);
-        try {
-            const res = await fetch('/api/admin/accounts/collect-fee', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    instituteId: activeInstitute.id,
-                    studentId: student.studentId,
-                    studentName: student.studentName,
-                    paidAmount: 0,
-                    selectedFeeIds: [],
-                    applyAdvanceTo,
-                })
-            });
-            const data = await res.json();
-            if (res.ok) { 
-                if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                onSuccess(data.message); onClose(); 
+        const handleApplyAdvance = async () => {
+            if (!student || !activeInstitute?.id || !applyAdvanceTo) return;
+            setIsSubmitting(true);
+            try {
+                const res = await fetch('/api/admin/accounts/collect-fee', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instituteId: activeInstitute.id,
+                        studentId: student.studentId,
+                        studentName: student.studentName,
+                        paidAmount: 0,
+                        selectedFeeIds: [],
+                        applyAdvanceTo
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
+                    onSuccess(data.message);
+                    onClose();
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsSubmitting(false);
             }
-        } catch (err) { console.error(err); }
-        finally { setIsSubmitting(false); }
-    };
+        };
 
-    // Ensure modal only renders after successful scan
-    if (!student || !mounted || !student.studentId || !student.studentName) return null;
-
-    return createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 font-bengali">
-            <motion.div
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-                style={{ willChange: 'opacity' }}
             />
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 transition={{ duration: 0.2, type: 'spring', bounce: 0.3 }}
-                className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col h-[85vh] max-h-[85vh]"
+                className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] min-h-0"
                 style={{ willChange: 'transform, opacity' }}
             >
                 {/* Header */}
@@ -444,7 +443,7 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
                 {/* ── DUES TAB ── */}
                 {step === 'select' && activeTab === 'dues' && (
                     <>
-                        <div className="flex-1 overflow-y-auto min-h-[340px]" data-lenis-prevent>
+                        <div className="flex-1 overflow-y-auto min-h-0" data-lenis-prevent>
                             {loadingData ? (
                                 <div className="p-10 flex items-center justify-center">
                                     <div className="w-8 h-8 border-2 border-[#045c84] border-t-transparent rounded-full animate-spin" />
@@ -467,8 +466,9 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
                                         });
 
                                         const groupEntries = Object.entries(groups);
+                                        const displayedGroupEntries = activeCategory ? groupEntries.filter(([name]) => name === activeCategory) : groupEntries;
 
-                                        return groupEntries.map(([groupName, fees]) => {
+                                        return displayedGroupEntries.map(([groupName, fees]) => {
                                             const isExpanded = expandedGroups.has(groupName);
                                             const groupTotal = fees.reduce((s, f) => s + getFeeAmount(f), 0);
                                             const selectedInGroup = fees.filter(f => selectedFeeIds.has(f.id)).length;
@@ -481,6 +481,7 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
                                                     else next.add(groupName);
                                                     return next;
                                                 });
+                                                setActiveCategory(prev => prev === groupName ? null : groupName);
                                             };
 
                                             const toggleGroupSelection = (e: React.MouseEvent) => {
@@ -828,7 +829,7 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
 
                 {/* ── HISTORY TAB ── */}
                 {step === 'select' && activeTab === 'history' && (
-                    <div className="flex-1 flex flex-col overflow-hidden min-h-[340px]">
+                    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                         {/* Summary bar */}
                         <div className="px-6 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-2">
@@ -893,3 +894,5 @@ export default function FeeCollectModal({ student, onClose, onSuccess, onPrintRe
         document.body
     );
 }
+
+export default FeeCollectModal;

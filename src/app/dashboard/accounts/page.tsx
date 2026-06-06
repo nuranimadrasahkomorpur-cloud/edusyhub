@@ -83,16 +83,84 @@ export default function AccountsPage() {
     const [selectedTypeDetails, setSelectedTypeDetails] = useState<any | null>(null);
     const [orphanedCategoryToDelete, setOrphanedCategoryToDelete] = useState<string | null>(null);
     const [deleteCountdown, setDeleteCountdown] = useState<number>(5);
+
+    const studentReceiptGroups = React.useMemo(() => {
+        if (!selectedStudentDetails?.items?.length) return [];
+
+        const normalizeTitle = (raw: string) => {
+            const title = raw.split(',')[0].trim();
+            const beforeParen = title.split('(')[0].trim();
+            const trimmed = beforeParen.length > 32 ? `${beforeParen.slice(0, 32).trim()}...` : beforeParen;
+            return trimmed || raw;
+        };
+
+        const map = new Map<string, any>();
+
+        selectedStudentDetails.items.forEach((item: any) => {
+            const receiptKey = item.receiptNo || `#${(item.id || '').slice(-6).toUpperCase()}`;
+            const existing = map.get(receiptKey);
+            const rawTitle = item.category || item.note || 'রশিদের বিস্তারিত';
+            const title = normalizeTitle(rawTitle);
+            const status = item.status?.toUpperCase();
+
+            if (existing) {
+                existing.amount += item.amount || 0;
+                existing.rawItems.push(item);
+                if (existing.status !== 'COMPLETED' && status === 'COMPLETED') {
+                    existing.status = status;
+                }
+            } else {
+                map.set(receiptKey, {
+                    receiptKey,
+                    receiptNo: item.receiptNo,
+                    title,
+                    date: item.date,
+                    amount: item.amount || 0,
+                    type: item.type,
+                    status,
+                    rawItems: [item]
+                });
+            }
+        });
+
+        return Array.from(map.values());
+    }, [selectedStudentDetails]);
     const [isDeletingProgress, setIsDeletingProgress] = useState<boolean>(false);
     const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
     const [feeCollectStudent, setFeeCollectStudent] = useState<any | null>(null);
     const [selectedTransactionForPrint, setSelectedTransactionForPrint] = useState<any | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<any | null>(null);
     const [isDeletingTxn, setIsDeletingTxn] = useState(false);
+
+    const createStudentLedgerTransaction = (student: any) => {
+        const raw = student.items || [];
+        const paidFlattened: any[] = [];
+
+        raw.forEach((it: any) => {
+            if (it.status?.toUpperCase() !== 'COMPLETED') return;
+            if (Array.isArray(it.rawItems) && it.rawItems.length) {
+                it.rawItems.forEach((ri: any) => paidFlattened.push({ ...ri, originalCategory: ri.originalCategory || ri.category }));
+            } else {
+                paidFlattened.push({ ...it, originalCategory: it.originalCategory || it.category });
+            }
+        });
+
+        const totalAmount = paidFlattened.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+
+        return {
+            ...student,
+            amount: totalAmount,
+            subTransactions: paidFlattened,
+            isLedger: true,
+            date: paidFlattened.length ? paidFlattened[0].date : new Date().toISOString(),
+        };
+    };
+    const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
     const [showScanner, setShowScanner] = useState(false);
     const [isScanningStudent, setIsScanningStudent] = useState(false);
     const [showFloatingActions, setShowFloatingActions] = useState(true);
+    const [categories, setCategories] = useState<any[]>([]);
     const scanRequestInFlightRef = React.useRef(false);
     const paginationRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -190,6 +258,24 @@ export default function AccountsPage() {
         }
     }, [activeInstitute?.id]);
 
+
+    // Fetch categories so we can detect archived categories and avoid showing dues for them
+    useEffect(() => {
+        const fetchCategories = async () => {
+            if (!activeInstitute?.id) return;
+            try {
+                const res = await fetch(`/api/admin/accounts/categories?instituteId=${activeInstitute.id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setCategories(Array.isArray(data) ? data : []);
+                }
+            } catch (err) {
+                console.error('Fetch categories error:', err);
+                setCategories([]);
+            }
+        };
+        fetchCategories();
+    }, [activeInstitute?.id]);
     // Reset modal state on component mount and when institute changes
     useEffect(() => {
         setFeeCollectStudent(null);
@@ -273,19 +359,20 @@ export default function AccountsPage() {
             const res = await fetch(`/api/admin/accounts/transactions/${transactionToDelete.id}`, {
                 method: 'DELETE'
             });
-            if (res.ok) {
-                setToast({ message: 'লেনদেন সফলভাবে মুছে ফেলা হয়েছে', type: 'success' });
-                // Re-sync dues to recreate any PENDING dues that might have been affected
-                if (activeInstitute?.id) {
-                    await fetch('/api/admin/accounts/sync-dues', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ instituteId: activeInstitute.id })
-                    });
-                }
-                fetchAccounts();
-                setTransactionToDelete(null);
-            } else {
+                if (res.ok) {
+                    setToast({ message: 'লেনদেন সফলভাবে মুছে ফেলা হয়েছে', type: 'success' });
+                    // Fire-and-forget: re-sync dues in background so UI isn't blocked by a long-running task
+                    if (activeInstitute?.id) {
+                        fetch('/api/admin/accounts/sync-dues', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ instituteId: activeInstitute.id })
+                        }).catch(err => console.error('Background sync-dues failed:', err));
+                    }
+                    // Refresh UI data (don't await sync-dues)
+                    fetchAccounts();
+                    setTransactionToDelete(null);
+                } else {
                 const data = await res.json();
                 setToast({ message: data.message || 'লেনদেন মুছতে সমস্যা হয়েছে', type: 'error' });
             }
@@ -425,6 +512,16 @@ export default function AccountsPage() {
             }
         }
 
+        // Exclude dues whose category has been archived (do not apply dues for archived categories)
+        if (activeSubTab === 'pending' && categories && categories.length > 0) {
+            txns = txns.filter(t => {
+                const raw = (t.category || '').toString();
+                const base = raw.replace(/\s*\(.*?\)\s*/g, '').trim();
+                const match = categories.find(c => c.name === base || c.name === raw || c.name === (t.originalCategory || ''));
+                return !(match && match.isArchived);
+            });
+        }
+
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
             txns = txns.filter(t => 
@@ -474,7 +571,7 @@ export default function AccountsPage() {
         if (activeSubTab !== 'pending') return [];
         const pendingTxns = filteredTransactions || [];
         
-        const groups: Record<string, { studentName: string; studentId: string; studentUniqueId: string; studentPhoto: string | null; items: any[]; totalAmount: number }> = {};
+        const groups: Record<string, { studentName: string; studentId: string; studentUniqueId: string; studentPhoto: string | null; items: any[]; totalAmount: number; summaryLabel: string }> = {};
         
         pendingTxns.forEach(t => {
             const key = t.studentId || t.studentName || 'unknown';
@@ -485,7 +582,8 @@ export default function AccountsPage() {
                     studentUniqueId: t.studentUniqueId || t.studentId || 'N/A',
                     studentPhoto: t.studentPhoto || null,
                     items: [],
-                    totalAmount: 0
+                    totalAmount: 0,
+                    summaryLabel: 'মোট বকেয়া ফি'
                 };
             }
             groups[key].items.push(t);
@@ -578,7 +676,43 @@ export default function AccountsPage() {
         }
     };
 
-    const cardGridClass = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 mx-auto max-w-[1280px]';
+    const renderCardMenu = (id: string, actions: { label: string; onClick: () => void; icon?: React.ReactNode }[]) => (
+        <div className="relative ml-auto">
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveCardMenuId(prev => (prev === id ? null : id));
+                }}
+                className="w-9 h-9 bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors flex items-center justify-center"
+                aria-label="More options"
+            >
+                <MoreVertical size={16} />
+            </button>
+            {activeCardMenuId === id && (
+                <div className="absolute right-0 top-full mt-2 min-w-[160px] rounded-2xl border border-slate-200 bg-white shadow-lg z-20 overflow-hidden">
+                    {actions.map((action) => (
+                        <button
+                            key={action.label}
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveCardMenuId(null);
+                                action.onClick();
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                        >
+                            {action.icon}
+                            {action.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const cardGridClass = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4 p-4 w-full';
+    const cardBaseClass = 'bg-white p-4 rounded-[28px] border border-slate-200 shadow-sm transition-all flex flex-col justify-between gap-4 min-h-[120px] max-h-[120px] overflow-hidden';
 
     const renderTableContent = () => {
         if (loading) {
@@ -639,7 +773,7 @@ export default function AccountsPage() {
                                 <div 
                                     key={student.studentId}
                                     onClick={() => setSelectedStudentDetails(student)}
-                                    className="group cursor-pointer bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2"
+                                    className={`${cardBaseClass} cursor-pointer`}
                                 >
                                     <div className="flex items-center gap-2">
                                         {student.studentPhoto ? (
@@ -743,7 +877,7 @@ export default function AccountsPage() {
                                 <div 
                                     key={group.category}
                                     onClick={() => setSelectedTypeDetails(group)}
-                                    className="group cursor-pointer bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2"
+                                    className={`${cardBaseClass} cursor-pointer`}
                                 >
                                     <div className="flex items-center gap-2">
                                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
@@ -884,7 +1018,7 @@ export default function AccountsPage() {
                     {classWiseDues.length > 0 && (
                         <div 
                             ref={classTabsRef}
-                            className="flex overflow-x-auto hide-scrollbar gap-2 px-6 py-4 bg-slate-50/50 border-b border-slate-100 scroll-smooth"
+                            className="sticky top-0 z-20 flex overflow-x-auto hide-scrollbar gap-2 px-6 py-4 bg-slate-50/95 border-b border-slate-100 scroll-smooth"
                         >
                             {classWiseDues.map((group) => (
                                 <button
@@ -910,23 +1044,45 @@ export default function AccountsPage() {
                         <div className={cardGridClass}>
                             {classTxns.length > 0 ? (
                                 classTxns.map((txn) => (
-                                    <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                            {txn.studentPhoto ? (
-                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
-                                                    {txn.studentName?.[0] || 'S'}
+                                    <div
+                                        key={txn.id}
+                                        className={`${cardBaseClass} cursor-pointer hover:border-slate-300 hover:shadow-md`}
+                                        onClick={() => {
+                                            if (txn.receiptNo) {
+                                                setSelectedTransactionForPrint(txn);
+                                            }
+                                        }}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                if (txn.receiptNo) {
+                                                    setSelectedTransactionForPrint(txn);
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3">
+                                                {txn.studentPhoto ? (
+                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-base shadow-sm">
+                                                        {txn.studentName?.[0] || 'S'}
+                                                    </div>
+                                                )}
+                                                <div className="flex flex-col gap-0.5">
+                                                    <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
+                                                    <p className="text-[10px] text-slate-500" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                                    <p className="text-[10px] text-slate-400">{txn.receiptNo || `#${(txn.id || '').slice(-6).toUpperCase()}`}</p>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
-                                                <p className="text-[10px] text-slate-500 mt-0.5">{txn.category}</p>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                            <p className="text-[9px] text-slate-400 uppercase tracking-wider">পরিমাণ</p>
-                                            <p className="font-black text-sm text-rose-600">৳ {txn.amount?.toLocaleString()}</p>
+                                            <div className="text-right flex flex-col items-end gap-2">
+                                                <p className={`font-black text-lg ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    ৳ {txn.amount?.toLocaleString()}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 ))
@@ -979,14 +1135,7 @@ export default function AccountsPage() {
                                             <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
                                                 {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
                                             </td>
-                                            <td className="px-8 py-4 text-right">
-                                                <button 
-                                                    onClick={() => setTransactionToDelete(txn)}
-                                                    className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </td>
+                                            <td className="px-8 py-4 text-right"></td>
                                         </tr>
                                     ))
                                 ) : (
@@ -1014,31 +1163,47 @@ export default function AccountsPage() {
                     <div className={cardGridClass}>
                         {pendingTransactions.length > 0 ? (
                             pendingTransactions.map((txn) => (
-                                <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-3">
+                                <div key={txn.id} className={cardBaseClass}>
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex items-start gap-3">
                                             {txn.studentPhoto ? (
-                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover" />
+                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
                                             ) : (
-                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
+                                                <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-base shadow-sm">
                                                     {txn.studentName?.[0] || 'S'}
                                                 </div>
                                             )}
-                                            <div>
+                                            <div className="flex flex-col gap-1">
                                                 <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
-                                                <p className="text-[10px] text-slate-500 mt-0.5">{txn.category}</p>
+                                                <p className="text-[10px] text-slate-500">{txn.category}</p>
+                                                <p className={`font-black text-lg ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    ৳ {txn.amount?.toLocaleString()}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400">{txn.receiptNo || `#${(txn.id || '').slice(-6).toUpperCase()}`}</p>
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={() => setTransactionToDelete(txn)}
-                                            className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center shrink-0"
-                                        >
-                                            <Trash2 size={15} />
-                                        </button>
+                                        <div className="flex flex-col items-end gap-3">
+                                            {txn.status?.toUpperCase() === 'COMPLETED' && txn.receiptNo && txn.type === 'INCOME' && (
+                                                <button
+                                                    onClick={() => setSelectedTransactionForPrint(txn)}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white transition-all text-xs font-black uppercase tracking-[0.12em]"
+                                                >
+                                                    <Receipt size={14} /> রশিদ প্রিন্ট
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                        <span className="text-[10px] text-slate-500">{new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}</span>
-                                        <span className="font-black text-sm text-rose-600">৳ {txn.amount?.toLocaleString()}</span>
+                                    <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-50">
+                                        <div className="space-y-1">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
+                                            <p className="font-bold text-xs text-slate-500">
+                                                {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1 text-right">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">স্ট্যাটাস</p>
+                                            <p className="font-bold text-xs text-slate-500">{txn.status || '---'}</p>
+                                        </div>
                                     </div>
                                 </div>
                             ))
@@ -1093,14 +1258,7 @@ export default function AccountsPage() {
                                     <td className="px-6 py-4 text-center text-[10px] font-black text-slate-400">
                                         {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
                                     </td>
-                                    <td className="px-8 py-4 text-right">
-                                        <button 
-                                            onClick={() => setTransactionToDelete(txn)}
-                                            className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </td>
+                                    <td className="px-8 py-4 text-right"></td>
                                 </tr>
                             ))
                         ) : (
@@ -1132,7 +1290,8 @@ export default function AccountsPage() {
                         studentUniqueId: t.studentUniqueId || t.studentId || 'N/A',
                         studentPhoto: t.studentPhoto || null,
                         items: [],
-                        totalAmount: 0
+                        totalAmount: 0,
+                        summaryLabel: 'মোট পরিমাণ'
                     };
                 }
                 personWiseTransactions[key].items.push(t);
@@ -1146,17 +1305,31 @@ export default function AccountsPage() {
                     <div className={cardGridClass}>
                         {personList.length > 0 ? (
                             personList.map((student) => (
-                                <div key={student.studentId} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
-                                    <div className="flex items-center gap-3">
-                                        {student.studentPhoto ? (
-                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover" />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
-                                                {student.studentName[0] || 'S'}
+                                <div
+                                    key={student.studentId}
+                                    className={`${cardBaseClass} cursor-pointer hover:border-slate-300 hover:shadow-md`}
+                                    onClick={() => setSelectedStudentDetails(student)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            setSelectedStudentDetails(student);
+                                        }
+                                    }}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                            {student.studentPhoto ? (
+                                                <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
+                                                    {student.studentName[0] || 'S'}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
                                             </div>
-                                        )}
-                                        <div>
-                                            <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-50 gap-4">
@@ -1257,14 +1430,19 @@ export default function AccountsPage() {
                     <div className={cardGridClass}>
                         {typeList.length > 0 ? (
                             typeList.map((group) => (
-                                <div key={group.category} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${group.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                            <Receipt size={16} />
+                                <div key={group.category} className={cardBaseClass}>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${group.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                <Receipt size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-sm text-slate-800 leading-tight" title={group.category}>{getShortCategory(group.category)}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-black text-sm text-slate-800 leading-tight" title={group.category}>{getShortCategory(group.category)}</p>
-                                        </div>
+                                        {renderCardMenu(String(group.category), [
+                                            { label: 'বিস্তারিত দেখুন', onClick: () => setSelectedTypeDetails(group), icon: <ChevronRight size={14} /> }
+                                        ])}
                                     </div>
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-50 gap-4">
                                         <span className="text-[10px] text-slate-500">{group.items.length} টি লেনদেন</span>
@@ -1382,7 +1560,7 @@ export default function AccountsPage() {
                     {classList.length > 0 && (
                         <div 
                             ref={classTabsRef}
-                            className="flex overflow-x-auto hide-scrollbar gap-2 px-6 py-4 bg-slate-50/50 border-b border-slate-100 scroll-smooth"
+                            className="sticky top-0 z-20 flex overflow-x-auto hide-scrollbar gap-2 px-6 py-4 bg-slate-50/95 border-b border-slate-100 scroll-smooth"
                         >
                             {classList.map((group) => (
                                 <button
@@ -1408,55 +1586,47 @@ export default function AccountsPage() {
                         <div className={cardGridClass}>
                             {classTxns.length > 0 ? (
                                 classTxns.map((txn) => (
-                                    <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
-                                        <div className="flex items-start justify-between">
-                                            <span className="font-mono text-[9px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg tracking-tighter border border-purple-100">
-                                                #{(txn.id || '').slice(-6).toUpperCase()}
-                                            </span>
-                                            <div className="flex items-center gap-1.5 shrink-0">
-                                                <button 
-                                                    onClick={() => setTransactionToDelete(txn)}
-                                                    className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center"
-                                                    title="মুছুন"
-                                                >
-                                                    <Trash2 size={15} />
-                                                </button>
-                                                {txn.receiptNo && txn.type === 'INCOME' && (
-                                                    <button 
-                                                        onClick={() => setSelectedTransactionForPrint(txn)}
-                                                        className="px-2 py-1.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white font-black text-[9px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
-                                                        title="রশিদ প্রিন্ট"
-                                                    >
-                                                        <Receipt size={12} />
-                                                    </button>
+                                    <div
+                                        key={txn.id}
+                                        className={`${cardBaseClass} cursor-pointer hover:border-slate-300 hover:shadow-md`}
+                                        onClick={() => {
+                                            if (txn.receiptNo) {
+                                                setSelectedTransactionForPrint(txn);
+                                            }
+                                        }}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                if (txn.receiptNo) {
+                                                    setSelectedTransactionForPrint(txn);
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3">
+                                                {txn.studentPhoto ? (
+                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-base shadow-sm">
+                                                        {txn.studentName?.[0] || 'S'}
+                                                    </div>
                                                 )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            {txn.studentPhoto ? (
-                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
-                                                    {txn.studentName?.[0] || 'S'}
+                                                <div className="flex flex-col gap-0.5">
+                                                    <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
+                                                    <p className="text-[10px] text-slate-500" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                                    <p className="text-[10px] text-slate-400">{txn.receiptNo || `#${(txn.id || '').slice(-6).toUpperCase()}`}</p>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5" title={txn.category}>{getShortCategory(txn.category)}</p>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                            <div>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
-                                                <p className="font-bold text-xs text-slate-500">
-                                                    {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
-                                                <p className={`font-black text-sm ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            <div className="text-right flex flex-col items-end gap-2">
+                                                <p className={`font-black text-lg ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                     ৳ {txn.amount?.toLocaleString()}
                                                 </p>
+                                                {renderCardMenu(String(txn.id), [
+                                                    { label: 'মুছুন', onClick: () => setTransactionToDelete(txn), icon: <Trash2 size={14} /> }
+                                                ])}
                                             </div>
                                         </div>
                                     </div>
@@ -1553,56 +1723,44 @@ export default function AccountsPage() {
                 <div className={cardGridClass}>
                     {filteredTransactions.length > 0 ? (
                         filteredTransactions.map((txn: any) => (
-                            <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
-                                <div className="flex items-start justify-between gap-2">
-                                    <span className="font-mono text-[9px] font-black text-[#045c84] bg-blue-50 px-2 py-1 rounded-lg tracking-tighter border border-blue-100">
-                                        {txn.receiptNo || `#${txn.id.slice(-6).toUpperCase()}`}
-                                    </span>
-                                    <div className="shrink-0">
-                                        {renderStatus(txn.status)}
+                            <div
+                                key={txn.id}
+                                className={`${cardBaseClass} cursor-pointer hover:border-slate-300 hover:shadow-md`}
+                                onClick={() => {
+                                    if (txn.status?.toUpperCase() === 'COMPLETED' && txn.receiptNo && txn.type === 'INCOME') {
+                                        setSelectedTransactionForPrint(txn);
+                                    }
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        if (txn.status?.toUpperCase() === 'COMPLETED' && txn.receiptNo && txn.type === 'INCOME') {
+                                            setSelectedTransactionForPrint(txn);
+                                        }
+                                    }
+                                }}
+                            >
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${txn.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                            <Receipt size={18} />
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            <p className="font-black text-sm text-slate-800 leading-tight" title={txn.studentName}>{txn.studentName || 'অজানা'}</p>
+                                            <p className="text-[10px] text-slate-500" title={txn.category}>{getShortCategory(txn.category)}</p>
+                                            <p className="text-[10px] text-slate-500">{txn.receiptNo || `#${txn.id.slice(-6).toUpperCase()}`}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${txn.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                        <Receipt size={16} />
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-sm text-slate-800 leading-tight" title={txn.category}>{getShortCategory(txn.category)}</p>
-                                        <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate max-w-[150px]">
-                                            {txn.studentName || 'অজানা'}{txn.studentUniqueId ? ` (ID: ${txn.studentUniqueId})` : ''}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                    <div>
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
-                                        <p className="font-bold text-xs text-slate-500">
-                                            {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
-                                        <p className={`font-black text-sm ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div>{renderCardMenu(String(txn.id), [
+                                            { label: 'মুছুন', onClick: () => setTransactionToDelete(txn), icon: <Trash2 size={14} /> }
+                                        ])}</div>
+                                        <p className={`font-black text-lg ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                             ৳ {txn.amount?.toLocaleString()}
                                         </p>
                                     </div>
-                                </div>
-                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-50/50">
-                                    <button 
-                                        onClick={() => setTransactionToDelete(txn)}
-                                        className="px-3 py-1.5 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
-                                        title="মুছুন"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
-                                    {txn.status?.toUpperCase() === 'COMPLETED' && txn.receiptNo && txn.type === 'INCOME' && (
-                                        <button 
-                                            onClick={() => setSelectedTransactionForPrint(txn)}
-                                            className="px-3 py-1.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
-                                        >
-                                            <Receipt size={12} /> রশিদ প্রিন্ট
-                                        </button>
-                                    )}
                                 </div>
                             </div>
                         ))
@@ -1708,54 +1866,42 @@ export default function AccountsPage() {
 
     return (
         <div className="p-4 space-y-4 animate-fade-in font-bengali min-h-screen bg-slate-50/50 pb-20">
-            {/* Main Navigation Tabs */}
-            <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50 w-full">
-                <button
-                    onClick={() => { setActiveMainTab('overview'); setActiveSubTab('transactions'); }}
-                    className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
-                        ? 'bg-[#045c84] text-white shadow-lg'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                >
-                    <Wallet size={14} /> ওভারভিউ
-                </button>
-                <button
-                    onClick={() => { setActiveMainTab('income'); setActiveSubTab('transactions'); }}
-                    className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'income'
-                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                >
-                    <TrendingUp size={14} /> আয়
-                </button>
-                <button
-                    onClick={() => { setActiveMainTab('expense'); setActiveSubTab('transactions'); }}
-                    className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'expense'
-                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                >
-                    <TrendingDown size={14} /> ব্যয়
-                </button>
-            </div>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="w-full lg:w-auto">
+                    <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50 mx-auto max-w-[760px] lg:max-w-[560px]">
+                        <button
+                            onClick={() => { setActiveMainTab('overview'); setActiveSubTab('transactions'); }}
+                            className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
+                                ? 'bg-[#045c84] text-white shadow-lg'
+                                : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                        >
+                            <Wallet size={14} /> ওভারভিউ
+                        </button>
+                        <button
+                            onClick={() => { setActiveMainTab('income'); setActiveSubTab('transactions'); }}
+                            className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'income'
+                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                                : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                        >
+                            <TrendingUp size={14} /> আয়
+                        </button>
+                        <button
+                            onClick={() => { setActiveMainTab('expense'); setActiveSubTab('transactions'); }}
+                            className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'expense'
+                                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
+                                : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                        >
+                            <TrendingDown size={14} /> ব্যয়
+                        </button>
+                    </div>
+                </div>
 
-            <AnimatePresence mode="wait">
-                <motion.div
-                    key={activeMainTab}
-                    initial={{ opacity: 0, scale: 0.98, y: 30 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.98, y: -30 }}
-                    transition={{ 
-                        type: "spring",
-                        damping: 25,
-                        stiffness: 200,
-                        mass: 0.8
-                    }}
-                    className="space-y-4"
-                >
-                    {/* Search & Actions Row */}
-                    <div className="flex items-center justify-between gap-1 w-full">
-                        <div className="relative group flex-1 max-w-xl sm:max-w-2xl">
+                <div className="flex w-full lg:w-auto justify-end">
+                    <div className="flex items-center gap-2 w-full lg:w-auto">
+                        <div className="relative group w-full lg:w-[420px]">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#045c84] transition-colors" size={20} />
                             <input
                                 type="text"
@@ -1774,7 +1920,6 @@ export default function AccountsPage() {
                             )}
                         </div>
 
-                        {/* Actions (Filter, Download, Add Category) */}
                         <div className="flex items-center gap-2 shrink-0">
                             {activeSubTab === 'categories' ? (
                                 <button 
@@ -1782,7 +1927,7 @@ export default function AccountsPage() {
                                     onClick={() => setAddTrigger(prev => prev + 1)}
                                     className={`px-3 sm:px-4 py-2 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md transition-all flex items-center gap-1.5 active:scale-95 whitespace-nowrap ${
                                         activeMainTab === 'income' ? 'bg-emerald-600 hover:shadow-emerald-100' : 
-                                        activeMainTab === 'expense' ? 'bg-rose-600 hover:shadow-rose-100' : 
+                                        activeMainTab === 'expense' ? 'bg-rose-600 hover:shadow-rose-100' :  
                                         'bg-[#045c84] hover:shadow-blue-100'
                                     }`}
                                 >
@@ -1800,7 +1945,22 @@ export default function AccountsPage() {
                             )}
                         </div>
                     </div>
-
+                </div>
+            </div>
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={activeMainTab}
+                    initial={{ opacity: 0, scale: 0.98, y: 30 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.98, y: -30 }}
+                    transition={{ 
+                        type: "spring",
+                        damping: 25,
+                        stiffness: 200,
+                        mass: 0.8
+                    }}
+                    className="space-y-4"
+                >
                     {/* Quick Stats Scrollable Container */}
                     <div 
                         className="flex overflow-x-auto gap-1 sm:gap-2 pb-2 scroll-smooth custom-scrollbar" 
@@ -1828,7 +1988,7 @@ export default function AccountsPage() {
                     </div>
 
                     {/* Main Content Area (Table & Sub-tabs) */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all min-h-[500px]">
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all min-h-[500px] max-h-[calc(100vh-14rem)]">
                         {/* Sub-tab Navigation */}
                         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-50 flex flex-col gap-3 bg-white">
                             {/* Top Row: Tabs and Count */}
@@ -1924,7 +2084,7 @@ export default function AccountsPage() {
                             </div>
                         ) : (
                             <>
-                                <div className="flex-1">
+                                <div className="flex-1 overflow-y-auto" data-lenis-prevent>
                                     <AnimatePresence mode="wait">
                                         <motion.div
                                             key={`${activeSubTab}_${transactionFilterMode}`}
@@ -1992,43 +2152,58 @@ export default function AccountsPage() {
 
                         {/* Modal Body - Scrollable list */}
                         <div className="p-8 py-4 overflow-y-auto flex-1 space-y-4" data-lenis-prevent>
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50/50">
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-l-xl whitespace-nowrap">আইডি</th>
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">ফি-এর ধরণ / খাত</th>
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center whitespace-nowrap">তারিখ</th>
-                                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right rounded-r-xl whitespace-nowrap">পরিমাণ</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {selectedStudentDetails.items.map((item: any) => (
-                                        <tr key={item.id} className="hover:bg-slate-50/30 transition-colors">
-                                            <td className="px-6 py-3.5">
-                                                <span className="font-mono text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">
-                                                    #{(item.id || '').slice(-6).toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-3.5">
-                                                <span className="font-bold text-xs text-slate-700">{item.category}</span>
-                                            </td>
-                                            <td className="px-6 py-3.5 text-center text-xs font-bold text-slate-400">
-                                                {new Date(item.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                                            </td>
-                                            <td className="px-6 py-3.5 text-right font-black text-xs text-amber-600">
-                                                ৳ {item.amount?.toLocaleString()}
-                                            </td>
-                                        </tr>
+                            {studentReceiptGroups.length > 0 ? (
+                                <div className="space-y-3">
+                                    {studentReceiptGroups.map((receipt: any) => (
+                                        <div
+                                            key={receipt.receiptKey}
+                                            className="rounded-3xl border border-slate-100 bg-slate-50 p-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="font-black text-sm text-slate-800 truncate">{receipt.title}</p>
+                                                <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+                                                    <span className="font-mono font-black bg-white px-2 py-1 rounded-full border border-slate-200">
+                                                        {receipt.receiptNo ? `#${receipt.receiptNo}` : receipt.receiptKey}
+                                                    </span>
+                                                    {receipt.date && (
+                                                        <span className="uppercase tracking-[0.18em]">
+                                                            {new Date(receipt.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col items-end gap-2 whitespace-nowrap">
+                                                <p className={`font-black text-lg ${receipt.status === 'COMPLETED' ? 'text-emerald-600' : 'text-amber-600'}`}>৳ {receipt.amount?.toLocaleString()}</p>
+                                                {receipt.receiptNo && receipt.type === 'INCOME' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedTransactionForPrint(receipt.rawItems[0]);
+                                                        }}
+                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white font-black text-[10px] uppercase tracking-widest transition-all"
+                                                    >
+                                                        <Receipt size={14} /> প্রিন্ট
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
+                                </div>
+                            ) : (
+                                <div className="py-16 text-center opacity-50">
+                                    <p className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">রশিদ পাওয়া যায়নি</p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Modal Footer */}
                         <div className="p-8 pt-4 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">মোট বকেয়া ফি</p>
-                                <p className="text-xl font-black text-amber-600">৳ {selectedStudentDetails.totalAmount?.toLocaleString()}</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">
+                                    {selectedStudentDetails.summaryLabel || (activeSubTab === 'pending' ? 'মোট বকেয়া ফি' : 'মোট পরিমাণ')}
+                                </p>
+                                <p className={`text-xl font-black ${selectedStudentDetails.summaryLabel === 'মোট পরিমাণ' ? 'text-emerald-600' : 'text-amber-600'}`}>৳ {selectedStudentDetails.totalAmount?.toLocaleString()}</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button 
@@ -2037,15 +2212,31 @@ export default function AccountsPage() {
                                 >
                                     বন্ধ করুন
                                 </button>
-                                <button
-                                    onClick={() => {
-                                        setFeeCollectStudent(selectedStudentDetails);
-                                        setSelectedStudentDetails(null);
-                                    }}
-                                    className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all flex items-center gap-2"
-                                >
-                                    <CreditCard size={14} /> ফি সংগ্রহ
-                                </button>
+                                {activeSubTab === 'transactions' ? (
+                                    <button
+                                        onClick={() => {
+                                            const ledgerTxn = createStudentLedgerTransaction(selectedStudentDetails);
+                                            if (ledgerTxn.subTransactions.length > 0) {
+                                                setSelectedTransactionForPrint(ledgerTxn);
+                                                setSelectedStudentDetails(null);
+                                            }
+                                        }}
+                                        disabled={!selectedStudentDetails.items?.some((t: any) => t.status?.toUpperCase() === 'COMPLETED')}
+                                        className="px-6 py-3 bg-[#045c84] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-[#034f6b] active:scale-95 transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                                    >
+                                        <Receipt size={14} /> লেজার প্রিন্ট
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            setFeeCollectStudent(selectedStudentDetails);
+                                            setSelectedStudentDetails(null);
+                                        }}
+                                        className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all flex items-center gap-2"
+                                    >
+                                        <CreditCard size={14} /> ফি সংগ্রহ
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </motion.div>
@@ -2265,12 +2456,12 @@ export default function AccountsPage() {
                     <FeeCollectModal
                         student={feeCollectStudent}
                         onClose={() => setFeeCollectStudent(null)}
-                        onSuccess={(msg) => {
+                        onSuccess={(msg: string) => {
                             setToast({ message: msg, type: 'success' });
                             setFeeCollectStudent(null);
                             fetchAccounts();
                         }}
-                        onPrintReceipt={(txn) => {
+                        onPrintReceipt={(txn: any) => {
                             setSelectedTransactionForPrint(txn);
                         }}
                     />
@@ -2517,7 +2708,8 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
     const executeConfirmDelete = async () => {
         if (!categoryToDelete) return;
         try {
-            const res = await fetch(`/api/admin/accounts/categories?id=${categoryToDelete.id}`, {
+            const permanent = categoryToDelete.isArchived ? '&permanent=true' : '';
+            const res = await fetch(`/api/admin/accounts/categories?id=${categoryToDelete.id}${permanent}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -2625,16 +2817,16 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {!cat.isArchived && (
-                                            <>
-                                                <button 
-                                                    onClick={() => handleEdit(cat)}
-                                                    className="p-2 text-slate-400 hover:text-[#045c84] transition-colors"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button onClick={() => setCategoryToDelete(cat)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
-                                            </>
+                                            <button 
+                                                onClick={() => handleEdit(cat)}
+                                                className="p-2 text-slate-400 hover:text-[#045c84] transition-colors"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
                                         )}
+                                        <button onClick={() => setCategoryToDelete(cat)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors" title={cat.isArchived ? 'স্থায়ীভাবে মুছুন' : 'মুছুন'}>
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
                                 
@@ -2685,43 +2877,70 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
                                         <Trash2 size={32} />
                                     </div>
                                     
-                                    <h2 className="text-2xl font-black text-slate-800 mb-2">খাতটি মুছে ফেলুন</h2>
-                                    <p className="text-slate-500 text-sm font-bold mb-8 leading-relaxed">
-                                        আপনি "<span className="text-slate-800">{categoryToDelete.name}</span>" মুছে ফেলতে যাচ্ছেন। মুছে ফেলার ধরন নির্বাচন করুন:
-                                    </p>
-
-                                    <div className="space-y-4 mb-8">
-                                        <div className="flex items-start gap-4 p-5 rounded-2xl border-2 border-rose-500 bg-rose-50/50">
-                                            <div className="mt-1 text-rose-500">
-                                                <AlertCircle size={20} />
+                                    <h2 className="text-2xl font-black text-slate-800 mb-2">{categoryToDelete.isArchived ? 'স্থায়ীভাবে মুছুন' : 'খাতটি মুছে ফেলুন'}</h2>
+                                    {categoryToDelete.isArchived ? (
+                                        <>
+                                            <p className="text-slate-500 text-sm font-bold mb-8 leading-relaxed">
+                                                আপনি "<span className="text-slate-800">{categoryToDelete.name}</span>" স্থায়ীভাবে মুছতে যাচ্ছেন। এই খাতটি বর্তমানে স্থগিত (archived) অবস্থায় আছে; এই অপারেশন স্থায়ী এবং আগের রেকর্ডও প্রভাবিত করতে পারে। ফেরত নেওয়া যাবে না।
+                                            </p>
+                                            <div className="flex items-center gap-3">
+                                                <button 
+                                                    onClick={() => setCategoryToDelete(null)}
+                                                    className="flex-1 py-4 bg-slate-50 text-slate-600 font-black rounded-2xl hover:bg-slate-100 transition-colors"
+                                                >
+                                                    বাতিল
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        setIsDeletingProgress(true);
+                                                        setDeleteCountdown(5);
+                                                    }}
+                                                    className="flex-1 py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-600 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Trash2 size={18} /> স্থায়ীভাবে মুছুন
+                                                </button>
                                             </div>
-                                            <div>
-                                                <h4 className="font-black text-rose-600 mb-1 text-[15px]">বকেয়া ফি মুছুন</h4>
-                                                <p className="text-xs font-bold text-slate-500 leading-relaxed">
-                                                    ভবিষ্যতে আর নতুন ফি যোগ হবে না এবং সমস্ত অপরিশোধিত (Pending) বকেয়া মুছে যাবে। 
-                                                    তবে হিসাবের সুরক্ষার জন্য আগের সমস্ত <span className="text-emerald-600">পরিশোধিত ফি (Paid)</span> অক্ষুণ্ন থাকবে।
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-slate-500 text-sm font-bold mb-8 leading-relaxed">
+                                                আপনি "<span className="text-slate-800">{categoryToDelete.name}</span>" মুছে ফেলতে যাচ্ছেন। মুছে ফেলার ধরন নির্বাচন করুন:
+                                            </p>
 
-                                    <div className="flex items-center gap-3">
-                                        <button 
-                                            onClick={() => setCategoryToDelete(null)}
-                                            className="flex-1 py-4 bg-slate-50 text-slate-600 font-black rounded-2xl hover:bg-slate-100 transition-colors"
-                                        >
-                                            বাতিল
-                                        </button>
-                                        <button 
-                                            onClick={() => {
-                                                setIsDeletingProgress(true);
-                                                setDeleteCountdown(5);
-                                            }}
-                                            className="flex-1 py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-600 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <Trash2 size={18} /> মুছে ফেলুন
-                                        </button>
-                                    </div>
+                                            <div className="space-y-4 mb-8">
+                                                <div className="flex items-start gap-4 p-5 rounded-2xl border-2 border-rose-500 bg-rose-50/50">
+                                                    <div className="mt-1 text-rose-500">
+                                                        <AlertCircle size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-black text-rose-600 mb-1 text-[15px]">বকেয়া ফি মুছুন</h4>
+                                                        <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                                                            ভবিষ্যতে আর নতুন ফি যোগ হবে না এবং সমস্ত অপরিশোধিত (Pending) বকেয়া মুছে যাবে। 
+                                                            তবে হিসাবের সুরক্ষার জন্য আগের সমস্ত <span className="text-emerald-600">পরিশোধিত ফি (Paid)</span> অক্ষুণ্ন থাকবে।
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3">
+                                                <button 
+                                                    onClick={() => setCategoryToDelete(null)}
+                                                    className="flex-1 py-4 bg-slate-50 text-slate-600 font-black rounded-2xl hover:bg-slate-100 transition-colors"
+                                                >
+                                                    বাতিল
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        setIsDeletingProgress(true);
+                                                        setDeleteCountdown(5);
+                                                    }}
+                                                    className="flex-1 py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg shadow-rose-200 hover:bg-rose-600 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Trash2 size={18} /> মুছে ফেলুন
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
                                 </>
                             ) : (
                                 <>
