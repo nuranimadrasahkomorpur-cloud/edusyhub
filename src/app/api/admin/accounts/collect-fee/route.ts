@@ -119,6 +119,7 @@ export async function POST(req: Request) {
         // 4. Mark selected fees as COMPLETED (paid)
         let remaining = parseFloat(paidAmount.toString()) + existingAdvance;
         const completedFeeIds: string[] = [];
+        const receiptSubTxns: any[] = [];
 
         for (const fee of selectedFees) {
             if (remaining <= 0 && fee.amount > 0) break;
@@ -134,16 +135,24 @@ export async function POST(req: Request) {
                     }
                 });
                 completedFeeIds.push(fee.id);
+                receiptSubTxns.push({
+                    originalCategory: fee.originalCategory || fee.category,
+                    category: fee.category,
+                    note: paymentNote ? `${fee.note ? `${fee.note} - ` : ''}${paymentNote}` : fee.note || '',
+                    amount: fee.amount,
+                    date: fee.date,
+                    createdAt: fee.createdAt
+                });
                 remaining -= fee.amount;
             } else {
                 // Partial payment: split the fee
-                // Mark original as CANCELLED, create new COMPLETED for partial amount
+                // Mark original as CANCELLED, create new COMPLETED for paid portion
                 // and keep a new PENDING for remainder
                 await (prisma as any).transaction.update({
                     where: { id: fee.id },
                     data: { status: 'CANCELLED' }
                 });
-                // Create COMPLETED for the paid portion
+                const partialNote = paymentNote ? `${fee.note ? `${fee.note} - ` : ''}${paymentNote} (আংশিক পরিশোধ)` : `${fee.note || ''} (আংশিক পরিশোধ)`;
                 await (prisma as any).transaction.create({
                     data: {
                         amount: remaining,
@@ -155,14 +164,21 @@ export async function POST(req: Request) {
                         classId: fee.classId,
                         className: fee.className,
                         status: 'COMPLETED',
-                        note: `${paymentNote || ''} (আংশিক পরিশোধ)`,
+                        note: partialNote,
                         receiptNo,
-                        date: fee.date, // Preserve original due date
+                        date: fee.date,
                         createdAt: fee.createdAt,
                         instituteId
                     }
                 });
-                // Create PENDING for the remainder
+                receiptSubTxns.push({
+                    originalCategory: fee.originalCategory || fee.category,
+                    category: fee.category,
+                    note: partialNote,
+                    amount: remaining,
+                    date: fee.date,
+                    createdAt: fee.createdAt
+                });
                 await (prisma as any).transaction.create({
                     data: {
                         amount: fee.amount - remaining,
@@ -205,8 +221,15 @@ export async function POST(req: Request) {
                         }
                     });
                     completedFeeIds.push(fee.id);
+                    receiptSubTxns.push({
+                        originalCategory: fee.originalCategory || fee.category,
+                        category: fee.category,
+                        note: paymentNote ? `${paymentNote} (অগ্রিম পরিশোধ)` : 'অগ্রিম পরিশোধ',
+                        amount: fee.amount,
+                        date: new Date(fee.date),
+                        createdAt: new Date(fee.date)
+                    });
                     remaining -= fee.amount;
-                    selectedFees.push(fee); // For receipt
                 } else {
                     await (prisma as any).transaction.create({
                         data: {
@@ -237,9 +260,14 @@ export async function POST(req: Request) {
                             instituteId
                         }
                     });
-                    
-                    const partialFee = { ...fee, amount: remaining, originalCategory: fee.originalCategory || fee.category };
-                    selectedFees.push(partialFee); // For receipt
+                    receiptSubTxns.push({
+                        originalCategory: fee.originalCategory || fee.category,
+                        category: fee.category,
+                        note: paymentNote ? `${paymentNote} (আংশিক অগ্রিম পরিশোধ)` : 'আংশিক অগ্রিম পরিশোধ',
+                        amount: remaining,
+                        date: new Date(fee.date),
+                        createdAt: new Date(fee.date)
+                    });
                     remaining = 0;
                 }
             }
@@ -336,7 +364,7 @@ export async function POST(req: Request) {
             }
         }
 
-        const subTxnsForReceipt = selectedFees.map((f: any) => {
+        const subTxnsForReceipt = receiptSubTxns.map((f: any) => {
             let finalNote = f.note || '';
             if (paymentNote && !finalNote.includes(paymentNote)) {
                 finalNote = finalNote ? `${finalNote} - ${paymentNote}` : paymentNote;

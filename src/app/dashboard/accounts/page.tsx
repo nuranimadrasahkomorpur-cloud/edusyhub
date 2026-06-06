@@ -61,7 +61,11 @@ export default function AccountsPage() {
     const [activeMainTab, setActiveMainTab] = useState<'overview' | 'income' | 'expense'>('overview'); 
     const [activeSubTab, setActiveSubTab] = useState<'transactions' | 'pending' | 'categories'>('transactions');
     const [searchQuery, setSearchQuery] = useState('');
-    const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+    const [viewMode, setViewMode] = useState<'table' | 'card'>(() => {
+        if (typeof window === 'undefined') return 'table';
+        const storedMode = window.localStorage.getItem('accounts_view_mode');
+        return storedMode === 'card' ? 'card' : 'table';
+    });
     const [addTrigger, setAddTrigger] = useState(0);
     const [accountData, setAccountData] = useState<{ summary: any, transactions: any[] }>({
         summary: null,
@@ -69,6 +73,8 @@ export default function AccountsPage() {
     });
     const [loading, setLoading] = useState(true);
     const classTabsRef = React.useRef<HTMLDivElement>(null);
+    const subTabContainerRef = React.useRef<HTMLDivElement>(null);
+    const filterTabsRef = React.useRef<HTMLDivElement>(null);
     const [dueGroupMode, setDueGroupMode] = useState<'person' | 'type'>('person');
     const [transactionFilterMode, setTransactionFilterMode] = useState<'all' | 'person' | 'type' | 'class'>('all');
     const [activeClassFilter, setActiveClassFilter] = useState<string | null>(null);
@@ -86,7 +92,22 @@ export default function AccountsPage() {
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
     const [showScanner, setShowScanner] = useState(false);
     const [isScanningStudent, setIsScanningStudent] = useState(false);
+    const [showFloatingActions, setShowFloatingActions] = useState(true);
     const scanRequestInFlightRef = React.useRef(false);
+    const paginationRef = React.useRef<HTMLDivElement | null>(null);
+
+    const handleSubTabClick = (tab: 'transactions' | 'pending' | 'categories', event: React.MouseEvent<HTMLButtonElement>) => {
+        setActiveSubTab(tab);
+        const button = event.currentTarget;
+        button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    };
+
+    const handleFilterTabClick = (mode: 'all' | 'person' | 'type' | 'class', event: React.MouseEvent<HTMLButtonElement>) => {
+        setTransactionFilterMode(mode);
+        setActiveClassFilter(null);
+        const button = event.currentTarget;
+        button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    };
 
     useEffect(() => {
         if (selectedStudentDetails || selectedTypeDetails || orphanedCategoryToDelete) {
@@ -98,6 +119,12 @@ export default function AccountsPage() {
             document.body.style.overflow = 'unset';
         };
     }, [selectedStudentDetails, selectedTypeDetails, orphanedCategoryToDelete]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('accounts_view_mode', viewMode);
+        }
+    }, [viewMode]);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
@@ -169,6 +196,48 @@ export default function AccountsPage() {
         setShowScanner(false);
         setSelectedStudentDetails(null);
     }, []);
+
+    useEffect(() => {
+        const getFloatingArea = () => {
+            const floatWidth = 56;
+            const floatRight = window.innerWidth - 6;
+            const floatLeft = floatRight - floatWidth;
+            const floatBottom = window.innerHeight - 16;
+            const floatTop = floatBottom - 72; // covers both buttons stacked with spacing
+            return { left: floatLeft, right: floatRight, top: floatTop, bottom: floatBottom };
+        };
+
+        const intersectsFloatingArea = (rect: DOMRect) => {
+            const floatArea = getFloatingArea();
+            return !(rect.right < floatArea.left || rect.left > floatArea.right || rect.bottom < floatArea.top || rect.top > floatArea.bottom);
+        };
+
+        const updateFloatingVisibility = () => {
+            if (showScanner || isTransactionModalOpen) {
+                setShowFloatingActions(false);
+                return;
+            }
+
+            if (paginationRef.current) {
+                const paginationRect = paginationRef.current.getBoundingClientRect();
+                if (intersectsFloatingArea(paginationRect)) {
+                    setShowFloatingActions(false);
+                    return;
+                }
+            }
+
+            setShowFloatingActions(true);
+        };
+
+        window.addEventListener('scroll', updateFloatingVisibility, { passive: true });
+        window.addEventListener('resize', updateFloatingVisibility);
+        updateFloatingVisibility();
+
+        return () => {
+            window.removeEventListener('scroll', updateFloatingVisibility);
+            window.removeEventListener('resize', updateFloatingVisibility);
+        };
+    }, [showScanner, isTransactionModalOpen]);
 
     const handleDeleteOrphanedCategory = (categoryName: string) => {
         setOrphanedCategoryToDelete(categoryName);
@@ -509,20 +578,22 @@ export default function AccountsPage() {
         }
     };
 
+    const cardGridClass = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 mx-auto max-w-[1280px]';
+
     const renderTableContent = () => {
         if (loading) {
             if (viewMode === 'card') {
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    <div className={cardGridClass}>
                         {[...Array(6)].map((_, i) => (
-                            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm animate-pulse space-y-4">
-                                <div className="flex justify-between items-center">
+                            <div key={i} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm animate-pulse space-y-2">
+                                <div className="flex justify-between items-center gap-2">
                                     <div className="h-4 bg-slate-100 rounded w-1/3" />
                                     <div className="h-4 bg-slate-100 rounded-full w-1/4" />
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
                                     <div className="w-10 h-10 rounded-xl bg-slate-100" />
-                                    <div className="space-y-2 flex-1">
+                                    <div className="space-y-1 flex-1">
                                         <div className="h-4 bg-slate-100 rounded w-2/3" />
                                         <div className="h-3 bg-slate-100 rounded w-1/2" />
                                     </div>
@@ -562,36 +633,30 @@ export default function AccountsPage() {
         if (activeSubTab === 'pending' && transactionFilterMode === 'person') {
             if (viewMode === 'card') {
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    <div className={cardGridClass}>
                         {personWiseDues.length > 0 ? (
                             personWiseDues.map((student) => (
                                 <div 
                                     key={student.studentId}
                                     onClick={() => setSelectedStudentDetails(student)}
-                                    className="group cursor-pointer bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4"
+                                    className="group cursor-pointer bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2"
                                 >
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
                                         {student.studentPhoto ? (
-                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover" />
                                         ) : (
-                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
                                                 {student.studentName[0] || 'S'}
                                             </div>
                                         )}
                                         <div>
                                             <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">ID: {student.studentUniqueId}</p>
+                                            <p className="text-[10px] text-slate-500 mt-0.5">{student.items.length} টি ফি</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                        <div>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">বকেয়া ফি</p>
-                                            <p className="font-black text-xs text-slate-700">{student.items.length} টি খাত</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
-                                            <p className="font-black text-sm text-amber-600">৳ {student.totalAmount.toLocaleString()}</p>
-                                        </div>
+                                        <p className="text-[9px] text-slate-400 uppercase tracking-wider">মোট বকেয়া</p>
+                                        <p className="font-black text-sm text-amber-600">৳ {student.totalAmount.toLocaleString()}</p>
                                     </div>
                                 </div>
                             ))
@@ -672,52 +737,33 @@ export default function AccountsPage() {
         if (activeSubTab === 'pending' && transactionFilterMode === 'type') {
             if (viewMode === 'card') {
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    <div className={cardGridClass}>
                         {typeWiseDues.length > 0 ? (
                             typeWiseDues.map((group) => (
                                 <div 
                                     key={group.category}
                                     onClick={() => setSelectedTypeDetails(group)}
-                                    className="group cursor-pointer bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4"
+                                    className="group cursor-pointer bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2"
                                 >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-                                                !group.categoryExists ? 'bg-rose-50 text-rose-600' : 'bg-purple-50 text-purple-600'
-                                            }`}>
-                                                <Receipt size={16} />
-                                            </div>
-                                            <div>
-                                                <p className="font-black text-sm text-slate-800 leading-tight">{group.category}</p>
-                                                {!group.categoryExists && (
-                                                    <span className="inline-block mt-1 px-2 py-0.5 text-[8px] font-black tracking-wider text-rose-600 bg-rose-50 rounded-full border border-rose-100">
-                                                        মুছে ফেলা খাত
-                                                    </span>
-                                                )}
-                                            </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                                            !group.categoryExists ? 'bg-rose-50 text-rose-600' : 'bg-purple-50 text-purple-600'
+                                        }`}>
+                                            <Receipt size={16} />
                                         </div>
-                                        {!group.categoryExists && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteOrphanedCategory(group.category);
-                                                }}
-                                                className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center shrink-0"
-                                                title="বকেয়া ফি মুছুন"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
                                         <div>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">বকেয়া ব্যক্তি</p>
-                                            <p className="font-black text-xs text-slate-700">{group.items.length} জন</p>
+                                            <p className="font-black text-sm text-slate-800 leading-tight">{group.category}</p>
+                                            {!group.categoryExists && (
+                                                <span className="inline-block mt-1 px-2 py-0.5 text-[8px] text-rose-600 bg-rose-50 rounded-full border border-rose-100">
+                                                    মুছে ফেলা খাত
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
-                                            <p className="font-black text-sm text-amber-600">৳ {group.totalAmount.toLocaleString()}</p>
-                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50 gap-3">
+                                        <p className="text-[9px] text-slate-400 uppercase tracking-wider">জন</p>
+                                        <p className="font-black text-sm text-slate-700">{group.items.length}</p>
+                                        <p className="font-black text-sm text-amber-600">৳ {group.totalAmount.toLocaleString()}</p>
                                     </div>
                                 </div>
                             ))
@@ -861,47 +907,26 @@ export default function AccountsPage() {
                     )}
                     
                     {viewMode === 'card' ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        <div className={cardGridClass}>
                             {classTxns.length > 0 ? (
                                 classTxns.map((txn) => (
-                                    <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
-                                        <div className="flex items-start justify-between">
-                                            <span className="font-mono text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg tracking-tighter border border-amber-100">
-                                                #{(txn.id || '').slice(-6).toUpperCase()}
-                                            </span>
-                                            <button 
-                                                onClick={() => setTransactionToDelete(txn)}
-                                                className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center shrink-0"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center gap-3">
+                                    <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
+                                        <div className="flex items-center gap-2">
                                             {txn.studentPhoto ? (
-                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover" />
                                             ) : (
-                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
                                                     {txn.studentName?.[0] || 'S'}
                                                 </div>
                                             )}
                                             <div>
                                                 <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
-                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{txn.category}</p>
+                                                <p className="text-[10px] text-slate-500 mt-0.5">{txn.category}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                            <div>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
-                                                <p className="font-bold text-xs text-slate-500">
-                                                    {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
-                                                <p className="font-black text-sm text-rose-600">
-                                                    ৳ {txn.amount?.toLocaleString()}
-                                                </p>
-                                            </div>
+                                            <p className="text-[9px] text-slate-400 uppercase tracking-wider">পরিমাণ</p>
+                                            <p className="font-black text-sm text-rose-600">৳ {txn.amount?.toLocaleString()}</p>
                                         </div>
                                     </div>
                                 ))
@@ -986,14 +1011,24 @@ export default function AccountsPage() {
 
             if (viewMode === 'card') {
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    <div className={cardGridClass}>
                         {pendingTransactions.length > 0 ? (
                             pendingTransactions.map((txn) => (
-                                <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
-                                    <div className="flex items-start justify-between">
-                                        <span className="font-mono text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg tracking-tighter border border-amber-100">
-                                            #{(txn.id || '').slice(-6).toUpperCase()}
-                                        </span>
+                                <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-3">
+                                            {txn.studentPhoto ? (
+                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
+                                                    {txn.studentName?.[0] || 'S'}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
+                                                <p className="text-[10px] text-slate-500 mt-0.5">{txn.category}</p>
+                                            </div>
+                                        </div>
                                         <button 
                                             onClick={() => setTransactionToDelete(txn)}
                                             className="w-8 h-8 bg-rose-50 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all flex items-center justify-center shrink-0"
@@ -1001,32 +1036,9 @@ export default function AccountsPage() {
                                             <Trash2 size={15} />
                                         </button>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        {txn.studentPhoto ? (
-                                            <img src={txn.studentPhoto} alt={txn.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
-                                                {txn.studentName?.[0] || 'S'}
-                                            </div>
-                                        )}
-                                        <div>
-                                            <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{txn.category}</p>
-                                        </div>
-                                    </div>
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                        <div>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">তারিখ</p>
-                                            <p className="font-bold text-xs text-slate-500">
-                                                {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">পরিমাণ</p>
-                                            <p className="font-black text-sm text-rose-600">
-                                                ৳ {txn.amount?.toLocaleString()}
-                                            </p>
-                                        </div>
+                                        <span className="text-[10px] text-slate-500">{new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })}</span>
+                                        <span className="font-black text-sm text-rose-600">৳ {txn.amount?.toLocaleString()}</span>
                                     </div>
                                 </div>
                             ))
@@ -1131,32 +1143,25 @@ export default function AccountsPage() {
 
             if (viewMode === 'card') {
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    <div className={cardGridClass}>
                         {personList.length > 0 ? (
                             personList.map((student) => (
-                                <div key={student.studentId} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                <div key={student.studentId} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
                                     <div className="flex items-center gap-3">
                                         {student.studentPhoto ? (
-                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover shadow-sm" />
+                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover" />
                                         ) : (
-                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm shadow-sm">
+                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
                                                 {student.studentName[0] || 'S'}
                                             </div>
                                         )}
                                         <div>
                                             <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">ID: {student.studentUniqueId}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                        <div>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">লেনদেন সংখ্যা</p>
-                                            <p className="font-black text-xs text-slate-700">{student.items.length} টি লেনদেন</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
-                                            <p className="font-black text-sm text-emerald-600">৳ {student.totalAmount.toLocaleString()}</p>
-                                        </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50 gap-4">
+                                        <span className="text-[10px] text-slate-500">{student.items.length} টি লেনদেন</span>
+                                        <span className="font-black text-sm text-emerald-600">৳ {student.totalAmount.toLocaleString()}</span>
                                     </div>
                                 </div>
                             ))
@@ -1249,30 +1254,23 @@ export default function AccountsPage() {
 
             if (viewMode === 'card') {
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    <div className={cardGridClass}>
                         {typeList.length > 0 ? (
                             typeList.map((group) => (
-                                <div key={group.category} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                <div key={group.category} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
                                     <div className="flex items-center gap-3">
                                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${group.type === 'INCOME' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                                             <Receipt size={16} />
                                         </div>
                                         <div>
                                             <p className="font-black text-sm text-slate-800 leading-tight" title={group.category}>{getShortCategory(group.category)}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{group.type === 'INCOME' ? 'আয়' : 'ব্যয়'}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                        <div>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">লেনদেন সংখ্যা</p>
-                                            <p className="font-black text-xs text-slate-700">{group.items.length} টি লেনদেন</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">মোট পরিমাণ</p>
-                                            <p className={`font-black text-sm ${group.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                ৳ {group.totalAmount.toLocaleString()}
-                                            </p>
-                                        </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50 gap-4">
+                                        <span className="text-[10px] text-slate-500">{group.items.length} টি লেনদেন</span>
+                                        <span className={`font-black text-sm ${group.type === 'INCOME' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            ৳ {group.totalAmount.toLocaleString()}
+                                        </span>
                                     </div>
                                 </div>
                             ))
@@ -1407,10 +1405,10 @@ export default function AccountsPage() {
                     )}
                     
                     {viewMode === 'card' ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                        <div className={cardGridClass}>
                             {classTxns.length > 0 ? (
                                 classTxns.map((txn) => (
-                                    <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                                    <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
                                         <div className="flex items-start justify-between">
                                             <span className="font-mono text-[9px] font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg tracking-tighter border border-purple-100">
                                                 #{(txn.id || '').slice(-6).toUpperCase()}
@@ -1552,10 +1550,10 @@ export default function AccountsPage() {
         // Default 'all' or other tabs
         if (viewMode === 'card') {
             return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                <div className={cardGridClass}>
                     {filteredTransactions.length > 0 ? (
                         filteredTransactions.map((txn: any) => (
-                            <div key={txn.id} className="bg-white p-5 rounded-2xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                            <div key={txn.id} className="bg-white p-3 rounded-xl border border-slate-150/60 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-2">
                                 <div className="flex items-start justify-between gap-2">
                                     <span className="font-mono text-[9px] font-black text-[#045c84] bg-blue-50 px-2 py-1 rounded-lg tracking-tighter border border-blue-100">
                                         {txn.receiptNo || `#${txn.id.slice(-6).toUpperCase()}`}
@@ -1709,12 +1707,12 @@ export default function AccountsPage() {
     };
 
     return (
-        <div className="p-6 space-y-6 animate-fade-in font-bengali min-h-screen bg-slate-50/50 pb-24">
+        <div className="p-4 space-y-4 animate-fade-in font-bengali min-h-screen bg-slate-50/50 pb-20">
             {/* Main Navigation Tabs */}
             <div className="flex bg-slate-100/50 p-1 rounded-2xl border border-slate-200/50 w-full">
                 <button
                     onClick={() => { setActiveMainTab('overview'); setActiveSubTab('transactions'); }}
-                    className={`flex-1 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
+                    className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeMainTab === 'overview'
                         ? 'bg-[#045c84] text-white shadow-lg'
                         : 'text-slate-400 hover:text-slate-600'
                     }`}
@@ -1723,7 +1721,7 @@ export default function AccountsPage() {
                 </button>
                 <button
                     onClick={() => { setActiveMainTab('income'); setActiveSubTab('transactions'); }}
-                    className={`flex-1 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'income'
+                    className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'income'
                         ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
                         : 'text-slate-400 hover:text-slate-600'
                     }`}
@@ -1732,7 +1730,7 @@ export default function AccountsPage() {
                 </button>
                 <button
                     onClick={() => { setActiveMainTab('expense'); setActiveSubTab('transactions'); }}
-                    className={`flex-1 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'expense'
+                    className={`flex-1 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-2 ${activeMainTab === 'expense'
                         ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
                         : 'text-slate-400 hover:text-slate-600'
                     }`}
@@ -1753,18 +1751,18 @@ export default function AccountsPage() {
                         stiffness: 200,
                         mass: 0.8
                     }}
-                    className="space-y-6"
+                    className="space-y-4"
                 >
                     {/* Search & Actions Row */}
-                    <div className="flex items-center justify-between gap-3 w-full">
-                        <div className="relative group flex-1 max-w-md">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#045c84] transition-colors" size={18} />
+                    <div className="flex items-center justify-between gap-1 w-full">
+                        <div className="relative group flex-1 max-w-xl sm:max-w-2xl">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#045c84] transition-colors" size={20} />
                             <input
                                 type="text"
                                 placeholder={activeSubTab === 'categories' ? "খাত খুঁজুন..." : "লেনদেন খুঁজুন..."}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-12 pr-10 py-3 bg-white border border-slate-100 shadow-sm rounded-2xl text-xs font-bold placeholder:text-slate-400 focus:ring-1 focus:ring-[#045c84]/10 w-full transition-all"
+                                className="pl-14 pr-10 py-3 bg-white border border-slate-100 shadow-sm rounded-2xl text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:ring-1 focus:ring-[#045c84]/10 w-full transition-all"
                             />
                             {searchQuery && (
                                 <button 
@@ -1782,7 +1780,7 @@ export default function AccountsPage() {
                                 <button 
                                     id="add-category-btn-global"
                                     onClick={() => setAddTrigger(prev => prev + 1)}
-                                    className={`px-4 sm:px-6 py-2.5 sm:py-3 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md transition-all flex items-center gap-2 active:scale-95 whitespace-nowrap ${
+                                    className={`px-3 sm:px-4 py-2 text-white rounded-xl sm:rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-md transition-all flex items-center gap-1.5 active:scale-95 whitespace-nowrap ${
                                         activeMainTab === 'income' ? 'bg-emerald-600 hover:shadow-emerald-100' : 
                                         activeMainTab === 'expense' ? 'bg-rose-600 hover:shadow-rose-100' : 
                                         'bg-[#045c84] hover:shadow-blue-100'
@@ -1791,11 +1789,11 @@ export default function AccountsPage() {
                                     <Plus size={16} /> <span className="hidden sm:inline">নতুন {activeMainTab === 'income' ? 'আয়ের ' : activeMainTab === 'expense' ? 'ব্যয়ের ' : ''}খাত</span>
                                 </button>
                             ) : (
-                                <div className="flex items-center gap-2">
-                                    <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
+                                <div className="flex items-center gap-1">
+                                    <button className="w-9 h-9 sm:w-11 sm:h-11 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
                                         <Filter size={18} />
                                     </button>
-                                    <button className="w-10 h-10 sm:w-12 sm:h-12 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
+                                    <button className="w-9 h-9 sm:w-11 sm:h-11 bg-white border border-slate-200/60 shadow-sm text-slate-400 rounded-xl sm:rounded-2xl hover:text-[#045c84] hover:bg-slate-50 transition-all flex items-center justify-center">
                                         <Download size={18} />
                                     </button>
                                 </div>
@@ -1805,12 +1803,12 @@ export default function AccountsPage() {
 
                     {/* Quick Stats Scrollable Container */}
                     <div 
-                        className="flex overflow-x-auto gap-3 sm:gap-4 pb-2 scroll-smooth custom-scrollbar" 
+                        className="flex overflow-x-auto gap-1 sm:gap-2 pb-2 scroll-smooth custom-scrollbar" 
                         data-lenis-prevent="true"
                     >
                         {stats.map((stat, idx) => (
-                            <div key={idx} className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden min-w-[170px] sm:min-w-[200px] flex-1 flex-shrink-0">
-                                <div className="flex flex-col gap-2 sm:gap-2.5">
+                            <div key={idx} className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden min-w-[170px] sm:min-w-[200px] flex-1 flex-shrink-0">
+                                <div className="flex flex-col gap-1 sm:gap-2">
                                     <div className="flex items-center justify-between">
                                         <div className={`w-9 h-9 sm:w-10 sm:h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center shadow-sm`}>
                                             <stat.icon size={18} />
@@ -1830,17 +1828,18 @@ export default function AccountsPage() {
                     </div>
 
                     {/* Main Content Area (Table & Sub-tabs) */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[600px] flex flex-col transition-all">
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col transition-all min-h-[500px]">
                         {/* Sub-tab Navigation */}
-                        <div className="px-6 sm:px-8 py-4 sm:py-6 border-b border-slate-50 flex flex-col gap-4 bg-white">
+                        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-50 flex flex-col gap-3 bg-white">
                             {/* Top Row: Tabs and Count */}
-                            <div className="flex items-center justify-between gap-4 w-full">
-                                <div className="flex items-center gap-2 p-1.5 bg-slate-50 rounded-2xl flex-1 overflow-x-auto custom-scrollbar">
+                            <div className="flex gap-2 w-full items-center">
+                                <div ref={subTabContainerRef} className="flex-1 flex items-center gap-1 p-1 bg-slate-50 rounded-2xl overflow-x-auto hide-scrollbar scroll-smooth min-w-0">
                                     {['transactions', ...((activeMainTab === 'income' || activeMainTab === 'overview') ? ['pending'] : []), 'categories'].map((tab) => (
                                         <button
                                             key={tab}
-                                            onClick={() => setActiveSubTab(tab as any)}
-                                            className={`flex-1 px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap text-center ${activeSubTab === tab
+                                            data-active-subtab={activeSubTab === tab}
+                                            onClick={(e) => handleSubTabClick(tab as any, e)}
+                                            className={`flex-1 min-w-[110px] px-2.5 sm:px-3 py-2 rounded-xl text-[11px] sm:text-[12px] font-black uppercase tracking-widest transition-all whitespace-nowrap text-center ${activeSubTab === tab
                                                     ? 'bg-white text-[#045c84] shadow-sm'
                                                     : 'text-slate-400 hover:text-slate-600'
                                                 }`}
@@ -1850,20 +1849,23 @@ export default function AccountsPage() {
                                         </button>
                                     ))}
                                 </div>
-                                <div className="text-right shrink-0 w-[75px] sm:w-[100px]">
-                                    <p className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap truncate">
-                                        {activeSubTab === 'categories' ? '' :
-                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'person' ? `${personWiseDues.length} জন` :
-                                         (activeSubTab === 'transactions' || activeSubTab === 'pending') && transactionFilterMode === 'type' ? `${typeWiseDues.length} টি খাত` :
-                                         `${filteredTransactions.length} টি ${activeSubTab === 'pending' ? 'বকেয়া' : 'লেনদেন'}`}
-                                    </p>
+
+                                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/50 shrink-0">
+                                    <button
+                                        onClick={() => setViewMode((prev) => prev === 'table' ? 'card' : 'table')}
+                                        className="p-2 rounded-lg text-slate-400 hover:text-[#045c84] hover:bg-white transition-all shadow-sm bg-white/80"
+                                        title={viewMode === 'table' ? 'কার্ড ভিউ' : 'টেবিল ভিউ'}
+                                        aria-label="ভিউ টগোল করুন"
+                                    >
+                                        {viewMode === 'table' ? <LayoutGrid size={18} /> : <List size={18} />}
+                                    </button>
                                 </div>
                             </div>
                             
-                            {/* Bottom Row: Filters & Toggle View */}
-                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                            {/* Bottom Row: Filters */}
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
                                 {activeSubTab !== 'categories' && (
-                                    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50 w-max shrink-0">
+                                    <div ref={filterTabsRef} className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/50 overflow-x-auto hide-scrollbar w-full scroll-smooth">
                                         {[
                                             { id: 'all', label: 'সব লেনদেন' },
                                             { id: 'person', label: 'ব্যক্তি ভিত্তিক' },
@@ -1872,8 +1874,8 @@ export default function AccountsPage() {
                                         ].map(mode => (
                                             <button
                                                 key={mode.id}
-                                                onClick={() => { setTransactionFilterMode(mode.id as any); setActiveClassFilter(null); }}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+                                                onClick={(e) => handleFilterTabClick(mode.id as any, e)}
+                                                className={`flex-none min-w-[96px] px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
                                                     transactionFilterMode === mode.id
                                                         ? 'bg-[#045c84] text-white shadow-sm'
                                                         : 'text-slate-400 hover:text-slate-600'
@@ -1885,33 +1887,6 @@ export default function AccountsPage() {
                                     </div>
                                 )}
 
-                                {/* Card/Table View Mode Toggle Buttons */}
-                                {activeSubTab !== 'categories' && (
-                                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/50 shrink-0 ml-auto">
-                                        <button
-                                            onClick={() => setViewMode('table')}
-                                            className={`p-1.5 rounded-lg transition-all ${
-                                                viewMode === 'table'
-                                                    ? 'bg-white text-[#045c84] shadow-sm'
-                                                    : 'text-slate-400 hover:text-slate-600'
-                                            }`}
-                                            title="টেবিল ভিউ"
-                                        >
-                                            <List size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setViewMode('card')}
-                                            className={`p-1.5 rounded-lg transition-all ${
-                                                viewMode === 'card'
-                                                    ? 'bg-white text-[#045c84] shadow-sm'
-                                                    : 'text-slate-400 hover:text-slate-600'
-                                            }`}
-                                            title="কার্ড ভিউ"
-                                        >
-                                            <LayoutGrid size={16} />
-                                        </button>
-                                    </div>
-                                )}
                                 {activeSubTab === 'categories' && (
                                     <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/50 w-max shrink-0">
                                         {[
@@ -1938,7 +1913,7 @@ export default function AccountsPage() {
                         </div>
 
                         {activeSubTab === 'categories' ? (
-                            <div className="p-6">
+                            <div className="p-4">
                                 <CategoryManagementView 
                                     externalSearchQuery={searchQuery} 
                                     addTrigger={addTrigger}
@@ -1949,22 +1924,24 @@ export default function AccountsPage() {
                             </div>
                         ) : (
                             <>
-                                <AnimatePresence mode="wait">
-                                    <motion.div
-                                        key={`${activeSubTab}_${transactionFilterMode}`}
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        transition={{ duration: 0.3 }}
-                                        className="flex-1 overflow-x-auto"
-                                    >
-                                        {renderTableContent()}
-                                    </motion.div>
-                                </AnimatePresence>
+                                <div className="flex-1">
+                                    <AnimatePresence mode="wait">
+                                        <motion.div
+                                            key={`${activeSubTab}_${transactionFilterMode}`}
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -20 }}
+                                            transition={{ duration: 0.3 }}
+                                            className="min-h-[320px]"
+                                        >
+                                            {renderTableContent()}
+                                        </motion.div>
+                                    </AnimatePresence>
+                                </div>
 
                                 {/* Enhanced Pagination Controls */}
                                 {((activeSubTab === 'transactions' && filteredTransactions.length > 0) || (activeSubTab === 'pending' && filteredTransactions.some(t => t.status?.toUpperCase() === 'PENDING'))) && (
-                                    <div className="px-8 py-4 border-t border-slate-50 flex items-center justify-between bg-white mt-auto">
+                                    <div ref={paginationRef} className="px-8 py-4 border-t border-slate-50 flex items-center justify-between bg-white mt-auto">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">১-{Math.min(5, getDisplayedCount()).toLocaleString('bn-BD')} (মোট {getDisplayedCount().toLocaleString('bn-BD')}টি)</p>
                                         <div className="flex items-center gap-3">
                                             <button className="px-4 py-2 rounded-xl bg-slate-50 text-slate-300 font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all">পূর্ববর্তী</button>
@@ -2311,37 +2288,51 @@ export default function AccountsPage() {
             </AnimatePresence>
 
             {/* Floating Action Buttons */}
-            <motion.button
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                    // Clear old fee data and open scanner immediately
-                    setFeeCollectStudent(null);
-                    setShowScanner(true);
-                }}
-                className="fixed bottom-24 right-8 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl z-40 bg-emerald-600 shadow-emerald-600/30 transition-colors"
-                title="স্ক্যান করুন"
-            >
-                <Scan size={28} />
-            </motion.button>
+            <AnimatePresence>
+                {showFloatingActions && (
+                    <motion.button
+                        key="scan-button"
+                        initial={{ opacity: 0, y: 20, scale: 0.85 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.85 }}
+                        transition={{ duration: 0.15 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                            // Clear old fee data and open scanner immediately
+                            setFeeCollectStudent(null);
+                            setShowScanner(true);
+                        }}
+                        className="fixed bottom-32 right-6 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl z-50 bg-emerald-600 shadow-emerald-600/30 transition-colors"
+                        title="স্ক্যান করুন"
+                    >
+                        <Scan size={28} />
+                    </motion.button>
+                )}
+            </AnimatePresence>
 
-            <motion.button
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsTransactionModalOpen(true)}
-                className={`fixed bottom-8 right-8 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl z-40 transition-colors ${
-                    activeMainTab === 'income' ? 'bg-emerald-600 shadow-emerald-600/30' : 
-                    activeMainTab === 'expense' ? 'bg-rose-600 shadow-rose-600/30' : 
-                    'bg-[#045c84] shadow-blue-900/30'
-                }`}
-                title="লেনদেন যোগ করুন"
-            >
-                <Plus size={28} />
-            </motion.button>
+            <AnimatePresence>
+                {showFloatingActions && (
+                    <motion.button
+                        key="add-button"
+                        initial={{ opacity: 0, y: 20, scale: 0.85 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.85 }}
+                        transition={{ duration: 0.15 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setIsTransactionModalOpen(true)}
+                        className={`fixed bottom-16 right-6 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl z-50 transition-colors ${
+                            activeMainTab === 'income' ? 'bg-emerald-600 shadow-emerald-600/30' : 
+                            activeMainTab === 'expense' ? 'bg-rose-600 shadow-rose-600/30' : 
+                            'bg-[#045c84] shadow-blue-900/30'
+                        }`}
+                        title="লেনদেন যোগ করুন"
+                    >
+                        <Plus size={28} />
+                    </motion.button>
+                )}
+            </AnimatePresence>
 
             {/* QR/Barcode Scanner Modal */}
             <QRBarcodeScanner
