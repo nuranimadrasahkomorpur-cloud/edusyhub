@@ -140,8 +140,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     // Drag state for reordering
     const dragColRef = useRef<string | null>(null);
 
-    const selectedStudentIds_init = React.useMemo(
-        () => new Set((payload?.students || []).map((s: any) => s.id)),
+    const selectedStudentIds_init = React.useMemo<Set<string>>(
+        () => new Set<string>((payload?.students || []).map((s: any) => s.id as string)),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         []
     );
