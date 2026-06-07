@@ -18,7 +18,7 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
             wheelMultiplier: 1,
             touchMultiplier: 2,
             lerp: 0.1,
-        };
+        } as const;
 
         // create global/window Lenis
         const globalLenis = new Lenis(options);
@@ -48,7 +48,7 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
                 const el = node as HTMLElement;
                 if (el.dataset && el.dataset.lenisAttached) return;
                 try {
-                    const instance = new Lenis({ ...options, el });
+                    const instance = new Lenis({ ...(options as any), el } as any);
                     instancesRef.current.push(instance);
                     el.dataset.lenisAttached = 'true';
                 } catch (e) {
