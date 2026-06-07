@@ -101,14 +101,14 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 const allGroups = Array.from(categoryPart.matchAll(/\(([^)]+)\)/g)).map(m => m[1].trim()).filter(Boolean);
                 catKey = rawCat.replace(/\s*\([^)]*\)/g, '').trim();
                 const partialIndicators = ['আংশিক', 'আংশিক পরিশোধ', 'আংশিক অগ্রিম পরিশোধ', 'আংশিক স্বয়ংক্রিয় পরিশোধ', 'আংশিক স্বয়ংক্রিয় পরিশোধ'];
-                subName = allGroups.filter(group => !partialIndicators.some(indicator => group.includes(indicator))).slice(-1)[0] || allGroups[0] || '';
+                subName = allGroups.filter(group => !partialIndicators.some(indicator => group.includes(indicator))).slice(-1)[0] || '';
             }
         }
 
         if (!subName && typeof t.note === 'string') {
             const noteGroups = Array.from(t.note.matchAll(/\(([^)]+)\)/g) as RegExpMatchArray[]).map(m => m[1].trim()).filter(Boolean);
             const partialIndicators = ['আংশিক', 'আংশিক পরিশোধ', 'আংশিক অগ্রিম পরিশোধ', 'আংশিক স্বয়ংক্রিয় পরিশোধ', 'আংশিক স্বয়ংক্রিয় পরিশোধ'];
-            subName = noteGroups.filter(group => !partialIndicators.some(indicator => group.includes(indicator))).slice(-1)[0] || noteGroups[0] || '';
+            subName = noteGroups.filter(group => !partialIndicators.some(indicator => group.includes(indicator))).slice(-1)[0] || '';
         }
 
         if (!acc[catKey]) acc[catKey] = { items: [], total: 0 };
@@ -127,20 +127,20 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
             const note = String(t.note || '').trim();
             const isPartial = note.includes('আংশিক');
             const cleanedNote = note.replace(/\s*\((আংশিক(?: পরিশোধ)?|আংশিক অগ্রিম পরিশোধ|আংশিক স্বয়ংক্রিয় পরিশোধ|আংশিক স্বয়ংক্রিয় পরিশোধ)\)\s*/g, '').trim()
-                                      .replace(/\s+(আংশিক পরিশোধ|আংশিক অগ্রিম পরিশোধ|আংশিক স্বয়ংক্রিয় পরিশোধ|আংশিক স্বয়ংক্রিয় পরিশোধ)$/g, '').trim();
+                                      .replace(/(?:^|\s+)(আংশিক পরিশোধ|আংশিক অগ্রিম পরিশোধ|আংশিক স্বয়ংক্রিয় পরিশোধ|আংশিক স্বয়ংক্রিয় পরিশোধ)$/g, '').trim();
             const partialSuffix = isPartial ? ' (আংশিক)' : '';
 
             const extractParenthesisLabel = (text: string) => {
                 const matches = Array.from(text.matchAll(/\(([^)]+)\)/g)).map(m => m[1].trim());
                 const filtered = matches.filter(m => !m.includes('আংশিক'));
-                return filtered.length ? filtered[filtered.length - 1] : matches.length ? matches[matches.length - 1] : '';
+                return filtered.length ? filtered[filtered.length - 1] : '';
             };
 
             if (t.parsedSubName) {
                 return `${t.parsedSubName}${partialSuffix}`.trim();
             }
 
-            const bracketLabel = extractParenthesisLabel(note || t.category || '');
+            const bracketLabel = extractParenthesisLabel(t.category || '');
             if (bracketLabel && bracketLabel !== cat) {
                 return `${bracketLabel}${partialSuffix}`;
             }
@@ -176,10 +176,10 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
             }
 
             if (t.category && t.category !== cat) {
-                return t.category;
+                return `${t.category}${partialSuffix}`;
             }
 
-            return 'ফি প্রদান';
+            return `ফি প্রদান${partialSuffix}`;
         };
 
         return (
@@ -187,54 +187,90 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 title={isLedger ? 'লেনদেন লেজার' : 'মানি রশিদ'} 
                 institute={activeInstitute} 
                 date={isLedger && generatedAt ? generatedDateStr : ''} 
-                pageSize={isLedger ? 'A4' : 'A5'}
+                pageSize="auto"
                 previewOnly={isPreview}
+                hideLogo={true}
             >
-                <div className="flex justify-between items-start mb-4 pb-3 border-b-2 border-slate-200">
-                    <div className="flex items-center gap-4 mt-0" style={isLedger ? { marginTop: '-50px' } : undefined}>
-                            {transaction.studentPhoto ? (
-                                <img src={transaction.studentPhoto} alt={transaction.studentName} className="w-20 h-28 rounded-xl object-cover border-2 border-slate-200 shadow-sm" />
-                            ) : (
-                                <div className="w-20 h-28 rounded-xl bg-slate-50 flex items-center justify-center border-2 border-slate-200 shadow-sm text-slate-300">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                            </div>
-                        )}
-                        <div>
-                            <p className="font-bold text-slate-500 text-[11px] mb-1 uppercase tracking-widest">প্রাপক/শিক্ষার্থীর নাম</p>
-                            <h3 className="font-black text-[18px] text-slate-900 leading-tight mb-1">{transaction.studentName || 'অজানা'}</h3>
-                            <div className="space-y-0.5">
-                                <p className="text-slate-600 font-bold text-[13px]">ID: <span className="font-black text-slate-800">{transaction.studentUniqueId || ''}</span></p>
-                                <p className="text-slate-600 font-bold text-[13px]">পিতা: <span className="text-slate-800">{transaction.fatherName || ''}</span></p>
-                                <p className="text-slate-600 font-bold text-[13px]">মোবাইল: <span className="text-slate-800">{transaction.mobileNumber || ''}</span></p>
+                <div className="mb-6">
+                    <div className="flex justify-between items-start mb-4" style={isLedger ? { marginTop: '-50px' } : undefined}>
+                        {/* Left: Date */}
+                        <div className="text-left">
+                            {!isLedger && (
+                                <table className="border-collapse border border-slate-400 text-[13px] text-left min-w-[200px]">
+                                    <tbody>
+                                        <tr>
+                                            <td className="border border-slate-400 px-2 py-1 font-bold text-slate-600 bg-slate-50 w-20">তারিখ</td>
+                                            <td className="border border-slate-400 px-2 py-1 font-black text-slate-900">{new Date(transaction.createdAt || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
+                        {/* Right: Receipt No */}
+                        <div className="text-right">
+                            <table className="border-collapse border border-slate-400 text-[13px] text-left min-w-[200px]">
+                                <tbody>
+                                    <tr>
+                                        <td className="border border-slate-400 px-2 py-1 font-bold text-slate-600 bg-slate-50">{isLedger ? 'লেজার' : 'রশিদ নং'}</td>
+                                        <td className="border border-slate-400 px-2 py-1 font-black text-slate-900 font-mono">{isLedger ? (transaction.studentUniqueId || 'লেজার') : (transaction.receiptNo || 'N/A')}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-4">
+                        <div className="flex-1">
+                            <div className="grid grid-cols-[100px_10px_1fr] gap-x-2 gap-y-0.5 text-[14px]">
+                                <div className="font-bold text-[#045c84]">শিক্ষার্থীর নাম</div>
+                                <div className="font-bold text-[#045c84] text-center">:</div>
+                                <div className="font-black text-slate-900 text-[16px]">{transaction.studentName || 'অজানা'}</div>
+
+                                <div className="font-bold text-[#045c84]">আইডি</div>
+                                <div className="font-bold text-[#045c84] text-center">:</div>
+                                <div className="font-black text-slate-800">{transaction.studentUniqueId || '-'}</div>
+
+                                <div className="font-bold text-[#045c84]">পিতা</div>
+                                <div className="font-bold text-[#045c84] text-center">:</div>
+                                <div className="font-bold text-slate-800">{transaction.fatherName || '-'}</div>
+
+                                <div className="font-bold text-[#045c84]">মোবাইল</div>
+                                <div className="font-bold text-[#045c84] text-center">:</div>
+                                <div className="font-bold text-slate-800">{transaction.mobileNumber || '-'}</div>
+
                                 {transaction.className && (
-                                    <p className="text-slate-600 font-bold text-[13px]">শ্রেণী: <span className="font-black text-[#045c84]">{transaction.className}</span></p>
+                                    <>
+                                        <div className="font-bold text-[#045c84]">শ্রেণী</div>
+                                        <div className="font-bold text-[#045c84] text-center">:</div>
+                                        <div className="font-black text-[#045c84]">{transaction.className}</div>
+                                    </>
                                 )}
                             </div>
                         </div>
-                    </div>
-                    <div className="text-right">
-                            {!isLedger && (
-                                <>
-                                    <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mb-1">তারিখ</p>
-                                    <p className="text-[16px] font-black text-slate-800 mb-2">{new Date(transaction.createdAt || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                </>
+                        
+                        <div className="shrink-0">
+                            {transaction.studentPhoto ? (
+                                <img src={transaction.studentPhoto} alt={transaction.studentName} className="w-20 h-24 rounded-xl object-cover border-2 border-slate-200 shadow-sm" />
+                            ) : (
+                                <div className="w-20 h-24 rounded-xl bg-slate-50 flex items-center justify-center border-2 border-slate-200 shadow-sm text-slate-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                </div>
                             )}
-
-                        <p className="font-bold text-slate-500 text-[12px] mb-1">{isLedger ? 'লেজার' : 'রশিদ নং'}</p>
-                        <h3 className="font-black text-[16px] text-slate-900 font-mono tracking-tighter">{isLedger ? (transaction.studentUniqueId || 'লেজার') : (transaction.receiptNo || 'N/A')}</h3>
+                        </div>
                     </div>
                 </div>
 
                 {isLedger ? (
                     <div className="overflow-x-auto bg-white p-4 rounded-2xl mt-6">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full text-left border-collapse border border-slate-400">
                             <thead>
-                                <tr className="bg-slate-50/50 border-b-2 border-slate-800">
-                                    <th className="py-2 px-2 font-bold text-slate-700 text-[14px] w-12">ক্র.নং</th>
-                                    <th className="py-2 px-2 font-bold text-slate-700 text-[14px]">রশিদ নং</th>
-                                    <th className="py-2 px-2 font-bold text-slate-700 text-[14px]">তারিখ</th>
-                                    <th className="py-2 px-2 font-bold text-slate-700 text-[14px]">বিবরণ / খাত</th>
-                                    <th className="py-2 px-2 font-bold text-slate-700 text-right text-[14px]">পরিমাণ (টাকা)</th>
+                                <tr className="bg-slate-100 border-b border-slate-400">
+                                    <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 text-[14px] w-12 text-center">ক্র.নং</th>
+                                    <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 text-[14px]">রশিদ নং</th>
+                                    <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 text-[14px]">তারিখ</th>
+                                    <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 text-[14px]">বিবরণ / খাত</th>
+                                    <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 text-right text-[14px]">পরিমাণ (টাকা)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -242,56 +278,58 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                                     const feeLabel = buildFeeLabel(t, t.originalCategory || t.category || '');
                                     const dateStr = new Date(t.date || t.createdAt || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' });
                                     return (
-                                        <tr key={`ledger-row-${idx}`} className="border-b border-slate-100">
-                                            <td className="py-2 px-2 text-slate-800 font-bold text-[14px]">{idx + 1}</td>
-                                            <td className="py-2 px-2 text-slate-800 text-[14px]">{t.receiptNo || '-'}</td>
-                                            <td className="py-2 px-2 text-slate-800 text-[14px]">{dateStr}</td>
-                                            <td className="py-2 px-2 text-slate-800 text-[14px]">{feeLabel}</td>
-                                            <td className="py-2 px-2 text-slate-800 text-right text-[14px]">{(Number(t.amount) || 0).toLocaleString()}/-</td>
+                                        <tr key={`ledger-row-${idx}`}>
+                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 font-bold text-[14px] text-center">{idx + 1}</td>
+                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px]">{t.receiptNo || '-'}</td>
+                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px]">{dateStr}</td>
+                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px]">{feeLabel}</td>
+                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 text-right text-[14px]">{(Number(t.amount) || 0).toLocaleString()}/-</td>
                                         </tr>
                                     );
                                 })}
                                 <tr>
-                                    <td colSpan={4} className="py-3 text-right font-bold text-slate-700 pr-6 text-[14px]">সর্বমোট:</td>
-                                    <td className="py-3 text-right font-black text-[18px] text-slate-900 border-t-2 border-slate-800">{transaction.amount.toLocaleString()}/-</td>
+                                    <td colSpan={4} className="py-1.5 px-3 border border-slate-400 text-right font-bold text-slate-800 text-[14px]">সর্বমোট:</td>
+                                    <td className="py-1.5 px-3 border border-slate-400 text-right font-black text-[18px] text-slate-900 bg-slate-50/80">{transaction.amount.toLocaleString()}/-</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 ) : (
-                    <table className="w-full text-left mt-6 mb-2 border-collapse">
+                    <table className="w-full text-left mt-6 mb-2 border-collapse border border-slate-400">
                         <thead>
-                            <tr className="border-b-2 border-slate-800">
-                                <th className="py-2 font-bold text-slate-700 w-12 text-[14px]">ক্র.নং</th>
-                                <th className="py-2 font-bold text-slate-700 text-[14px]">বিবরণ / খাত</th>
-                                <th className="py-2 font-bold text-slate-700 text-right text-[14px]">পরিমাণ (টাকা)</th>
+                            <tr className="bg-slate-100 border-b border-slate-400">
+                                <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 w-12 text-[14px] text-center">ক্র.নং</th>
+                                <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 text-[14px]">বিবরণ / খাত</th>
+                                <th className="py-1 px-3 border border-slate-400 font-bold text-slate-700 text-right text-[14px]">পরিমাণ (টাকা)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {Object.entries(groupedByCategory).map(([categoryKey, group]: [string, any], gIdx) => (
                                 <React.Fragment key={gIdx}>
-                                    <tr className="border-b border-slate-200/60 bg-slate-50/50">
-                                        <td className="py-2 px-2 text-slate-800 font-bold text-[14px]">{gIdx + 1}</td>
-                                        <td className="py-2 px-2 text-slate-800 font-bold text-[14px]">{categoryKey}</td>
-                                        <td className="py-2 px-2 text-slate-800 font-bold text-right text-[14px]">{group.total.toLocaleString()}/-</td>
+                                    <tr className="bg-slate-50/50">
+                                        <td className="py-1 px-3 border border-slate-400 text-slate-800 font-bold text-[14px] text-center">{gIdx + 1}</td>
+                                        <td className="py-1 px-3 border border-slate-400 text-slate-800 font-bold text-[14px]">{categoryKey}</td>
+                                        <td className="py-1 px-3 border border-slate-400 text-slate-800 font-bold text-right text-[14px]">{group.total.toLocaleString()}/-</td>
                                     </tr>
                                     {group.items.map((t: any, idx: number) => {
                                         const feeLabel = buildFeeLabel(t, categoryKey);
                                         return (
-                                            <tr key={`${gIdx}-${idx}`} className="border-b border-slate-100 last:border-slate-200">
-                                                <td className="py-1"></td>
-                                                <td className="py-1 px-2 text-slate-600 text-[12px] flex items-center gap-2">
-                                                    <div className="w-1 h-1 rounded-full bg-slate-400" /> {feeLabel}
+                                            <tr key={`${gIdx}-${idx}`}>
+                                                <td className="py-0.5 px-3 border border-slate-400"></td>
+                                                <td className="py-0.5 px-3 border border-slate-400">
+                                                    <div className="text-slate-600 text-[12px] flex items-center gap-2">
+                                                        <span className="w-1 h-1 rounded-full bg-slate-400 inline-block mr-1"></span> {feeLabel}
+                                                    </div>
                                                 </td>
-                                                <td className="py-1 px-2 text-slate-600 text-[12px] text-right">{t.amount.toLocaleString()}/-</td>
+                                                <td className="py-0.5 px-3 border border-slate-400 text-slate-600 text-[12px] text-right">{t.amount.toLocaleString()}/-</td>
                                             </tr>
                                         );
                                     })}
                                 </React.Fragment>
                             ))}
                             <tr>
-                                <td colSpan={2} className="py-3 text-right font-bold text-slate-700 pr-6 text-[14px]">সর্বমোট:</td>
-                                <td className="py-3 text-right font-black text-[18px] text-slate-900 border-t-2 border-slate-800">{transaction.amount.toLocaleString()}/-</td>
+                                <td colSpan={2} className="py-1.5 px-3 border border-slate-400 text-right font-bold text-slate-800 text-[14px]">সর্বমোট:</td>
+                                <td className="py-1.5 px-3 border border-slate-400 text-right font-black text-[18px] text-slate-900 bg-slate-50/80">{transaction.amount.toLocaleString()}/-</td>
                             </tr>
                         </tbody>
                     </table>
@@ -310,7 +348,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
     if (!transaction || !mounted) return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 font-bengali">
+        <div className="fixed inset-0 z-[10050] flex items-center justify-center p-4 font-bengali">
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -344,8 +382,8 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto bg-slate-200/50 flex justify-center py-4 px-4">
-                    <div className="shadow-2xl bg-white origin-top flex-shrink-0 rounded-3xl border border-slate-200 overflow-auto max-h-[80vh]" style={{ width: isLedger ? 'min(210mm, 90vw)' : 'min(148mm, 84vw)' }}>
+                <div className="flex-1 overflow-y-auto bg-slate-200/50 flex justify-center items-start py-8 px-4" data-lenis-prevent>
+                    <div className="shadow-2xl bg-white flex-shrink-0 rounded-xl border border-slate-200" style={{ width: isLedger ? 'min(210mm, 90vw)' : 'min(180mm, 84vw)' }}>
                         {renderReceiptContent(true)}
                     </div>
                 </div>

@@ -8,50 +8,53 @@ interface PrintLayoutProps {
     institute?: any;
     children: React.ReactNode;
     date?: string;
-    pageSize?: 'A4' | 'A5';
+    pageSize?: 'A4' | 'A5' | 'A3' | 'Letter' | 'Legal' | 'auto' | string;
     previewOnly?: boolean;
     hideDate?: boolean;
     hideTitle?: boolean;
     pagePadding?: number;
+    hideLogo?: boolean;
 }
 
-export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding }: PrintLayoutProps) {
+export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding, hideLogo = false }: PrintLayoutProps) {
     const isA5 = pageSize === 'A5';
     const baseClass = `${previewOnly ? '' : 'print-area'} bg-white p-4 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 flex flex-col`;
     const sizeClass = previewOnly ? (isA5 ? 'min-h-[210mm] w-full mx-auto' : 'min-h-[10.5in] w-full') : 'w-full';
     return (
         <div className={`${baseClass} ${sizeClass}`} style={{ padding: `${pagePadding ?? 16}px` }}>
             {/* Institute Header: logo flush-left, institute text centered */}
-            <div className="mb-0 border-b-2 border-slate-800 pb-4" style={{ display: 'grid', gridTemplateColumns: '96px 1fr 96px', alignItems: 'center' }}>
+            <div className={`mb-0 border-b-2 border-slate-800 ${hideTitle ? 'pb-4' : 'pb-8'}`} style={{ display: 'grid', gridTemplateColumns: hideLogo ? '1fr' : '96px 1fr 96px', alignItems: 'center' }}>
                 {/* left logo column */}
-                <div className="pl-4 flex items-center justify-start">
-                    {institute?.logo ? (
-                        <img src={institute.logo} alt={institute.name} className="w-20 h-20 object-contain" />
-                    ) : (
-                        <div className="w-20 h-20 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center">
-                            <Building2 size={40} className="text-slate-400" />
-                        </div>
-                    )}
-                </div>
+                {!hideLogo && (
+                    <div className="pl-4 flex items-center justify-start">
+                        {institute?.logo ? (
+                            <img src={institute.logo} alt={institute.name} className="w-20 h-20 object-contain" />
+                        ) : (
+                            <div className="w-20 h-20 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center">
+                                <Building2 size={40} className="text-slate-400" />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* centered title column (will not overlap logo) */}
-                <div className="flex flex-col items-center justify-center">
-                    <h1 className="text-[24px] font-black uppercase tracking-tight text-slate-900 leading-tight text-center">
+                <div className="flex flex-col items-center justify-center" style={{ minWidth: 0 }}>
+                    <h1 className="text-[24px] font-black uppercase tracking-tight text-slate-900 leading-tight text-center whitespace-nowrap">
                         {institute?.name || 'Education Institute'}
                     </h1>
-                    <p className="text-[16px] font-bold text-slate-600 text-center">
+                    <p className="text-[16px] font-bold text-slate-600 text-center whitespace-nowrap">
                         {institute?.address || 'Address not provided'}
                     </p>
                 </div>
 
                 {/* right placeholder column (keeps center truly centered) */}
-                <div className="pr-4" />
+                {!hideLogo && <div className="pr-4" />}
             </div>
 
             {/* Document Title overlapping the break line */}
             {!hideTitle && (
-                <div className="flex justify-center mb-3" style={{ marginTop: '-12px' }}>
-                    <div className="inline-block bg-slate-900 text-white px-4 py-1 rounded-full font-black text-[16px] uppercase tracking-widest relative z-10 border-[6px] border-white">
+                <div className="flex justify-center mb-3" style={{ marginTop: '-18px' }}>
+                    <div className="inline-block bg-slate-900 text-white px-3 py-1 rounded-full font-black text-[14px] uppercase tracking-widest relative z-10 border-4 border-white">
                         {title}
                     </div>
                 </div>
@@ -72,15 +75,23 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                 {children}
             </div>
 
-            {/* Signature area removed as requested */}
-
-            {/* Footer Notice removed per request */}
+            {/* Signature Area */}
+            <div className="flex items-end justify-between mt-12 pt-4 signature-area shrink-0">
+                <div className="text-center">
+                    <div className="w-40 border-t border-slate-400 mb-1.5 mx-auto"></div>
+                    <p className="font-bold text-slate-600 text-[13px]">আদায়কারীর স্বাক্ষর</p>
+                </div>
+                <div className="text-center">
+                    <div className="w-40 border-t border-slate-400 mb-1.5 mx-auto"></div>
+                    <p className="font-bold text-slate-600 text-[13px]">প্রধান শিক্ষকের স্বাক্ষর</p>
+                </div>
+            </div>
 
             <style jsx global>{`
                 @media print {
                     @page {
                         size: ${pageSize} portrait;
-                        margin: 0.15in;
+                        margin: 0.5in;
                     }
                     body, html {
                         height: auto !important;

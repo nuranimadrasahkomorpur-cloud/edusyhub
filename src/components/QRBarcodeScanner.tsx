@@ -167,7 +167,7 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
 
         const cameraId = selectedCamera.id;
         const scannerConfig = {
-            fps: 5,
+            fps: 30,
             qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0,
             disableFlip: false
@@ -199,7 +199,7 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
                     scanDelayRef.current = null;
                 }
                 
-                // Trigger callback after 500ms to prevent rapid successive calls
+                // Trigger callback after 100ms to prevent rapid successive calls but keep it fast
                 scanDelayRef.current = setTimeout(async () => {
                     try {
                         await onScan(normalizedText);
@@ -217,9 +217,9 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
                             }
                             onClose();
                             isProcessingRef.current = false;
-                        }, 300);
+                        }, 100);
                     }
-                }, 500);
+                }, 100);
             }
         };
 

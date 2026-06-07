@@ -211,7 +211,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
             // First try to satisfy pending fees
             for (const fee of pendingFees) {
                 const amt = getFeeAmount(fee);
-                if (remaining >= amt) {
+                if (remaining > 0) {
                     newSelected.add(fee.id);
                     remaining -= amt;
                 }
@@ -220,7 +220,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
             if (autoAllocate && keepAsAdvance) {
                 for (const fee of upcomingFees) {
                     const amt = getFeeAmount(fee);
-                    if (remaining >= amt) {
+                    if (remaining > 0) {
                         newSelected.add(fee.id);
                         remaining -= amt;
                     }

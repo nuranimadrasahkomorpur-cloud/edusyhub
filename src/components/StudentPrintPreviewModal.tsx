@@ -66,6 +66,7 @@ const COL_LABELS: Record<string, string> = {
     sl: 'ক্র.নং',
     rollNumber: 'রোল নং',
     studentId: 'আইডি',
+    photo: 'ছবি',
     student: 'শিক্ষার্থী',
     className: 'ক্লাস ও গ্রুপ',
     contact: 'যোগাযোগ',
@@ -149,8 +150,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
 
 
     /* ── ui state ── */
-    const [leftOpen, setLeftOpen] = useState(true);
-    const [rightOpen, setRightOpen] = useState(true);
+    const [leftOpen, setLeftOpen] = useState(false);
+    const [rightOpen, setRightOpen] = useState(false);
     const [rightTab, setRightTab] = useState<'layout' | 'font'>('layout');
     const [filterText, setFilterText] = useState('');
     const [selectedClassId, setSelectedClassId] = useState<string>('all');
@@ -162,6 +163,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     const [filterBloodGroup, setFilterBloodGroup] = useState<string>('all');
     const [filterReligion, setFilterReligion] = useState<string>('all');
     const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+    const [isSelectedColsExpanded, setIsSelectedColsExpanded] = useState(false);
 
     /* ── settings ── */
     const [fontSize, setFontSize] = useState(14);
@@ -211,6 +213,34 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
         document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = prev; };
     }, []);
+
+    useEffect(() => {
+        // Auto open sidebars on desktop
+        if (window.innerWidth >= 1024) {
+            setLeftOpen(true);
+            setRightOpen(true);
+        }
+    }, []);
+
+    const toggleLeftSidebar = () => {
+        setLeftOpen(p => {
+            const next = !p;
+            if (next && window.innerWidth < 1024) {
+                setRightOpen(false);
+            }
+            return next;
+        });
+    };
+
+    const toggleRightSidebar = () => {
+        setRightOpen(p => {
+            const next = !p;
+            if (next && window.innerWidth < 1024) {
+                setLeftOpen(false);
+            }
+            return next;
+        });
+    };
 
     /* ref to the <main> canvas element for width measurement */
     const mainRef = useRef<HTMLElement | null>(null);
@@ -550,13 +580,13 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                 TOP HEADER BAR
             ══════════════════════════════ */}
             <header
-                className="flex-shrink-0 flex items-center gap-2 px-4 relative z-[10000]"
-                style={{ height: TOP_H, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #e2e8f0', boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}
+                className="flex-shrink-0 flex items-center gap-1.5 md:gap-2 px-2 md:px-4 relative z-[10000] overflow-x-auto hide-scrollbar"
+                style={{ height: TOP_H, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #e2e8f0', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
             >
                 {/* Left group */}
                 <button
                     onClick={onClose}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
+                    className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
                     style={{ background: '#f97316' }}
                 >
                     <ChevronLeft size={16} />
@@ -564,8 +594,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                 </button>
 
                 <button
-                    onClick={() => setLeftOpen(p => !p)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
+                    onClick={toggleLeftSidebar}
+                    className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
                     style={{ background: leftOpen ? '#4f46e5' : '#64748b' }}
                 >
                     <Users size={15} />
@@ -573,7 +603,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                 </button>
 
                 <button
-                    className="flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all hover:opacity-90 active:scale-95 shadow-sm"
+                    className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm transition-all hover:opacity-90 active:scale-95 shadow-sm"
                     style={{ background: '#ecfdf5', color: '#059669' }}
                 >
                     <User size={15} />
@@ -583,10 +613,10 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                 {/* Title removed per request */}
 
                 {/* Right group */}
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="flex items-center gap-1.5 md:gap-2 ml-auto pl-2 flex-shrink-0">
                     <button
                         onClick={handlePrint}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
+                        className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
                         style={{ background: '#2563eb' }}
                     >
                         <Printer size={15} />
@@ -594,8 +624,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                     </button>
 
                     <button
-                        onClick={() => setRightOpen(p => !p)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
+                        onClick={toggleRightSidebar}
+                        className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
                         style={{ background: rightOpen ? '#8b5cf6' : '#64748b' }}
                     >
                         <Settings2 size={15} />
@@ -617,8 +647,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
             <div className="print-modal-body flex flex-1 overflow-hidden relative">
                 {/* ── LEFT DRAWER ── */}
                 <aside
-                    className="flex-shrink-0 flex flex-col bg-white border-r border-slate-200 overflow-hidden transition-all duration-300 relative z-[1000]"
-                    style={{ width: leftOpen ? 300 : 0, opacity: leftOpen ? 1 : 0, pointerEvents: leftOpen ? 'auto' : 'none' }}
+                    className={`flex-shrink-0 flex flex-col bg-white border-r border-slate-200 overflow-hidden transition-all duration-300 ${window.innerWidth < 1024 ? 'absolute inset-y-0 left-0 shadow-2xl' : 'relative'} z-[1000]`}
+                    style={{ width: leftOpen ? (window.innerWidth < 1024 ? '85%' : 300) : 0, maxWidth: 320, opacity: leftOpen ? 1 : 0, pointerEvents: leftOpen ? 'auto' : 'none' }}
                 >
                     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                         <span className="text-sm font-black text-slate-800">শিক্ষার্থী</span>
@@ -847,7 +877,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                     >
                                         {group.className && (
                                             <div className="text-center mb-3 mt-1">
-                                                <h3 className="text-xl font-bold text-slate-800">{group.className}</h3>
+                                                <h3 className="text-lg font-bold text-slate-800">{group.className}</h3>
                                             </div>
                                         )}
                                         <div className="print-overflow-reset overflow-x-auto">
@@ -876,6 +906,27 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                                                 if (colId === 'sl') cell = idx + 1;
                                                                 else if (colId === 'rollNumber') cell = s.metadata?.rollNumber || '-';
                                                                 else if (colId === 'studentId') cell = s.metadata?.studentId || s.id.substring(0, 6);
+                                                                else if (colId === 'photo') {
+                                                                    const imgSrc = s.metadata?.studentPhoto || s.metadata?.photo || null;
+                                                                    cell = (
+                                                                        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                            {imgSrc ? (
+                                                                                <img
+                                                                                    src={imgSrc}
+                                                                                    alt={s.name}
+                                                                                    style={{ width: 'calc(52px * var(--content-scale, 1))', height: 'calc(52px * var(--content-scale, 1))', borderRadius: 4, objectFit: 'cover', border: '1px solid #cbd5e1', display: 'block' }}
+                                                                                />
+                                                                            ) : (
+                                                                                <div style={{ width: 'calc(52px * var(--content-scale, 1))', height: 'calc(52px * var(--content-scale, 1))', borderRadius: 4, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #cbd5e1' }}>
+                                                                                    <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth={1.5} style={{ width: '55%', height: '55%' }}>
+                                                                                        <circle cx="12" cy="8" r="4" />
+                                                                                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                                                                                    </svg>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                }
                                                                 else if (colId === 'student') cell = s.name;
                                                                 else if (colId === 'className') cell = `${classes.find(c => c.id === s.metadata?.classId)?.name || '-'}${s.metadata?.groupId ? ` • ${groups.find(g => g.id === s.metadata?.groupId)?.name || ''}` : ''}`;
                                                                 else if (colId === 'contact') cell = s.phone || s.metadata?.phone || '-';
@@ -890,7 +941,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                                                     </div>
                                                                 );
                                                                         return (
-                                                                    <td key={colId} style={{ padding: `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)`, fontSize: 'inherit' }} className="text-black text-center">
+                                                                    <td key={colId} style={{ padding: colId === 'photo' ? `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)` : `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)`, fontSize: 'inherit' }} className={`text-black ${colId === 'student' ? 'text-left' : 'text-center'}`}>
                                                                         {cell}
                                                                     </td>
                                                                 );
@@ -957,30 +1008,40 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                     {/* Selected columns (draggable) */}
                                     {activeColIds.length > 0 && (
                                         <div className="mb-3">
-                                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">✓ নির্বাচিত কলাম</p>
-                                            <div className="flex flex-col gap-1">
-                                                {activeColIds.map(colId => {
-                                                    const col = allAvailableCols.find(c => c.id === colId);
-                                                    return (
-                                                        <div
-                                                            key={colId}
-                                                            draggable
-                                                            onDragStart={() => handleColDragStart(colId)}
-                                                            onDragOver={e => handleColDragOver(e, colId)}
-                                                            onDragEnd={handleColDragEnd}
-                                                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50 cursor-grab active:cursor-grabbing select-none"
-                                                        >
-                                                            <GripVertical size={13} className="text-indigo-300 flex-shrink-0" />
-                                                            <span className="flex-1 text-xs font-semibold text-indigo-800 truncate">{col?.label || colId}</span>
-                                                            <button
-                                                                onClick={() => removeCol(colId)}
-                                                                className="p-0.5 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                                            <button 
+                                                onClick={() => setIsSelectedColsExpanded(!isSelectedColsExpanded)}
+                                                className="flex items-center justify-between w-full mb-1.5 focus:outline-none group bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1.5 rounded-md transition-colors"
+                                            >
+                                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">✓ নির্বাচিত কলাম ({activeColIds.length})</p>
+                                                {isSelectedColsExpanded ? <ChevronUp size={14} className="text-indigo-400" /> : <ChevronDown size={14} className="text-indigo-400" />}
+                                            </button>
+                                            <div 
+                                                className={`grid transition-all duration-300 ease-in-out ${isSelectedColsExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0'}`}
+                                            >
+                                                <div className="overflow-hidden flex flex-col gap-1">
+                                                    {activeColIds.map(colId => {
+                                                        const col = allAvailableCols.find(c => c.id === colId);
+                                                        return (
+                                                            <div
+                                                                key={colId}
+                                                                draggable
+                                                                onDragStart={() => handleColDragStart(colId)}
+                                                                onDragOver={e => handleColDragOver(e, colId)}
+                                                                onDragEnd={handleColDragEnd}
+                                                                className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50 cursor-grab active:cursor-grabbing select-none"
                                                             >
-                                                                <X size={11} />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
+                                                                <GripVertical size={13} className="text-indigo-300 flex-shrink-0" />
+                                                                <span className="flex-1 text-xs font-semibold text-indigo-800 truncate">{col?.label || colId}</span>
+                                                                <button
+                                                                    onClick={() => removeCol(colId)}
+                                                                    className="p-0.5 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                                                                >
+                                                                    <X size={11} />
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         </div>
                                     )}

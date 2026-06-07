@@ -20,10 +20,10 @@ const getFaceOrientation = (landmarks: faceapi.FaceLandmarks68) => {
     if (distRight === 0) return 'UNKNOWN';
     const ratio = distLeft / distRight;
     
-    // More lenient ratio for 'MIDDLE' so it's easier to capture front face
-    if (ratio >= 0.65 && ratio <= 1.55) {
+    // Make 'MIDDLE' highly forgiving so it's very easy to capture front face perfectly
+    if (ratio >= 0.40 && ratio <= 2.5) {
         return 'MIDDLE';
-    } else if (ratio < 0.65) {
+    } else if (ratio < 0.40) {
         return 'RIGHT';
     } else {
         return 'LEFT';
@@ -49,7 +49,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const [status, setStatus] = useState<'IDLE' | 'LOADING_MODELS' | 'READY' | 'CAPTURING' | 'SAVING' | 'SUCCESS' | 'ERROR'>('IDLE');
-    const [currentStep, setCurrentStep] = useState<'LEFT' | 'MIDDLE' | 'RIGHT' | 'DONE'>('LEFT');
+    const [currentStep, setCurrentStep] = useState<'MIDDLE' | 'RIGHT' | 'LEFT' | 'DONE'>('MIDDLE');
     const [capturedMiddle, setCapturedMiddle] = useState<number[] | null>(null);
     const [capturedMiddleImageBase64, setCapturedMiddleImageBase64] = useState<string | null>(null);
     const [capturedLeft, setCapturedLeft] = useState<number[] | null>(null);
@@ -62,6 +62,9 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
     const [isUsingPhoto, setIsUsingPhoto] = useState(false);
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+    const [countdown, setCountdown] = useState<number | null>(null);
+    const countdownValueRef = useRef<number | null>(null);
+    const countdownTimerRef = useRef<any>(null);
     const { isLowCapacity } = usePerformance();
 
     const [mode, setMode] = useState<'CAMERA' | 'UPLOAD'>('CAMERA');
@@ -332,37 +335,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
             // Process descriptor for current step rather than saving immediately
             const desc = Array.from(detections.descriptor);
 
-            // Verify if the face matches the previously captured step's face (Same Person Validation)
-            if (currentStep === 'MIDDLE' && capturedLeft) {
-                const dist = faceapi.euclideanDistance(capturedLeft, desc);
-                if (dist > 0.6) {
-                    setError('ভিন্ন ব্যক্তি সনাক্ত হয়েছে! অনুগ্রহ করে একই ব্যক্তির ছবি প্রদান করুন।');
-                    setStatus('READY');
-                    clearCurrentPreview();
-                    return;
-                }
-            } else if (currentStep === 'RIGHT') {
-                const compareTarget = capturedMiddle || capturedLeft;
-                if (compareTarget) {
-                    const dist = faceapi.euclideanDistance(compareTarget, desc);
-                    if (dist > 0.6) {
-                        setError('ভিন্ন ব্যক্তি সনাক্ত হয়েছে! অনুগ্রহ করে একই ব্যক্তির ছবি প্রদান করুন।');
-                        setStatus('READY');
-                        clearCurrentPreview();
-                        return;
-                    }
-                }
-            }
-
-            if (currentStep === 'LEFT') {
-                setCapturedLeft(desc);
-                setIsStepLocked(true);
-                setProgress(35);
-                setTimeout(() => {
-                    setCurrentStep('MIDDLE');
-                    setIsStepLocked(false);
-                }, 2000);
-            } else if (currentStep === 'MIDDLE') {
+            if (currentStep === 'MIDDLE') {
                 // Check for potential duplicates (Scaled Accuracy) on MIDDLE face
                 try {
                     const checkRes = await fetch(`/api/admin/students/check-duplicate-face`, {
@@ -374,7 +347,9 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                     if (checkRes.ok) {
                         const checkData = await checkRes.json();
                         if (checkData.isDuplicate && checkData.studentId !== studentId) {
-                            setError(`এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে। এটি নতুন করে যুক্ত করা সম্ভব নয়।`);
+                            const msg = `এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে। এটি নতুন করে যুক্ত করা সম্ভব নয়।`;
+                            setError(msg);
+                            window.alert(msg);
                             setStatus('READY');
                             clearCurrentPreview();
                             return;
@@ -386,20 +361,28 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
 
                 setCapturedMiddle(desc);
                 setIsStepLocked(true);
-                setProgress(70);
+                setProgress(35);
                 setTimeout(() => {
                     setCurrentStep('RIGHT');
                     setIsStepLocked(false);
                 }, 2000);
             } else if (currentStep === 'RIGHT') {
                 setCapturedRight(desc);
+                setIsStepLocked(true);
+                setProgress(70);
+                setTimeout(() => {
+                    setCurrentStep('LEFT');
+                    setIsStepLocked(false);
+                }, 2000);
+            } else if (currentStep === 'LEFT') {
+                setCapturedLeft(desc);
                 setProgress(90);
                 
                 // Auto-save when all three are successfully captured
                 const descs = [
-                    capturedLeft || desc,
+                    desc,
                     capturedMiddle || desc,
-                    desc
+                    capturedRight || desc
                 ];
                 await saveFaceDescriptors(descs);
             }
@@ -484,9 +467,9 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                     await saveFaceDescriptors([leftDesc, middleDesc, rightDesc], middleImageBase64 || undefined);
                 } else {
                     setError('সবগুলো দিক (বাম, ডান, সোজা) সফলভাবে সনাক্ত করা যায়নি। অনুগ্রহ করে অনুপস্থিত ছবিগুলো আলাদাভাবে আপলোড করুন।');
-                    if (!leftDesc) setCurrentStep('LEFT');
-                    else if (!middleDesc) setCurrentStep('MIDDLE');
+                    if (!middleDesc) setCurrentStep('MIDDLE');
                     else if (!rightDesc) setCurrentStep('RIGHT');
+                    else if (!leftDesc) setCurrentStep('LEFT');
                     else setCurrentStep('DONE');
                     setStatus('READY');
                 }
@@ -592,7 +575,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
         setCapturedMiddleImageBase64(null);
         setCapturedLeft(null);
         setCapturedRight(null);
-        setCurrentStep('LEFT');
+        setCurrentStep('MIDDLE');
         setIsStepLocked(false);
         setDetectedOrientation(null);
         setStatus('CAPTURING');
@@ -693,31 +676,49 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                 if (detections && detections.detection.score >= 0.50) {
                     const orientation = getFaceOrientation(detections.landmarks);
                     setDetectedOrientation(orientation);
-                    
-                    if (currentStep === 'LEFT' && orientation === 'LEFT') {
-                        setCapturedLeft(Array.from(detections.descriptor));
-                        setIsStepLocked(true);
-                        setProgress(35);
-                        setTimeout(() => {
-                            setCurrentStep('MIDDLE');
-                            setIsStepLocked(false);
-                        }, 2000);
-                    } else if (currentStep === 'MIDDLE' && orientation === 'MIDDLE') {
-                        // Same Person Validation
-                        if (capturedLeft) {
-                            const dist = faceapi.euclideanDistance(capturedLeft, Array.from(detections.descriptor));
-                            if (dist > 0.6) {
-                                setError('ভিন্ন ব্যক্তি সনাক্ত হয়েছে! অনুগ্রহ করে একই ব্যক্তির ছবি স্ক্যান করুন।');
-                                setTimeout(() => setError(null), 3000);
-                                setDetectedOrientation(null);
-                                // Skip capturing this frame, let loop continue
-                                if (active && status === 'CAPTURING') {
-                                    timerId = setTimeout(scanFrame, 200);
-                                }
-                                return;
-                            }
-                        }
 
+                    // Cancel countdown if face orientation is no longer MIDDLE
+                    if (currentStep === 'MIDDLE' && orientation !== 'MIDDLE') {
+                        if (countdownValueRef.current !== null) {
+                            clearInterval(countdownTimerRef.current);
+                            countdownValueRef.current = null;
+                            setCountdown(null);
+                        }
+                    }
+                    
+                    if (currentStep === 'MIDDLE' && orientation === 'MIDDLE') {
+                        // Handle 3-2-1 countdown logic
+                        if (countdownValueRef.current === null) {
+                            countdownValueRef.current = 3;
+                            setCountdown(3);
+                            countdownTimerRef.current = setInterval(() => {
+                                if (countdownValueRef.current && countdownValueRef.current > 1) {
+                                    countdownValueRef.current -= 1;
+                                    setCountdown(countdownValueRef.current);
+                                } else {
+                                    clearInterval(countdownTimerRef.current);
+                                    countdownValueRef.current = 0; // 0 means time to capture
+                                    setCountdown(0);
+                                }
+                            }, 1000);
+                            
+                            // Let the loop continue without capturing yet
+                            if (active && status === 'CAPTURING') {
+                                timerId = setTimeout(scanFrame, 200);
+                            }
+                            return;
+                        } else if (countdownValueRef.current > 0) {
+                            // Still counting down, wait
+                            if (active && status === 'CAPTURING') {
+                                timerId = setTimeout(scanFrame, 200);
+                            }
+                            return;
+                        }
+                        
+                        // Countdown is 0, proceed to capture!
+                        countdownValueRef.current = null;
+                        setCountdown(null);
+                        
                         // Check duplicate on middle face
                         try {
                             const checkRes = await fetch(`/api/admin/students/check-duplicate-face`, {
@@ -728,11 +729,13 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                             if (checkRes.ok) {
                                 const checkData = await checkRes.json();
                                 if (checkData.isDuplicate && checkData.studentId !== studentId) {
-                                    setError(`এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে।`);
-                                    setTimeout(() => setError(null), 3000);
+                                    const msg = `এই মুখটি ইতিপূর্বে ${checkData.studentName} নামে নিবন্ধিত হয়েছে। এটি নতুন করে যুক্ত করা সম্ভব নয়।`;
+                                    setError(msg);
+                                    window.alert(msg);
+                                    setTimeout(() => setError(null), 5000);
                                     setDetectedOrientation(null);
                                     if (active && status === 'CAPTURING') {
-                                        timerId = setTimeout(scanFrame, 200);
+                                        timerId = setTimeout(scanFrame, 1000);
                                     }
                                     return;
                                 }
@@ -759,17 +762,16 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
 
                         setCapturedMiddle(Array.from(detections.descriptor));
                         setIsStepLocked(true);
-                        setProgress(70);
+                        setProgress(35);
                         setTimeout(() => {
                             setCurrentStep('RIGHT');
                             setIsStepLocked(false);
                         }, 2000);
                     } else if (currentStep === 'RIGHT' && orientation === 'RIGHT') {
-                        // Same Person Validation
-                        const compareTarget = capturedMiddle || capturedLeft;
-                        if (compareTarget) {
-                            const dist = faceapi.euclideanDistance(compareTarget, Array.from(detections.descriptor));
-                            if (dist > 0.6) {
+                        // Same Person Validation (lenient threshold)
+                        if (capturedMiddle) {
+                            const dist = faceapi.euclideanDistance(capturedMiddle, Array.from(detections.descriptor));
+                            if (dist > 0.75) {
                                 setError('ভিন্ন ব্যক্তি সনাক্ত হয়েছে! অনুগ্রহ করে একই ব্যক্তির ছবি স্ক্যান করুন।');
                                 setStatus('READY');
                                 return;
@@ -777,19 +779,44 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                         }
 
                         setCapturedRight(Array.from(detections.descriptor));
+                        setIsStepLocked(true);
+                        setProgress(70);
+                        setTimeout(() => {
+                            setCurrentStep('LEFT');
+                            setIsStepLocked(false);
+                        }, 2000);
+                    } else if (currentStep === 'LEFT' && orientation === 'LEFT') {
+                        // Same Person Validation (lenient threshold)
+                        const compareTarget = capturedMiddle || capturedRight;
+                        if (compareTarget) {
+                            const dist = faceapi.euclideanDistance(compareTarget, Array.from(detections.descriptor));
+                            if (dist > 0.75) {
+                                setError('ভিন্ন ব্যক্তি সনাক্ত হয়েছে! অনুগ্রহ করে একই ব্যক্তির ছবি স্ক্যান করুন।');
+                                setStatus('READY');
+                                return;
+                            }
+                        }
+
+                        setCapturedLeft(Array.from(detections.descriptor));
                         setCurrentStep('DONE');
                         setProgress(90);
                         
                         // Auto-save when all three are successfully captured
                         const descs = [
-                            capturedLeft || Array.from(detections.descriptor),
+                            Array.from(detections.descriptor), // left
                             capturedMiddle || Array.from(detections.descriptor),
-                            Array.from(detections.descriptor)
+                            capturedRight || Array.from(detections.descriptor)
                         ];
                         await saveFaceDescriptors(descs);
                     }
                 } else {
                     setDetectedOrientation(null);
+                    // Cancel countdown if face is lost
+                    if (currentStep === 'MIDDLE' && countdownValueRef.current !== null) {
+                        clearInterval(countdownTimerRef.current);
+                        countdownValueRef.current = null;
+                        setCountdown(null);
+                    }
                 }
             } catch (err) {
                 console.error("Frame scan error:", err);
@@ -807,6 +834,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
         return () => {
             active = false;
             if (timerId) clearTimeout(timerId);
+            if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
             if (canvasRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
                 ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -925,11 +953,27 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                             </button>
 
                             {/* Face Overlay Guideline */}
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                                 <div className="w-64 h-64 border-2 border-dashed border-white/20 rounded-full flex items-center justify-center">
                                     <div className="w-56 h-56 border-2 border-white/40 rounded-full" />
                                 </div>
                             </div>
+
+                            {/* 3-2-1 Countdown Overlay */}
+                            {countdown !== null && countdown > 0 && (
+                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
+                                    <motion.span 
+                                        key={countdown}
+                                        initial={{ scale: 0.5, opacity: 0 }}
+                                        animate={{ scale: 1.2, opacity: 1 }}
+                                        exit={{ scale: 2, opacity: 0 }}
+                                        className="text-8xl font-black text-white drop-shadow-2xl"
+                                    >
+                                        {countdown}
+                                    </motion.span>
+                                    <span className="text-white font-bold mt-4 tracking-widest text-sm uppercase">স্থির থাকুন...</span>
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -943,52 +987,14 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                     ম্যানুয়াল ফটো আপলোড
                                 </h4>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                    বাম, সামনে এবং ডান দিকের ছবি আপলোড করুন
+                                    সামনে, ডান এবং বাম দিকের ছবি আপলোড করুন
                                     <br />(একসাথে ৩টি ছবি আপলোড করা যাবে)
                                 </p>
                             </div>
 
                             {/* Three Upload Slots Grid */}
                             <div className="grid grid-cols-3 gap-3 my-auto">
-                                {/* Slot 1: Left */}
-                                <div 
-                                    onClick={() => currentStep === 'LEFT' && !isUsingPhoto && uploadInputRef.current?.click()}
-                                    className={`relative aspect-[3/4] rounded-2xl border-2 flex flex-col items-center justify-center overflow-hidden transition-all bg-white ${
-                                        capturedLeft 
-                                            ? 'border-emerald-500 shadow-md shadow-emerald-50/50' 
-                                            : currentStep === 'LEFT' 
-                                                ? 'border-[#045c84] ring-4 ring-[#045c84]/10 cursor-pointer scale-105 shadow-md shadow-slate-100' 
-                                                : 'border-slate-200 opacity-50 cursor-not-allowed'
-                                    }`}
-                                >
-                                    {previewLeft ? (
-                                        <img src={previewLeft} alt="Left" className="w-full h-full object-cover" />
-                                    ) : capturedLeft ? (
-                                        <div className="flex flex-col items-center gap-1 text-center text-emerald-500 p-2">
-                                            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
-                                                <CheckCircle2 size={16} />
-                                            </div>
-                                            <span className="text-[8px] font-black leading-tight">স্ক্যানকৃত</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-1.5 p-2 text-center text-slate-400">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentStep === 'LEFT' ? 'bg-[#045c84]/10 text-[#045c84]' : 'bg-slate-50 text-slate-300'}`}>
-                                                <Upload size={14} />
-                                            </div>
-                                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">আপলোড</span>
-                                        </div>
-                                    )}
-                                    <div className={`absolute bottom-0 left-0 right-0 py-1 text-center text-[8px] font-bold text-white uppercase tracking-wider ${capturedLeft ? 'bg-emerald-500' : 'bg-slate-700/80'}`}>
-                                        ১. বাম দিক
-                                    </div>
-                                    {capturedLeft && (
-                                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow">
-                                            <CheckCircle2 size={10} strokeWidth={3} />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Slot 2: Middle */}
+                                {/* Slot 1: Middle */}
                                 <div 
                                     onClick={() => currentStep === 'MIDDLE' && !isUsingPhoto && uploadInputRef.current?.click()}
                                     className={`relative aspect-[3/4] rounded-2xl border-2 flex flex-col items-center justify-center overflow-hidden transition-all bg-white ${
@@ -1017,7 +1023,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                         </div>
                                     )}
                                     <div className={`absolute bottom-0 left-0 right-0 py-1 text-center text-[8px] font-bold text-white uppercase tracking-wider ${capturedMiddle ? 'bg-emerald-500' : 'bg-slate-700/80'}`}>
-                                        ২. সামনে সোজা
+                                        ১. সামনে সোজা
                                     </div>
                                     {capturedMiddle && (
                                         <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow">
@@ -1026,7 +1032,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                     )}
                                 </div>
 
-                                {/* Slot 3: Right */}
+                                {/* Slot 2: Right */}
                                 <div 
                                     onClick={() => currentStep === 'RIGHT' && !isUsingPhoto && uploadInputRef.current?.click()}
                                     className={`relative aspect-[3/4] rounded-2xl border-2 flex flex-col items-center justify-center overflow-hidden transition-all bg-white ${

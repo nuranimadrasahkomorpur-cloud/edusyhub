@@ -23,6 +23,7 @@ import {
     Pause
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePathname } from 'next/navigation';
 import { useSession } from './SessionProvider';
 import { usePerformance } from '../hooks/usePerformance';
 import { Lock } from 'lucide-react';
@@ -335,9 +336,20 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             const audio = audioRefs.current[type];
             if (!audio) return;
 
-            // Reset and play
-            audio.currentTime = 0;
-            audio.play().catch(e => console.error('Audio play failed:', e));
+            // Clone the audio node so it can play independently without cutting off 
+            // any currently playing instances of the same sound
+            const clone = audio.cloneNode() as HTMLAudioElement;
+            clone.volume = 1.0;
+            
+            const playPromise = clone.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => console.error('Audio play failed:', e));
+            }
+            
+            // Clean up memory after playing
+            clone.onended = () => {
+                clone.remove();
+            };
         } catch (e) {
             console.error('Audio playback error:', e);
         }
@@ -432,6 +444,16 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             setIsTestMode(false);
         }
     };
+
+    const pathname = usePathname();
+
+    // Auto-stop camera completely when moving to another page in the dashboard 
+    // to prevent background CPU/RAM usage and turn off the webcam light!
+    useEffect(() => {
+        if (pathname && !pathname.includes('/attendance/scan') && isCameraActive) {
+            stopScanner();
+        }
+    }, [pathname, isCameraActive]);
 
     // Real-time Sync Polling
     useEffect(() => {
@@ -810,6 +832,20 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
 
     const lastSoundPlayed = useRef<{ [label: string]: number }>({});
 
+    // Pause heavy camera processing when the mobile sidebar is opened to prevent lag
+    useEffect(() => {
+        const handleSidebarOpen = () => setIsPaused(true);
+        const handleSidebarClose = () => setIsPaused(false);
+        
+        window.addEventListener('dashboard-sidebar-open', handleSidebarOpen);
+        window.addEventListener('dashboard-sidebar-close', handleSidebarClose);
+        
+        return () => {
+            window.removeEventListener('dashboard-sidebar-open', handleSidebarOpen);
+            window.removeEventListener('dashboard-sidebar-close', handleSidebarClose);
+        };
+    }, []);
+
     useEffect(() => {
         // Better approach: use Web Audio API for reliable generated sounds using single context
         // processFrame will use the playSound from the outer scope
@@ -842,19 +878,44 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
 
             isProcessing = true;
             try {
-                // Use more lenient thresholds for real-time detection
-                const detections = await faceapi
-                    .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
-                    .withFaceLandmarks()
-                    .withFaceDescriptors();
+                // Step 1: Quick detection only (very lightweight)
+                const basicDetections = await faceapi.detectAllFaces(
+                    videoRef.current, 
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })
+                );
 
                 if (isPausedRef.current) {
                     if (canvasRef.current) {
                         const ctx = canvasRef.current.getContext('2d');
                         ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
                     }
+                    isProcessing = false;
                     return;
                 }
+
+                if (basicDetections.length === 0) {
+                    // Step 3: No face found, pause for 2 seconds before looking again to save CPU
+                    (videoRef.current as any).lastProcessTime = now + 2000;
+                    if (canvasRef.current) {
+                        const ctx = canvasRef.current.getContext('2d');
+                        ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                    }
+                    isProcessing = false;
+                    requestRef.current = requestAnimationFrame(processFrame);
+                    return;
+                }
+
+                // Security check: if the user navigated away while the first scan was running, videoRef might be null now!
+                if (!videoRef.current) {
+                    isProcessing = false;
+                    return;
+                }
+
+                // Step 2: Face found, now extract detailed landmarks and descriptors for matching
+                const detections = await faceapi
+                    .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
 
                 if (detections.length > 0 && canvasRef.current) {
                     const displaySize = { width: videoRef.current.videoWidth, height: videoRef.current.videoHeight };
@@ -913,13 +974,17 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
 
                             const candidate = candidates.length > 0 ? candidates[0] : null;
                             const student = candidate ? candidate.student : null;
-                            const box = detection.detection.box;
 
-                            // NEW: If there are multiple close matches, trigger selection UI
+                            // NEW: If unregistered face found, pause entire scanner for 2 seconds!
+                            if (!student) {
+                                (videoRef.current as any).lastProcessTime = now + 2000;
+                            }
+
+                            // If there are multiple close matches, trigger selection UI
                             // Ambiguity is defined as having more than one candidate within a close distance range
                             if (candidates.length > 1 && (candidates[1].distance - candidates[0].distance < 0.08)) {
-                                // Simple hash for the descriptor to track "ignored" faces
-                                const descriptorHash = Array.from(detection.descriptor.slice(0, 10)).map(v => v.toFixed(2)).join(',');
+                                // Generate a simple hash from the first few descriptor values to identify this face
+                                const descriptorHash = Array.from(detection.descriptor.slice(0, 10)).map(n => n.toFixed(2)).join(',');
                                 const lastIgnored = ignoredFaces.current[descriptorHash] || 0;
                                 
                                 if (now - lastIgnored > 10000) { // 10 second ignore window
@@ -934,6 +999,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                 }
                             }
 
+                            const box = detection.detection.box;
                             const isMirrored = facingMode === 'user';
                             const mirroredBox = isMirrored ? {
                                 x: displaySize.width - box.x - box.width,
@@ -1014,10 +1080,37 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                     setIsProcessingLocked(true);
                                     locallyLocked = true;
 
+                                    // Draw a prominent checkmark over the face
+                                    const ctx = canvasRef.current!.getContext('2d');
+                                    if (ctx) {
+                                        const cx = mirroredBox.x + mirroredBox.width / 2;
+                                        const cy = mirroredBox.y + mirroredBox.height / 2;
+                                        const radius = Math.max(30, Math.min(mirroredBox.width, mirroredBox.height) / 4);
+                                        
+                                        // Solid green circle
+                                        ctx.beginPath();
+                                        ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
+                                        ctx.fillStyle = '#10b981';
+                                        ctx.fill();
+                                        
+                                        // White border
+                                        ctx.lineWidth = 4;
+                                        ctx.strokeStyle = '#ffffff';
+                                        ctx.stroke();
+                                        
+                                        // Checkmark icon
+                                        ctx.beginPath();
+                                        ctx.moveTo(cx - radius * 0.4, cy);
+                                        ctx.lineTo(cx - radius * 0.1, cy + radius * 0.3);
+                                        ctx.lineTo(cx + radius * 0.5, cy - radius * 0.4);
+                                        ctx.lineWidth = Math.max(3, radius * 0.15);
+                                        ctx.stroke();
+                                    }
+
                                     setTimeout(() => {
                                         setMatchingState({ status: 'IDLE' });
                                         setIsProcessingLocked(false);
-                                    }, 1800);
+                                    }, 2000); // 2 second pause
                                 }
                             }
                         });

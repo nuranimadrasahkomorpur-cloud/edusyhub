@@ -68,6 +68,7 @@ import BookCard from '@/components/BookCard';
 import BookDetailsModal from '@/components/BookDetailsModal';
 import PdfReaderModal from '@/components/PdfReaderModal';
 import TeacherPermissionModal from '@/components/TeacherPermissionModal';
+import AddTeacherModal from '@/components/AddTeacherModal';
 import SubjectGradingModal from '@/components/SubjectGradingModal';
 import FeeCollectModal from '@/components/FeeCollectModal';
 import PrintReceiptModal from '@/components/PrintReceiptModal';
@@ -275,8 +276,27 @@ export default function StudentManagementPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isAddTeacherModalOpen, setIsAddTeacherModalOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+    const [openedViaScanner, setOpenedViaScanner] = useState(false);
+    const [showScanButton, setShowScanButton] = useState(true);
+    const scanLastScrollY = useRef(0);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            if (currentScrollY > scanLastScrollY.current && currentScrollY > 50) {
+                setShowScanButton(false);
+            } else {
+                setShowScanButton(true);
+            }
+            scanLastScrollY.current = currentScrollY;
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const { fetchWithSync } = useOfflineSync({
         onQueue: () => setToast({ message: 'ইন্টারনেট সংযোগ বিচ্ছিন্ন। তথ্য লোকালি সেভ করা হয়েছে এবং অনলাইনে সিঙ্ক হবে।', type: 'error' }),
@@ -320,39 +340,71 @@ export default function StudentManagementPage() {
     const [uploadingStudentId, setUploadingStudentId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const fabRef = useRef<HTMLDivElement>(null);
+    const lastScrollY = useRef(0);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            if (fabRef.current) {
+                if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+                    fabRef.current.classList.add('translate-y-24', 'opacity-0');
+                    fabRef.current.classList.remove('translate-y-0', 'opacity-100');
+                } else {
+                    fabRef.current.classList.remove('translate-y-24', 'opacity-0');
+                    fabRef.current.classList.add('translate-y-0', 'opacity-100');
+                }
+            }
+            lastScrollY.current = currentScrollY;
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
     const tableContainerRef = useRef<HTMLDivElement>(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [startY, setStartY] = useState(0);
-    const [scrollLeft, setScrollLeft] = useState(0);
-    const [scrollTop, setScrollTop] = useState(0);
+    const isDragging = useRef(false);
+    const startX = useRef(0);
+    const startY = useRef(0);
+    const scrollLeft = useRef(0);
+    const scrollTop = useRef(0);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!tableContainerRef.current) return;
-        setIsDragging(true);
-        setStartX(e.pageX - tableContainerRef.current.offsetLeft);
-        setStartY(e.pageY - tableContainerRef.current.offsetTop);
-        setScrollLeft(tableContainerRef.current.scrollLeft);
-        setScrollTop(tableContainerRef.current.scrollTop);
+        isDragging.current = true;
+        tableContainerRef.current.classList.add('cursor-grabbing', 'select-none');
+        tableContainerRef.current.classList.remove('cursor-grab');
+        startX.current = e.pageX - tableContainerRef.current.offsetLeft;
+        startY.current = e.pageY - tableContainerRef.current.offsetTop;
+        scrollLeft.current = tableContainerRef.current.scrollLeft;
+        scrollTop.current = tableContainerRef.current.scrollTop;
     };
 
     const handleMouseLeave = () => {
-        setIsDragging(false);
+        if (isDragging.current && tableContainerRef.current) {
+            tableContainerRef.current.classList.remove('cursor-grabbing', 'select-none');
+            tableContainerRef.current.classList.add('cursor-grab');
+        }
+        isDragging.current = false;
     };
 
     const handleMouseUp = () => {
-        setIsDragging(false);
+        if (isDragging.current && tableContainerRef.current) {
+            tableContainerRef.current.classList.remove('cursor-grabbing', 'select-none');
+            tableContainerRef.current.classList.add('cursor-grab');
+        }
+        isDragging.current = false;
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDragging || !tableContainerRef.current) return;
+        if (!isDragging.current || !tableContainerRef.current) return;
         e.preventDefault();
         const x = e.pageX - tableContainerRef.current.offsetLeft;
         const y = e.pageY - tableContainerRef.current.offsetTop;
-        const walkX = (x - startX) * 1.5;
-        const walkY = (y - startY) * 1.5;
-        tableContainerRef.current.scrollLeft = scrollLeft - walkX;
-        tableContainerRef.current.scrollTop = scrollTop - walkY;
+        const walkX = (x - startX.current) * 1.5;
+        const walkY = (y - startY.current) * 1.5;
+        tableContainerRef.current.scrollLeft = scrollLeft.current - walkX;
+        tableContainerRef.current.scrollTop = scrollTop.current - walkY;
     };
 
     const handleDirectImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,7 +412,12 @@ export default function StudentManagementPage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (isFaceModelLoaded) {
+        if (!isFaceModelLoaded.current) {
+            setToast({ message: 'ফেস মডেল লোড হচ্ছে, অপেক্ষা করুন...', type: 'info' });
+            await loadFaceModels();
+        }
+
+        if (isFaceModelLoaded.current) {
             extractFaceDescriptor(file, 'studentPhoto');
         }
 
@@ -509,13 +566,14 @@ export default function StudentManagementPage() {
 
     const [isProcessingFace, setIsProcessingFace] = useState(false);
     const [processingFieldId, setProcessingFieldId] = useState<string | null>(null);
-    const [isFaceModelLoaded, setIsFaceModelLoaded] = useState(false);
+    const isFaceModelLoaded = useRef(false);
 
     // Login Credentials Modal States
     const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
     const [loginType, setLoginType] = useState<'student' | 'guardian'>('student');
     const [credentialsData, setCredentialsData] = useState<any>(null);
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
+    const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'DEFAULT' | 'FEES_COLLECT' | 'ADMISSION'>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('students_viewMode') as any) || 'DEFAULT';
@@ -719,6 +777,7 @@ export default function StudentManagementPage() {
                     totalAmount: 0
                 });
                 setIsFeeModalOpen(true);
+                setOpenedViaScanner(true);
                 setShowScanner(false);
                 return;
             }
@@ -742,6 +801,7 @@ export default function StudentManagementPage() {
                         totalAmount: 0
                     });
                     setIsFeeModalOpen(true);
+                    setOpenedViaScanner(true);
                     setShowScanner(false);
                     return;
                 }
@@ -805,9 +865,7 @@ export default function StudentManagementPage() {
         }
     };
 
-    useEffect(() => {
-        loadFaceModels();
-    }, []);
+
 
     useEffect(() => {
         const generatePreviewIds = async () => {
@@ -855,7 +913,7 @@ export default function StudentManagementPage() {
                     return null;
                 }),
             ]);
-            setIsFaceModelLoaded(true);
+            isFaceModelLoaded.current = true;
             console.log('Face models loaded successfully');
         } catch (error) {
             console.error('Error loading face models:', error);
@@ -877,6 +935,29 @@ export default function StudentManagementPage() {
             }
         } catch (error) {
             console.error('Failed to fetch teachers:', error);
+        }
+    };
+
+    const handleAddTeacher = async (data: any) => {
+        if (!activeInstitute?.id) return;
+        try {
+            const res = await fetch('/api/teacher/invite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...data, instituteId: activeInstitute.id }),
+            });
+            const result = await res.json();
+
+            if (res.ok) {
+                setToast({ message: 'শিক্ষক সফলভাবে যুক্ত করা হয়েছে', type: 'success' });
+                if (activeTab === 'teachers') {
+                    fetchTeachers(); // Refresh list
+                }
+            } else {
+                setToast({ message: result.error || 'শিক্ষক যুক্ত করতে ব্যর্থ হয়েছে', type: 'error' });
+            }
+        } catch (error) {
+            setToast({ message: 'সার্ভার এরর, পুনরায় চেষ্টা করুন', type: 'error' });
         }
     };
 
@@ -1995,83 +2076,38 @@ export default function StudentManagementPage() {
                     />
                 </div>
 
-                {activeTab === 'students' && (
-                    <div className="flex items-center gap-2 shrink-0 z-[200]">
-                        {/* View Mode Toggle Button */}
-                        <button
-                            onClick={() => {
-                                const modes = ['DEFAULT', 'FEES_COLLECT', 'ADMISSION'] as const;
-                                const currentIndex = modes.indexOf(optimisticViewMode as any);
-                                const nextIndex = (currentIndex + 1) % modes.length;
-                                const nextMode = modes[nextIndex];
-                                
-                                setOptimisticViewMode(nextMode);
-                                startTransition(() => {
-                                    setViewMode(nextMode);
-                                });
-                            }}
-                            className="flex items-center gap-1.5 sm:gap-2 bg-[#045c84]/5 border border-[#045c84]/20 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-[#045c84] shadow-sm cursor-pointer hover:bg-[#045c84]/10 transition-all focus:outline-none shrink-0"
-                            title="পরিবর্তন করতে ক্লিক করুন"
-                        >
-                            <span className="flex items-center gap-1.5">
-                                {optimisticViewMode === 'DEFAULT' ? <><Users size={16} className="hidden sm:block" /> স্ট্যান্ডার্ড</> : optimisticViewMode === 'FEES_COLLECT' ? <><Wallet size={16} className="hidden sm:block" /> ফিস কালেকশন</> : <><UserPlus size={16} className="hidden sm:block" /> ভর্তি মোড</>}
-                            </span>
-                        </button>
-
-                        {/* Status Filter Dropdown */}
-                        <details className="relative shrink-0 group">
-                            <summary className="list-none flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none">
-                                <span className="flex items-center gap-1.5">
-                                    {statusFilter === 'ACTIVE' && <><span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:inline-block"></span> সক্রিয়</>}
-                                    {statusFilter === 'INACTIVE' && <><span className="w-2 h-2 rounded-full bg-rose-500 hidden sm:inline-block"></span> নিষ্ক্রিয়</>}
-                                    {statusFilter === 'ALL' && <><span className="w-2 h-2 rounded-full bg-slate-500 hidden sm:inline-block"></span> সকল</>}
-                                </span>
-                                <ChevronDown size={16} className="text-slate-400 group-open:rotate-180 transition-transform ml-1" />
-                            </summary>
+                <div className="flex items-center gap-2 shrink-0 z-[200]">
+                    {/* View Mode Toggle Button */}
+                    <button
+                        onClick={() => {
+                            const modes = ['DEFAULT', 'FEES_COLLECT', 'ADMISSION'] as const;
+                            const currentIndex = modes.indexOf(optimisticViewMode as any);
+                            const nextIndex = (currentIndex + 1) % modes.length;
+                            const nextMode = modes[nextIndex];
                             
-                            <div className="absolute right-0 top-[calc(100%+0.5rem)] w-40 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-[210] flex flex-col gap-1">
-                                {[
-                                    { id: 'ACTIVE', label: 'সক্রিয়', count: students.filter(s => (s.metadata?.status || 'ACTIVE') === 'ACTIVE').length, dot: 'bg-emerald-500' },
-                                    { id: 'INACTIVE', label: 'নিষ্ক্রিয়', count: students.filter(s => s.metadata?.status === 'INACTIVE').length, dot: 'bg-rose-500' },
-                                    { id: 'ALL', label: 'সকল', count: null, dot: 'bg-slate-500' }
-                                ].map((opt) => (
-                                    <button
-                                        key={opt.id}
-                                        onClick={() => {
-                                            setStatusFilter(opt.id as any);
-                                            const details = document.querySelectorAll('details.group[open]');
-                                            details.forEach(d => d.removeAttribute('open'));
-                                        }}
-                                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all w-full text-left ${
-                                            statusFilter === opt.id ? 'bg-[#045c84]/10 text-[#045c84]' : 'text-slate-600 hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            <span className={`w-1.5 h-1.5 rounded-full ${opt.dot}`}></span>
-                                            {opt.label}
-                                        </span>
-                                        {opt.count !== null && (
-                                            <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${
-                                                statusFilter === opt.id ? 'bg-[#045c84]/20 text-[#045c84]' : 'bg-slate-100 text-slate-500'
-                                            }`}>
-                                                {opt.count}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </details>
-                        {/* Print Preview Button */}
-                        <button
-                            onClick={() => openPrintPreview()}
-                            className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
-                            title="প্রিভিউ ও প্রিন্ট"
-                        >
-                            <Printer size={16} />
-                            <span className="hidden sm:inline-block">প্রিন্ট</span>
-                        </button>
-                    </div>
-                )}
+                            setOptimisticViewMode(nextMode);
+                            startTransition(() => {
+                                setViewMode(nextMode);
+                            });
+                        }}
+                        className="flex items-center gap-1.5 sm:gap-2 bg-[#045c84]/5 border border-[#045c84]/20 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-[#045c84] shadow-sm cursor-pointer hover:bg-[#045c84]/10 transition-all focus:outline-none shrink-0"
+                        title="পরিবর্তন করতে ক্লিক করুন"
+                    >
+                        <span className="flex items-center gap-1.5">
+                            {optimisticViewMode === 'DEFAULT' ? <><Users size={16} className="hidden sm:block" /> স্ট্যান্ডার্ড</> : optimisticViewMode === 'FEES_COLLECT' ? <><Wallet size={16} className="hidden sm:block" /> ফিস কালেকশন</> : <><UserPlus size={16} className="hidden sm:block" /> ভর্তি মোড</>}
+                        </span>
+                    </button>
+
+                    {/* Print Preview Button */}
+                    <button
+                        onClick={() => openPrintPreview()}
+                        className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
+                        title="প্রিভিউ ও প্রিন্ট"
+                    >
+                        <Printer size={16} />
+                        <span className="hidden sm:inline-block">প্রিন্ট</span>
+                    </button>
+                </div>
             </div>
 
 
@@ -2154,71 +2190,96 @@ export default function StudentManagementPage() {
 
                 {/* Main Navigation Tabs */}
                 <div className="w-full relative">
-                    <div className="flex items-center justify-between gap-4 w-full overflow-x-auto custom-scrollbar pb-1">
-                        <div className="flex items-center gap-2 p-1 bg-slate-100/50 rounded-2xl shrink-0 w-max">
-                            <button
-                                onClick={() => setActiveTab('students')}
-                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'students'
-                                    ? 'bg-white text-[#045c84] shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                শিক্ষার্থী
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('books')}
-                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'books'
-                                    ? 'bg-white text-[#045c84] shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                বই
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('teachers')}
-                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'teachers'
-                                    ? 'bg-white text-[#045c84] shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                শিক্ষক
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('applications')}
-                                className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'applications'
-                                    ? 'bg-white text-[#045c84] shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                <span>আবেদনসমূহ</span>
-                                <span className="bg-[#045c84]/10 text-[#045c84] px-2 py-0.5 rounded-lg text-[10px]">
-                                    {pendingCount || 0}
-                                </span>
-                            </button>
-                        </div>
-
-                        {/* Column Visibility Dropdown Button */}
-                        {activeTab === 'students' && viewMode === 'ADMISSION' && (
-                            <div className="shrink-0">
-                                <button 
-                                    onClick={() => setIsColumnDropdownOpen(!isColumnDropdownOpen)}
-                                    className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
+                    <div className="flex items-center justify-between gap-4 w-full pb-1">
+                        <div className="flex-1 min-w-0 overflow-x-auto custom-scrollbar pb-2 -mb-2">
+                            <div className="flex items-center gap-2 p-1 bg-slate-100/50 rounded-2xl shrink-0 w-max">
+                                <button
+                                    onClick={() => setActiveTab('students')}
+                                    className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'students'
+                                        ? 'bg-white text-[#045c84] shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
                                 >
-                                    <Settings2 size={16} />
-                                    <span className="hidden sm:inline-block">কলাম</span>
-                                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${isColumnDropdownOpen ? 'rotate-180' : ''}`} />
+                                    শিক্ষার্থী
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('books')}
+                                    className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'books'
+                                        ? 'bg-white text-[#045c84] shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    বই
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('teachers')}
+                                    className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all ${activeTab === 'teachers'
+                                        ? 'bg-white text-[#045c84] shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    শিক্ষক
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('applications')}
+                                    className={`px-4 sm:px-6 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${activeTab === 'applications'
+                                        ? 'bg-white text-[#045c84] shadow-sm'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    <span>আবেদনসমূহ</span>
+                                    <span className="bg-[#045c84]/10 text-[#045c84] px-2 py-0.5 rounded-lg text-[10px]">
+                                        {pendingCount || 0}
+                                    </span>
                                 </button>
                             </div>
-                        )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                            {/* Status Filter Toggle Button */}
+                            <button
+                                onClick={() => setStatusFilter(prev => prev === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')}
+                                className="flex items-center gap-1.5 sm:gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none shrink-0"
+                                title="ক্লিক করে স্ট্যাটাস ফিল্টার পরিবর্তন করুন"
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    {statusFilter === 'ACTIVE' ? (
+                                        <>
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:inline-block animate-pulse"></span>
+                                            সক্রিয় ({students.filter(s => (s.metadata?.status || 'ACTIVE') === 'ACTIVE').length})
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="w-2 h-2 rounded-full bg-rose-500 hidden sm:inline-block"></span>
+                                            নিষ্ক্রিয় ({students.filter(s => s.metadata?.status === 'INACTIVE').length})
+                                        </>
+                                    )}
+                                </span>
+                            </button>
+
+                            {/* Column Visibility Dropdown Button */}
+                            {activeTab === 'students' && viewMode === 'ADMISSION' && (
+                                <div className="shrink-0">
+                                    <button 
+                                        onClick={() => setIsColumnDropdownOpen(!isColumnDropdownOpen)}
+                                        className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
+                                    >
+                                        <Settings2 size={16} />
+                                        <span className="hidden sm:inline-block">কলাম</span>
+                                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isColumnDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     
                     {/* Dropdown Menu - Extracted to prevent clipping */}
                     {activeTab === 'students' && viewMode === 'ADMISSION' && isColumnDropdownOpen && (
                         <>
                             <div className="fixed inset-0 z-[205]" onClick={() => setIsColumnDropdownOpen(false)}></div>
-                            <div className="absolute right-0 top-full mt-2 w-64 z-[210] animate-fade-in">
+                            <div className="absolute right-0 top-full mt-2 w-64 z-[210] animate-fade-in bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col overflow-hidden">
                                 <div 
-                                    className="bg-white rounded-2xl shadow-xl border border-slate-100 p-2 flex flex-col gap-1 overflow-y-auto pointer-events-auto custom-scrollbar" 
+                                    className="p-2 flex flex-col gap-1 overflow-y-auto pointer-events-auto custom-scrollbar" 
                                     style={{ maxHeight: '50vh' }}
                                     onWheel={(e) => e.stopPropagation()}
                                     onTouchMove={(e) => e.stopPropagation()}
@@ -2234,7 +2295,7 @@ export default function StudentManagementPage() {
                                         ...customColumns,
                                         { id: 'action', label: 'অ্যাকশন' }
                                     ].map((col) => (
-                                        <label key={col.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-xl cursor-pointer">
+                                        <label key={col.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-xl cursor-pointer shrink-0">
                                             <input 
                                                 type="checkbox" 
                                                 checked={(tableColumns as any)[col.id]}
@@ -2246,19 +2307,18 @@ export default function StudentManagementPage() {
                                             <span className="text-sm font-medium text-slate-700">{col.label}</span>
                                         </label>
                                     ))}
-                                    
-                                    <div className="pt-2 mt-1 border-t border-slate-100 sticky bottom-0 bg-white z-10">
-                                        <button 
-                                            onClick={() => {
-                                                setIsCustomFieldModalOpen(true);
-                                                setIsColumnDropdownOpen(false);
-                                            }}
-                                            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-[#045c84] hover:bg-slate-50 rounded-lg transition-colors border border-dashed border-blue-200"
-                                        >
-                                            <Plus size={14} />
-                                            নতুন কাস্টম ফিল্ড
-                                        </button>
-                                    </div>
+                                </div>
+                                <div className="p-2 bg-slate-50 border-t border-slate-100">
+                                    <button 
+                                        onClick={() => {
+                                            setIsCustomFieldModalOpen(true);
+                                            setIsColumnDropdownOpen(false);
+                                        }}
+                                        className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-[#045c84] hover:bg-slate-100 bg-white rounded-xl transition-colors border border-dashed border-blue-200 shadow-sm"
+                                    >
+                                        <Plus size={14} />
+                                        নতুন কাস্টম ফিল্ড
+                                    </button>
                                 </div>
                             </div>
                         </>
@@ -2371,7 +2431,7 @@ export default function StudentManagementPage() {
                                 onMouseUp={handleMouseUp}
                                 onMouseMove={handleMouseMove}
                                 data-lenis-prevent="true"
-                                className={`overflow-auto overscroll-none w-full max-h-[calc(100vh-280px)] custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300 relative ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+                                className="overflow-auto overscroll-none w-full max-h-[calc(100vh-280px)] custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300 relative cursor-grab"
                             >
                                 <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleDirectImageUpload} />
                                 <table className="w-full text-left border-collapse bg-white rounded-2xl shadow-sm min-w-[800px] [&_th]:border [&_th]:border-slate-200 [&_td]:border [&_td]:border-slate-200">
@@ -4903,6 +4963,14 @@ export default function StudentManagementPage() {
                 canToggleAdminPower={isOwner}
             />
 
+            <AddTeacherModal
+                isOpen={isAddTeacherModalOpen}
+                onClose={() => setIsAddTeacherModalOpen(false)}
+                onAdd={handleAddTeacher}
+                instituteId={activeInstitute?.id}
+                instituteName={activeInstitute?.name}
+            />
+
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
             {/* Class Management Modal with DnD */}
@@ -5112,9 +5180,10 @@ export default function StudentManagementPage() {
                 mounted && pathname?.includes('/dashboard/students') && viewMode !== 'FEES_COLLECT' && (
                     (activeTab === 'students' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (selectedClassId !== 'all' ? canManageClass(selectedClassId) : classes.some(c => canManageClass(c.id))))) ||
                     (activeTab === 'books' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN')) ||
-                    (activeTab === 'applications' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (selectedClassId !== 'all' ? canManageClass(selectedClassId) : classes.some(c => canManageClass(c.id)))))
+                    (activeTab === 'applications' && (activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN' || (selectedClassId !== 'all' ? canManageClass(selectedClassId) : classes.some(c => canManageClass(c.id))))) ||
+                    (activeTab === 'teachers')
                 ) && createPortal(
-                    <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-4 pointer-events-none">
+                    <div ref={fabRef} className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-4 pointer-events-none transition-all duration-300 ease-in-out translate-y-0 opacity-100">
                         <button
                             onClick={() => {
                                 if (activeTab === 'students') {
@@ -5156,10 +5225,12 @@ export default function StudentManagementPage() {
                                             document.body.removeChild(textArea);
                                         }
                                     }
+                                } else if (activeTab === 'teachers') {
+                                    setIsAddTeacherModalOpen(true);
                                 }
                             }}
                             className="pointer-events-auto flex items-center justify-center w-16 h-16 bg-[#045c84] text-white rounded-full shadow-2xl hover:shadow-[#045c84]/30 hover:-translate-y-1 transition-all duration-300 active:scale-95 border-b-4 border-[#034a6b] active:border-b-0 animate-in slide-in-from-bottom-6"
-                            title={activeTab === 'students' ? 'শিক্ষার্থী যোগ করুন' : activeTab === 'books' ? 'বই যোগ করুন' : 'ভর্তি লিঙ্ক কপি করুন'}
+                            title={activeTab === 'students' ? 'শিক্ষার্থী যোগ করুন' : activeTab === 'books' ? 'বই যোগ করুন' : activeTab === 'teachers' ? 'শিক্ষক যোগ করুন' : 'ভর্তি লিঙ্ক কপি করুন'}
                         >
                             {activeTab === 'students' ? (
                                 <div className="relative">
@@ -5171,6 +5242,10 @@ export default function StudentManagementPage() {
                                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#045c84] border-2 border-white rounded-full flex items-center justify-center -mr-0.5 -mt-0.5">
                                         <Plus size={12} strokeWidth={4} />
                                     </div>
+                                </div>
+                            ) : activeTab === 'teachers' ? (
+                                <div className="relative">
+                                    <UserPlus size={28} />
                                 </div>
                             ) : (
                                 <div className="relative">
@@ -5278,13 +5353,13 @@ export default function StudentManagementPage() {
                 )}
             </Modal>
             {/* Floating Scanner Button (visible in fee-collect mode) */}
-            {viewMode === 'FEES_COLLECT' && (
+            {viewMode === 'FEES_COLLECT' && activeTab === 'students' && typeof document !== 'undefined' && createPortal(
                 <>
-                    <div className="fixed bottom-20 right-6 z-[9998]">
+                    <div className={`fixed right-6 z-[9999] transition-all duration-500 ease-in-out ${showScanButton ? 'bottom-24 translate-y-0 opacity-100 pointer-events-auto' : 'bottom-0 translate-y-full opacity-0 pointer-events-none'}`}>
                         <button
                             onClick={() => setShowScanner(true)}
                             title="স্ক্যান"
-                            className="w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"
+                            className="w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center justify-center hover:scale-105 transition-transform"
                         >
                             <Scan size={24} />
                         </button>
@@ -5294,7 +5369,8 @@ export default function StudentManagementPage() {
                         onClose={() => setShowScanner(false)}
                         onScan={handleScanResult}
                     />
-                </>
+                </>,
+                document.body
             )}
 
             {/* Fee Collect Modal */}
@@ -5304,10 +5380,18 @@ export default function StudentManagementPage() {
                     onClose={() => {
                         setIsFeeModalOpen(false);
                         setSelectedStudentForFee(null);
+                        if (openedViaScanner) {
+                            setShowScanner(true);
+                            setOpenedViaScanner(false);
+                        }
                     }}
                     onSuccess={(msg) => {
                         setIsFeeModalOpen(false);
                         setToast({ message: msg, type: 'success' });
+                        if (openedViaScanner) {
+                            setShowScanner(true);
+                            setOpenedViaScanner(false);
+                        }
                         fetchFeesData();
                     }}
                     onPrintReceipt={(txn) => {

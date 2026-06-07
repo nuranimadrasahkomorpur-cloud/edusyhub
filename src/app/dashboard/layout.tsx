@@ -213,6 +213,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
     }, [pathname]);
 
+    // Dispatch event to pause heavy background processes (like Face Scanner) when sidebar opens on mobile
+    useEffect(() => {
+        if (isSidebarOpen) {
+            window.dispatchEvent(new CustomEvent('dashboard-sidebar-open'));
+        } else {
+            window.dispatchEvent(new CustomEvent('dashboard-sidebar-close'));
+        }
+    }, [isSidebarOpen]);
+
     // Handle popstate for browser back/forward history transitions
     useEffect(() => {
         const handlePopState = () => {
@@ -622,7 +631,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {visitedPaths.map((path) => (
                         <div
                             key={path}
-                            style={{ display: path === activeTab ? 'block' : 'none' }}
+                            style={{ 
+                                position: path === activeTab ? 'relative' : 'absolute',
+                                visibility: path === activeTab ? 'visible' : 'hidden',
+                                opacity: path === activeTab ? 1 : 0,
+                                pointerEvents: path === activeTab ? 'auto' : 'none',
+                                zIndex: path === activeTab ? 1 : -1,
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%'
+                            }}
                             className="w-full h-full"
                         >
                             {getKeepAliveComponent(path)}

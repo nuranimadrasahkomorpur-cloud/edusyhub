@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     CreditCard,
     DollarSign,
@@ -158,6 +159,7 @@ export default function AccountsPage() {
     const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
     const [showScanner, setShowScanner] = useState(false);
+    const [openedViaScanner, setOpenedViaScanner] = useState(false);
     const [isScanningStudent, setIsScanningStudent] = useState(false);
     const [showFloatingActions, setShowFloatingActions] = useState(true);
     const [categories, setCategories] = useState<any[]>([]);
@@ -283,6 +285,8 @@ export default function AccountsPage() {
         setSelectedStudentDetails(null);
     }, []);
 
+    const lastScrollY = useRef(0);
+
     useEffect(() => {
         const getFloatingArea = () => {
             const floatWidth = 56;
@@ -304,15 +308,13 @@ export default function AccountsPage() {
                 return;
             }
 
-            if (paginationRef.current) {
-                const paginationRect = paginationRef.current.getBoundingClientRect();
-                if (intersectsFloatingArea(paginationRect)) {
-                    setShowFloatingActions(false);
-                    return;
-                }
+            const currentScrollY = window.scrollY;
+            if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+                setShowFloatingActions(false);
+            } else {
+                setShowFloatingActions(true);
             }
-
-            setShowFloatingActions(true);
+            lastScrollY.current = currentScrollY;
         };
 
         window.addEventListener('scroll', updateFloatingVisibility, { passive: true });
@@ -426,6 +428,7 @@ export default function AccountsPage() {
                     };
 
                     setFeeCollectStudent(studentForFee);
+                    setOpenedViaScanner(true);
                     setShowScanner(false);
                     setToast({ message: 'ছাত্র পাওয়া গেছে - ফি সংগ্রহের জন্য প্রস্তুত', type: 'success' });
                 } else {
@@ -2455,10 +2458,20 @@ export default function AccountsPage() {
                 {feeCollectStudent && !showScanner && (
                     <FeeCollectModal
                         student={feeCollectStudent}
-                        onClose={() => setFeeCollectStudent(null)}
+                        onClose={() => {
+                            setFeeCollectStudent(null);
+                            if (openedViaScanner) {
+                                setShowScanner(true);
+                                setOpenedViaScanner(false);
+                            }
+                        }}
                         onSuccess={(msg: string) => {
                             setToast({ message: msg, type: 'success' });
                             setFeeCollectStudent(null);
+                            if (openedViaScanner) {
+                                setShowScanner(true);
+                                setOpenedViaScanner(false);
+                            }
                             fetchAccounts();
                         }}
                         onPrintReceipt={(txn: any) => {
@@ -2479,51 +2492,52 @@ export default function AccountsPage() {
             </AnimatePresence>
 
             {/* Floating Action Buttons */}
-            <AnimatePresence>
-                {showFloatingActions && (
-                    <motion.button
-                        key="scan-button"
-                        initial={{ opacity: 0, y: 20, scale: 0.85 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 20, scale: 0.85 }}
-                        transition={{ duration: 0.15 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                            // Clear old fee data and open scanner immediately
-                            setFeeCollectStudent(null);
-                            setShowScanner(true);
-                        }}
-                        className="fixed bottom-32 right-6 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl z-50 bg-emerald-600 shadow-emerald-600/30 transition-colors"
-                        title="স্ক্যান করুন"
-                    >
-                        <Scan size={28} />
-                    </motion.button>
-                )}
-            </AnimatePresence>
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {showFloatingActions && (
+                        <>
+                            <motion.button
+                                key="scan-button"
+                                initial={{ opacity: 0, y: 20, scale: 0.85 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 20, scale: 0.85 }}
+                                transition={{ duration: 0.15 }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                    // Clear old fee data and open scanner immediately
+                                    setFeeCollectStudent(null);
+                                    setShowScanner(true);
+                                }}
+                                className="fixed bottom-40 right-6 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-[9999] bg-emerald-600 transition-colors"
+                                title="স্ক্যান করুন"
+                            >
+                                <Scan size={28} />
+                            </motion.button>
 
-            <AnimatePresence>
-                {showFloatingActions && (
-                    <motion.button
-                        key="add-button"
-                        initial={{ opacity: 0, y: 20, scale: 0.85 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 20, scale: 0.85 }}
-                        transition={{ duration: 0.15 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setIsTransactionModalOpen(true)}
-                        className={`fixed bottom-16 right-6 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-2xl z-50 transition-colors ${
-                            activeMainTab === 'income' ? 'bg-emerald-600 shadow-emerald-600/30' : 
-                            activeMainTab === 'expense' ? 'bg-rose-600 shadow-rose-600/30' : 
-                            'bg-[#045c84] shadow-blue-900/30'
-                        }`}
-                        title="লেনদেন যোগ করুন"
-                    >
-                        <Plus size={28} />
-                    </motion.button>
-                )}
-            </AnimatePresence>
+                            <motion.button
+                                key="add-button"
+                                initial={{ opacity: 0, y: 20, scale: 0.85 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 20, scale: 0.85 }}
+                                transition={{ duration: 0.15 }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setIsTransactionModalOpen(true)}
+                                className={`fixed bottom-24 right-6 w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] z-[9999] transition-colors ${
+                                    activeMainTab === 'income' ? 'bg-emerald-600' : 
+                                    activeMainTab === 'expense' ? 'bg-rose-600' : 
+                                    'bg-[#045c84]'
+                                }`}
+                                title="লেনদেন যোগ করুন"
+                            >
+                                <Plus size={28} />
+                            </motion.button>
+                        </>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
 
             {/* QR/Barcode Scanner Modal */}
             <QRBarcodeScanner
