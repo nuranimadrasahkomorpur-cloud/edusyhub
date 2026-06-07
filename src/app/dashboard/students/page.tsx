@@ -53,7 +53,8 @@ import {
     Wallet,
     FileUp,
     Camera,
-    Scan
+    Scan,
+    Printer
 } from 'lucide-react';
 import QRBarcodeScanner from '@/components/QRBarcodeScanner';
 import { ScrollableTabs } from '@/components/ui/ScrollableTabs';
@@ -70,6 +71,7 @@ import TeacherPermissionModal from '@/components/TeacherPermissionModal';
 import SubjectGradingModal from '@/components/SubjectGradingModal';
 import FeeCollectModal from '@/components/FeeCollectModal';
 import PrintReceiptModal from '@/components/PrintReceiptModal';
+import StudentPrintPreviewModal from '@/components/StudentPrintPreviewModal';
 import { useUI } from '@/components/UIProvider';
 import { getCleanId } from '@/utils/digit-utils';
 
@@ -590,6 +592,10 @@ export default function StudentManagementPage() {
     const [newCustomColumnLabel, setNewCustomColumnLabel] = useState('');
     const [newCustomColumnType, setNewCustomColumnType] = useState('text');
 
+    // Print preview modal state
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [printPreviewPayload, setPrintPreviewPayload] = useState<any | null>(null);
+
     // Load custom columns from DB
     useEffect(() => {
         if (!activeInstitute?.id) return;
@@ -775,6 +781,29 @@ export default function StudentManagementPage() {
         window.addEventListener('openFeeCollection', handler as EventListener);
         return () => window.removeEventListener('openFeeCollection', handler as EventListener);
     }, [students, activeInstitute?.id]);
+
+    const openPrintPreview = () => {
+        try {
+            const payload = {
+                students: students || [],
+                columns: tableColumns || {},
+                customColumns: customColumns || [],
+                classes: classes || [],
+                groups: groups || [],
+                institute: activeInstitute || null,
+                selectedClassId,
+                selectedGroupId,
+                title: `${activeInstitute?.name || 'Institute'} - শিক্ষার্থী তালিকা (${new Date().toLocaleDateString('bn-BD')})`,
+                timestamp: Date.now()
+            };
+            // Open as modal overlay instead of new page
+            setPrintPreviewPayload(payload);
+            setShowPrintModal(true);
+        } catch (err) {
+            console.error('Open print preview error:', err);
+            setToast({ message: 'প্রিভিউ খুলতে ব্যর্থ হয়েছে।', type: 'error' });
+        }
+    };
 
     useEffect(() => {
         loadFaceModels();
@@ -2032,6 +2061,15 @@ export default function StudentManagementPage() {
                                 ))}
                             </div>
                         </details>
+                        {/* Print Preview Button */}
+                        <button
+                            onClick={() => openPrintPreview()}
+                            className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
+                            title="প্রিভিউ ও প্রিন্ট"
+                        >
+                            <Printer size={16} />
+                            <span className="hidden sm:inline-block">প্রিন্ট</span>
+                        </button>
                     </div>
                 )}
             </div>
@@ -5283,6 +5321,14 @@ export default function StudentManagementPage() {
                 <PrintReceiptModal
                     transaction={selectedTransactionForPrint}
                     onClose={() => setSelectedTransactionForPrint(null)}
+                />
+            )}
+
+            {/* In-page Print Preview Modal (over entire UI) */}
+            {showPrintModal && printPreviewPayload && (
+                <StudentPrintPreviewModal
+                    payload={printPreviewPayload}
+                    onClose={() => { setShowPrintModal(false); setPrintPreviewPayload(null); }}
                 />
             )}
 

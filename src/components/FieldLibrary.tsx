@@ -6,6 +6,8 @@ import {
     Calendar,
     List,
     FileUp,
+    QrCode,
+    Barcode,
     Plus,
     X,
     Info,
@@ -92,6 +94,8 @@ export const POSSIBLE_FIELDS: FieldDefinition[] = [
     { id: 'marksheet', label: 'মার্কশিট/একাডেমিক ট্রান্সক্রিপ্ট', type: 'attachment', category: 'নথিপত্র', icon: FileUp },
     { id: 'testimonial', label: 'প্রশংসাপত্র', type: 'attachment', category: 'নথিপত্র', icon: Award },
     { id: 'transferCertificate', label: 'টিসি (ট্রান্সফার সার্টিফিকেট)', type: 'attachment', category: 'নথিপত্র', icon: FileUp },
+    { id: 'qr', label: 'কিউআর কোড', type: 'text', category: 'নথিপত্র', icon: QrCode },
+    { id: 'barcode', label: 'বারকোড', type: 'text', category: 'নথিপত্র', icon: Barcode },
 
     // Health
     { id: 'disability', label: 'শারীরিক প্রতিবন্ধকতা', type: 'text', category: 'স্বাস্থ্য তথ্য', icon: Stethoscope, placeholder: 'যদি থাকে (না থাকলে প্রযোজ্য নয় লিখুন)' },

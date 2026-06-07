@@ -10,17 +10,21 @@ interface PrintLayoutProps {
     date?: string;
     pageSize?: 'A4' | 'A5';
     previewOnly?: boolean;
+    hideDate?: boolean;
+    hideTitle?: boolean;
+    pagePadding?: number;
 }
 
-export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false }: PrintLayoutProps) {
+export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding }: PrintLayoutProps) {
     const isA5 = pageSize === 'A5';
     const baseClass = `${previewOnly ? '' : 'print-area'} bg-white p-4 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 flex flex-col`;
-    const sizeClass = previewOnly ? (isA5 ? 'min-h-[210mm] max-w-[148mm] mx-auto text-[16px]' : 'min-h-[10.5in] text-[16px]') : (isA5 ? 'max-w-[210mm] text-[16px]' : 'max-w-[210mm] text-[16px]');
+    const sizeClass = previewOnly ? (isA5 ? 'min-h-[210mm] w-full mx-auto' : 'min-h-[10.5in] w-full') : 'w-full';
     return (
-        <div className={`${baseClass} ${sizeClass}`}>
-            {/* Institute Header */}
-            <div className="flex justify-center mb-0 border-b-2 border-slate-800 pb-4 relative">
-                <div className="flex items-center gap-3">
+        <div className={`${baseClass} ${sizeClass}`} style={{ padding: `${pagePadding ?? 16}px` }}>
+            {/* Institute Header: logo flush-left, institute text centered */}
+            <div className="mb-0 border-b-2 border-slate-800 pb-4" style={{ display: 'grid', gridTemplateColumns: '96px 1fr 96px', alignItems: 'center' }}>
+                {/* left logo column */}
+                <div className="pl-4 flex items-center justify-start">
                     {institute?.logo ? (
                         <img src={institute.logo} alt={institute.name} className="w-20 h-20 object-contain" />
                     ) : (
@@ -28,26 +32,33 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                             <Building2 size={40} className="text-slate-400" />
                         </div>
                     )}
-                    <div className="text-left">
-                        <h1 className="text-[24px] font-black uppercase tracking-tight text-slate-900 leading-tight">
-                            {institute?.name || 'Education Institute'}
-                        </h1>
-                        <p className="text-[16px] font-bold text-slate-600">
-                            {institute?.address || 'Address not provided'}
-                        </p>
-                    </div>
                 </div>
+
+                {/* centered title column (will not overlap logo) */}
+                <div className="flex flex-col items-center justify-center">
+                    <h1 className="text-[24px] font-black uppercase tracking-tight text-slate-900 leading-tight text-center">
+                        {institute?.name || 'Education Institute'}
+                    </h1>
+                    <p className="text-[16px] font-bold text-slate-600 text-center">
+                        {institute?.address || 'Address not provided'}
+                    </p>
+                </div>
+
+                {/* right placeholder column (keeps center truly centered) */}
+                <div className="pr-4" />
             </div>
 
             {/* Document Title overlapping the break line */}
-            <div className="flex justify-center mb-3" style={{ marginTop: '-12px' }}>
-                <div className="inline-block bg-slate-900 text-white px-4 py-1 rounded-full font-black text-[16px] uppercase tracking-widest relative z-10 border-[6px] border-white">
-                    {title}
+            {!hideTitle && (
+                <div className="flex justify-center mb-3" style={{ marginTop: '-12px' }}>
+                    <div className="inline-block bg-slate-900 text-white px-4 py-1 rounded-full font-black text-[16px] uppercase tracking-widest relative z-10 border-[6px] border-white">
+                        {title}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Date */}
-            {date && (
+            {!hideDate && date && (
                 <div className="flex justify-end mb-4">
                     <div className="text-right">
                         <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">তারিখ</p>
@@ -57,25 +68,11 @@ export default function PrintLayout({ title, institute, children, date = new Dat
             )}
 
             {/* Main Content */}
-            <div className="flex-1">
+            <div className="flex-1 print-min-h">
                 {children}
             </div>
 
-            {/* Signature Area */}
-            <div className={`${previewOnly ? 'mt-auto pt-6' : 'pt-6'} grid grid-cols-3 gap-6 text-center items-end signature-area`}>
-                <div className="space-y-1 border-t border-slate-300 pt-2">
-                    <p className="text-[14px] font-bold text-slate-600 uppercase tracking-widest">অভিভাবকের স্বাক্ষর</p>
-                    <p className="text-[10px] text-slate-400">(Guardian's Signature)</p>
-                </div>
-                <div className="space-y-1 border-t border-slate-300 pt-2">
-                    <p className="text-[14px] font-bold text-slate-600 uppercase tracking-widest">হিসাবরক্ষকের স্বাক্ষর</p>
-                    <p className="text-[10px] text-slate-400">(Accountant's Signature)</p>
-                </div>
-                <div className="space-y-1 border-t border-slate-300 pt-2">
-                    <p className="text-[14px] font-bold text-slate-600 uppercase tracking-widest">অধ্যক্ষের স্বাক্ষর</p>
-                    <p className="text-[10px] text-slate-400">(Principal's Signature)</p>
-                </div>
-            </div>
+            {/* Signature area removed as requested */}
 
             {/* Footer Notice removed per request */}
 
@@ -83,38 +80,74 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                 @media print {
                     @page {
                         size: ${pageSize} portrait;
-                        margin: 10mm;
+                        margin: 0.15in;
                     }
-                    body * {
-                        visibility: hidden;
+                    body, html {
+                        height: auto !important;
+                        overflow: visible !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                     }
-                    html, body { height: auto !important; }
-                    .print-area, .print-area * {
-                        visibility: visible;
-                        box-sizing: border-box;
+                    body * { visibility: hidden; }
+                    .print-area, .print-area * { visibility: visible; }
+                    
+                    @supports selector(:has(a)) {
+                        body *:not(:has(.print-area)):not(.print-area):not(.print-area *) {
+                            display: none !important;
+                        }
+                        body * { visibility: visible; }
                     }
+                    
                     .print-area {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
+                        position: static !important;
                         width: 100% !important;
                         max-width: none !important;
-                        height: auto;
-                        margin: 0;
-                        padding: 10mm;
-                        border: none;
-                        display: flex;
-                        flex-direction: column;
+                        height: auto !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        display: block !important;
+                        transform: none !important;
+                        page-break-after: always;
+                        break-after: page;
                         box-sizing: border-box;
-                        transform: none;
+                    }
+                    .print-min-h {
+                        min-height: calc(100vh - 250px) !important;
                     }
                     .print-area table { width: 100% !important; border-collapse: collapse; }
                     .print-area img { max-width: 100% !important; height: auto !important; }
-                    /* avoid forcing signature to bottom when printing to prevent extra blank space */
-                    .signature-area { page-break-inside: avoid; }
-                    .no-print {
-                        display: none !important;
+                    .signature-area { page-break-inside: avoid; break-inside: avoid; }
+                    .no-print { display: none !important; }
+                    .print-reset-outer, .print-reset-inner {
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: 0 !important;
+                        transform: none !important;
+                        position: static !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        display: block !important;
                     }
+                }
+            `}</style>
+            <style jsx>{`
+                .print-reset-inner {
+                    transition: transform var(--pv-transform, 360ms cubic-bezier(.2,.9,.3,1)), font-size var(--pv-font, 260ms cubic-bezier(.2,.9,.3,1));
+                    will-change: transform, font-size;
+                }
+                .print-area {
+                    transition: padding var(--pv-padding, 360ms cubic-bezier(.2,.9,.3,1));
+                    will-change: padding;
+                }
+                .print-area th, .print-area td {
+                    transition: padding var(--pv-padding, 360ms cubic-bezier(.2,.9,.3,1)), background-color var(--pv-bg, 200ms ease), line-height var(--pv-line, 360ms cubic-bezier(.2,.9,.3,1));
+                    will-change: padding, line-height, background-color;
+                }
+                .print-area tbody tr {
+                    transition: background-color var(--pv-bg, 220ms ease), transform var(--pv-transform, 360ms cubic-bezier(.2,.9,.3,1));
+                    will-change: background-color, transform;
                 }
             `}</style>
         </div>
