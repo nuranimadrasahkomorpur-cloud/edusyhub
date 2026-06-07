@@ -106,7 +106,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
         }
 
         if (!subName && typeof t.note === 'string') {
-            const noteGroups = Array.from(t.note.matchAll(/\(([^)]+)\)/g)).map(m => m[1].trim()).filter(Boolean);
+            const noteGroups = Array.from(t.note.matchAll(/\(([^)]+)\)/g) as RegExpMatchArray[]).map(m => m[1].trim()).filter(Boolean);
             const partialIndicators = ['আংশিক', 'আংশিক পরিশোধ', 'আংশিক অগ্রিম পরিশোধ', 'আংশিক স্বয়ংক্রিয় পরিশোধ', 'আংশিক স্বয়ংক্রিয় পরিশোধ'];
             subName = noteGroups.filter(group => !partialIndicators.some(indicator => group.includes(indicator))).slice(-1)[0] || noteGroups[0] || '';
         }
