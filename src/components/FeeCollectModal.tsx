@@ -322,6 +322,8 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
             }
         };
 
+        if (!student) return null;
+
         return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <div

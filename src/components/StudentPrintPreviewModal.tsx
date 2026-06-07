@@ -119,9 +119,21 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     }, [payload]);
 
     // Active columns: ordered array of IDs that appear in the printed table
+    // Persisted to localStorage so the selection survives page reloads
+    const COLS_STORAGE_KEY = 'edusy_print_cols';
     const [activeColIds, setActiveColIds] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem(COLS_STORAGE_KEY);
+            if (saved) {
+                const parsed: string[] = JSON.parse(saved);
+                const availableIds = new Set(allAvailableCols.map(c => c.id));
+                // Filter out stale IDs that no longer exist in the catalogue
+                const valid = parsed.filter(id => availableIds.has(id));
+                if (valid.length > 0) return valid;
+            }
+        } catch { /* ignore */ }
+        // Fallback: derive from payload
         const initialCols = payload?.columns || {};
-        // Start with columns that were enabled in payload, in their natural order
         return allAvailableCols.filter(c => initialCols[c.id]).map(c => c.id);
     });
 
@@ -403,8 +415,17 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     }, [fontSize]);
 
     /* ── column helpers ── */
-    const addCol = (id: string) => setActiveColIds(prev => prev.includes(id) ? prev : [...prev, id]);
-    const removeCol = (id: string) => setActiveColIds(prev => prev.filter(c => c !== id));
+    const addCol = (id: string) => setActiveColIds(prev => {
+        if (prev.includes(id)) return prev;
+        const next = [...prev, id];
+        try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(next)); } catch { }
+        return next;
+    });
+    const removeCol = (id: string) => setActiveColIds(prev => {
+        const next = prev.filter(c => c !== id);
+        try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(next)); } catch { }
+        return next;
+    });
 
     const handleColDragStart = (id: string) => { dragColRef.current = id; };
     const handleColDragOver = (e: React.DragEvent, overId: string) => {
@@ -418,6 +439,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
             if (fromIdx < 0 || toIdx < 0) return prev;
             arr.splice(fromIdx, 1);
             arr.splice(toIdx, 0, dragged);
+            try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(arr)); } catch { }
             return arr;
         });
     };
@@ -963,29 +985,30 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                         </div>
                                     )}
 
-                                    {/* Available columns */}
-                                    {(() => {
-                                        const inactive = allAvailableCols.filter(c => !activeColIds.includes(c.id));
-                                        if (inactive.length === 0) return null;
-                                        return (
-                                            <div>
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">অন্যান্য কলাম</p>
-                                                <div className="flex flex-col gap-1 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
-                                                    {inactive.map(col => (
+                                    {/* All columns — always visible, checkbox shows selected state */}
+                                    {allAvailableCols.length > 0 && (
+                                        <div className="mt-2">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">সব কলাম</p>
+                                            <div className="flex flex-col gap-1 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
+                                                {allAvailableCols.map(col => {
+                                                    const isActive = activeColIds.includes(col.id);
+                                                    return (
                                                         <button
                                                             key={col.id}
-                                                            onClick={() => addCol(col.id)}
-                                                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200 transition-colors text-left w-full"
+                                                            onClick={() => isActive ? removeCol(col.id) : addCol(col.id)}
+                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors text-left w-full ${isActive ? 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100' : 'border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200'}`}
                                                         >
-                                                            <span className="w-4 h-4 rounded border-2 border-slate-200 flex-shrink-0" />
-                                                            <span className="flex-1 text-xs text-slate-500 truncate">{col.label}</span>
-                                                            <span className="text-[10px] text-slate-300">+ যোগ করুন</span>
+                                                            <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isActive ? 'border-indigo-500 bg-indigo-500' : 'border-slate-200'}`}>
+                                                                {isActive && <svg viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth={2} style={{ width: 9, height: 9 }}><polyline points="1.5,5 4,7.5 8.5,2.5" /></svg>}
+                                                            </span>
+                                                            <span className={`flex-1 text-xs truncate font-semibold ${isActive ? 'text-indigo-800' : 'text-slate-500'}`}>{col.label}</span>
+                                                            <span className={`text-[10px] flex-shrink-0 ${isActive ? 'text-indigo-300' : 'text-slate-300'}`}>{isActive ? '✓ নির্বাচিত' : '+ যোগ করুন'}</span>
                                                         </button>
-                                                    ))}
-                                                </div>
+                                                    );
+                                                })}
                                             </div>
-                                        );
-                                    })()}
+                                        </div>
+                                    )}
                                 </Section>
 
 
