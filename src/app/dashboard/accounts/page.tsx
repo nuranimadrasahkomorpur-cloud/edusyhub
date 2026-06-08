@@ -520,8 +520,11 @@ export default function AccountsPage() {
             txns = txns.filter(t => {
                 const raw = (t.category || '').toString();
                 const base = raw.replace(/\s*\(.*?\)\s*/g, '').trim();
-                const match = categories.find(c => c.name === base || c.name === raw || c.name === (t.originalCategory || ''));
-                return !(match && match.isArchived);
+                const isFromActiveCat = t.categoryId ? categories.some(c => c.id === t.categoryId && !c.isArchived) : false;
+                if (isFromActiveCat) return true;
+                
+                const hasArchived = categories.some(c => (c.name === base || c.name === raw || c.name === (t.originalCategory || '')) && c.isArchived);
+                return !hasArchived;
             });
         }
 
@@ -2475,6 +2478,7 @@ export default function AccountsPage() {
                             fetchAccounts();
                         }}
                         onPrintReceipt={(txn: any) => {
+                            setFeeCollectStudent(null);
                             setSelectedTransactionForPrint(txn);
                         }}
                     />

@@ -5395,6 +5395,8 @@ export default function StudentManagementPage() {
                         fetchFeesData();
                     }}
                     onPrintReceipt={(txn) => {
+                        setIsFeeModalOpen(false);
+                        setSelectedStudentForFee(null);
                         setSelectedTransactionForPrint(txn);
                     }}
                 />

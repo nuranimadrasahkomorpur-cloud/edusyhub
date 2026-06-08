@@ -140,6 +140,7 @@ export async function POST(req: Request) {
                     category: fee.category,
                     note: paymentNote ? `${fee.note ? `${fee.note} - ` : ''}${paymentNote}` : fee.note || '',
                     amount: fee.amount,
+                    originalAmount: fee.amount,
                     date: fee.date,
                     createdAt: fee.createdAt
                 });
@@ -176,6 +177,7 @@ export async function POST(req: Request) {
                     category: fee.category,
                     note: partialNote,
                     amount: remaining,
+                    originalAmount: fee.amount,
                     date: fee.date,
                     createdAt: fee.createdAt
                 });
@@ -226,6 +228,7 @@ export async function POST(req: Request) {
                         category: fee.category,
                         note: paymentNote ? `${paymentNote} (অগ্রিম পরিশোধ)` : 'অগ্রিম পরিশোধ',
                         amount: fee.amount,
+                        originalAmount: fee.amount,
                         date: new Date(fee.date),
                         createdAt: new Date(fee.date)
                     });
@@ -265,6 +268,7 @@ export async function POST(req: Request) {
                         category: fee.category,
                         note: paymentNote ? `${paymentNote} (আংশিক অগ্রিম পরিশোধ)` : 'আংশিক অগ্রিম পরিশোধ',
                         amount: remaining,
+                        originalAmount: fee.amount,
                         date: new Date(fee.date),
                         createdAt: new Date(fee.date)
                     });
@@ -385,6 +389,7 @@ export async function POST(req: Request) {
                 category: displayCategory,
                 note: finalNote,
                 amount: f.amount,
+                originalAmount: f.originalAmount || f.amount,
                 date: f.date,
                 createdAt: f.createdAt || f.date
             };
@@ -396,6 +401,7 @@ export async function POST(req: Request) {
                 category: 'অনির্ধারিত অগ্রিম জমা',
                 note: 'অগ্রিম জমা (অতিরিক্ত পরিশোধ)',
                 amount: advanceAmount,
+                originalAmount: advanceAmount,
                 date: new Date(),
                 createdAt: new Date()
             });
@@ -415,6 +421,7 @@ export async function POST(req: Request) {
             receiptDetails: {
                 receiptNo,
                 studentName,
+                studentId,
                 studentUniqueId: selectedFees[0]?.studentUniqueId,
                 studentPhoto,
                 fatherName,
@@ -452,9 +459,23 @@ export async function GET(req: Request) {
             }
         });
 
-        const pendingFees = await (prisma as any).transaction.findMany({
+        const allPendingFees = await (prisma as any).transaction.findMany({
             where: { studentId, instituteId, status: 'PENDING' },
             orderBy: { date: 'asc' }
+        });
+
+        const categories = await (prisma as any).accountCategory.findMany({
+            where: { instituteId }
+        });
+
+        const activeCategories = categories.filter((c: any) => !(c.config?.isArchived === true));
+        const pendingFees = allPendingFees.filter((f: any) => {
+            if (f.categoryId) {
+                return activeCategories.some((c: any) => c.id === f.categoryId);
+            } else {
+                const hasArchived = categories.some((c: any) => c.name === f.category && c.config?.isArchived === true);
+                return !hasArchived;
+            }
         });
 
         const formattedPendingFees = pendingFees.map((t: any) => {
