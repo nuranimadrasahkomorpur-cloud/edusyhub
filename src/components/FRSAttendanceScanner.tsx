@@ -23,6 +23,7 @@ import {
     Pause
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { useSession } from './SessionProvider';
 import { usePerformance } from '../hooks/usePerformance';
@@ -117,6 +118,10 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
     const [attendanceRecords, setAttendanceRecords] = useState<Record<string, { deviceId: string, timestamp: Date, status: string }>>({});
     const [ambiguousMatches, setAmbiguousMatches] = useState<EnrolledStudent[]>([]);
     const [isProcessingLocked, setIsProcessingLocked] = useState(false);
+    const isProcessingLockedRef = useRef(false);
+    useEffect(() => {
+        isProcessingLockedRef.current = isProcessingLocked;
+    }, [isProcessingLocked]);
     const [matchingState, setMatchingState] = useState<{
         status: 'IDLE' | 'MATCHING' | 'MATCHED' | 'ALREADY_DONE';
         studentName?: string;
@@ -129,6 +134,18 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const uploadImgRef = useRef<HTMLInputElement>(null);
     const markingCooldown = useRef<{ [key: string]: number }>({});
+
+    useEffect(() => {
+        if (ambiguousMatches.length > 0) {
+            if (videoRef.current && !videoRef.current.paused) {
+                videoRef.current.pause();
+            }
+        } else {
+            if (videoRef.current && videoRef.current.paused && isCameraActive && !isPaused) {
+                videoRef.current.play().catch(e => console.error('Video play error:', e));
+            }
+        }
+    }, [ambiguousMatches, isCameraActive, isPaused]);
 
 
     // Web Audio API Context & Buffers
@@ -238,7 +255,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                     name: s.name,
                     classId: s.metadata?.classId,
                     faceDescriptor: s.faceDescriptor,
-                    photo: s.metadata?.studentPhoto,
+                    photo: s.metadata?.studentPhoto || s.metadata?.photo || s.photo,
                     stats: statsMap.get(normalizeId(s.id))
                 }));
 
@@ -745,7 +762,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                             name: s.name,
                             classId: s.metadata?.classId,
                             faceDescriptor: s.faceDescriptor,
-                            photo: s.metadata?.photo
+                            photo: s.metadata?.studentPhoto || s.metadata?.photo || s.photo
                         }));
                     currentStudents = enrolled;
                     const labeledDescriptors = enrolled.map((s: any) => {
@@ -815,10 +832,37 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
         }
     };
 
-    const handleSelectMatch = (student: EnrolledStudent) => {
+    const handleSelectMatch = async (student: EnrolledStudent) => {
         markAttendance(student.id, student.name, student.classId);
         setAmbiguousMatches([]);
-        setIsProcessingLocked(false);
+        
+        // Clear stuck canvas boxes immediately
+        if (canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+        
+        // Wait 2 seconds before rescanning
+        setTimeout(() => {
+            setIsProcessingLocked(false);
+        }, 2000);
+
+        // Improve future matching
+        const descriptor = (videoRef.current as any)?.currentAmbiguousDescriptor;
+        if (descriptor) {
+            try {
+                const res = await fetch(`/api/students/${student.id}/face`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ descriptor, action: 'append' })
+                });
+                if (res.ok) {
+                    showToast('ম্যাচিং উন্নত করা হয়েছে (1 point added)', 'SUCCESS');
+                }
+            } catch (err) {
+                console.error('Failed to improve matching:', err);
+            }
+        }
     };
 
     const handleSkipMatch = () => {
@@ -827,7 +871,17 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             ignoredFaces.current[hash] = Date.now();
         }
         setAmbiguousMatches([]);
-        setIsProcessingLocked(false);
+        
+        // Clear stuck canvas boxes immediately
+        if (canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+        
+        // Wait 2 seconds before rescanning
+        setTimeout(() => {
+            setIsProcessingLocked(false);
+        }, 2000);
     };
 
     const lastSoundPlayed = useRef<{ [label: string]: number }>({});
@@ -870,7 +924,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
             // Frame Throttling Logic (Process every ~150ms for faster matching within 1 sec)
             const now = Date.now();
             const lastProcess = (videoRef.current as any).lastProcessTime || 0;
-            if (now - lastProcess < 150 || isProcessingLocked) {
+            if (now - lastProcess < 150 || isProcessingLockedRef.current) {
                 requestRef.current = requestAnimationFrame(processFrame);
                 return;
             }
@@ -935,7 +989,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                         let hasMatchingCandidate = false;
 
                         resizedDetections.forEach(detection => {
-                            if (locallyLocked || isProcessingLocked) return;
+                            if (locallyLocked || isProcessingLockedRef.current) return;
 
                             // Find all potential candidates with distance < 0.5 (or stricter 0.45)
                             // We use faceMatcher.labeledDescriptors directly to find all matches
@@ -995,6 +1049,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                     
                                     // Store current descriptor to allow ignoring it if user clicks skip
                                     (videoRef.current as any).currentAmbiguousHash = descriptorHash;
+                                    (videoRef.current as any).currentAmbiguousDescriptor = Array.from(detection.descriptor);
                                     return;
                                 }
                             }
@@ -1115,7 +1170,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                             }
                         });
 
-                        if (!hasMatchingCandidate && !isProcessingLocked) {
+                        if (!hasMatchingCandidate && !isProcessingLockedRef.current) {
                             setMatchingState(prev => prev.status === 'MATCHING' ? { status: 'IDLE' } : prev);
                         }
 
@@ -1130,7 +1185,7 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                     const ctx = canvasRef.current.getContext('2d');
                     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
                 }
-                if (!isProcessingLocked && detections.length === 0) {
+                if (!isProcessingLockedRef.current && detections.length === 0) {
                     setMatchingState(prev => prev.status === 'MATCHING' ? { status: 'IDLE' } : prev);
                 }
             } catch (error) {
@@ -1422,14 +1477,16 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                             )}
 
                             {/* Ambiguous Match Selection Overlay */}
-                            <AnimatePresence>
-                                {ambiguousMatches.length > 0 && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        className="absolute inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6"
-                                    >
+                            {typeof window !== 'undefined' && createPortal(
+                                <AnimatePresence>
+                                    {ambiguousMatches.length > 0 && (
+                                        <motion.div
+                                            key="ambiguous-matches-modal"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="fixed inset-0 z-[999999] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-6"
+                                        >
                                         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
                                             <div className="bg-slate-50 p-6 border-b border-slate-100 flex items-center justify-between">
                                                 <div>
@@ -1479,9 +1536,11 @@ export default function FRSAttendanceScanner({ classId: propClassId, selectedDat
                                                 </button>
                                             </div>
                                         </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>,
+                                document.body
+                            )}
                         </div>
                     </div>
                 </div>

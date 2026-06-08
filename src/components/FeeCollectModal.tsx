@@ -335,7 +335,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 transition={{ duration: 0.2, type: 'spring', bounce: 0.3 }}
-                className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] min-h-0"
+                className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] min-h-[500px]"
                 style={{ willChange: 'transform, opacity' }}
             >
                 {/* Header */}
@@ -841,13 +841,13 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                             <span className="text-sm font-black text-emerald-700">৳ {totalPaid.toLocaleString()}</span>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto" data-lenis-prevent>
+                        <div className="flex-1 overflow-y-auto flex flex-col" data-lenis-prevent>
                             {loadingHistory ? (
-                                <div className="p-10 flex items-center justify-center">
+                                <div className="flex-1 min-h-[400px] p-10 flex items-center justify-center">
                                     <div className="w-8 h-8 border-2 border-[#045c84] border-t-transparent rounded-full animate-spin" />
                                 </div>
                             ) : historyTxns.length === 0 ? (
-                                <div className="p-12 text-center">
+                                <div className="flex-1 min-h-[400px] p-12 flex flex-col items-center justify-center text-center">
                                     <History size={40} className="mx-auto mb-3 text-slate-200" />
                                     <p className="text-xs font-black text-slate-400">কোন পেমেন্ট ইতিহাস পাওয়া যায়নি</p>
                                 </div>

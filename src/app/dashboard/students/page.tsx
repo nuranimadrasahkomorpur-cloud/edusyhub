@@ -1431,7 +1431,7 @@ export default function StudentManagementPage() {
         };
 
         if (data.previewLeft) await uploadBase64(data.previewLeft, 'studentPhotoLeft');
-        if (data.previewMiddle || data.middleImageBase64) await uploadBase64(data.previewMiddle || data.middleImageBase64!, 'studentPhoto');
+        if (data.previewMiddle || data.middleImageBase64) await uploadBase64(data.previewMiddle || data.middleImageBase64!, 'photo');
         if (data.previewRight) await uploadBase64(data.previewRight, 'studentPhotoRight');
     };
 
@@ -2553,9 +2553,9 @@ export default function StudentManagementPage() {
                                                                     className={`w-10 h-10 rounded-full ${bgColor} border-[0.5px] border-slate-600 shadow-sm overflow-hidden flex items-center justify-center text-white font-bold text-sm relative shrink-0 mx-auto group-hover:scale-105 transition-transform cursor-pointer`}
                                                                 >
                                                                     <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
-                                                                    {s.metadata?.studentPhoto && (
+                                                                    {(s.metadata?.studentPhoto || s.metadata?.photo) && (
                                                                         <img 
-                                                                            src={s.metadata.studentPhoto} 
+                                                                            src={s.metadata.studentPhoto || s.metadata.photo} 
                                                                             alt={s.name} 
                                                                             loading="lazy"
                                                                             className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
@@ -2587,9 +2587,9 @@ export default function StudentManagementPage() {
                                                                         className={`w-10 h-10 rounded-full ${bgColor} border-[0.5px] border-slate-600 shadow-sm overflow-hidden flex items-center justify-center text-white font-bold text-sm relative shrink-0 group-hover:scale-105 transition-transform ${!isTableEditMode ? 'cursor-pointer' : ''}`}
                                                                     >
                                                                         <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
-                                                                        {s.metadata?.studentPhoto && (
+                                                                        {(s.metadata?.studentPhoto || s.metadata?.photo) && (
                                                                             <img 
-                                                                                src={s.metadata.studentPhoto} 
+                                                                                src={s.metadata.studentPhoto || s.metadata.photo} 
                                                                                 alt={s.name} 
                                                                                 loading="lazy"
                                                                                 className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
@@ -2877,9 +2877,9 @@ export default function StudentManagementPage() {
                                                             <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
                                                             
                                                             {/* Lazy Loaded Image */}
-                                                            {s.metadata?.studentPhoto && (
+                                                            {(s.metadata?.studentPhoto || s.metadata?.photo) && (
                                                                 <img 
-                                                                    src={s.metadata.studentPhoto} 
+                                                                    src={s.metadata.studentPhoto || s.metadata.photo} 
                                                                     alt={s.name} 
                                                                     loading="lazy"
                                                                     className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
@@ -3244,9 +3244,9 @@ export default function StudentManagementPage() {
                                         return (
                                             <div className="relative shrink-0">
                                                 <div className={`w-12 h-12 rounded-full ${bgColor} border-2 border-white shadow-md overflow-hidden flex items-center justify-center text-white font-bold text-lg group-hover:scale-110 transition-transform duration-300`}>
-                                                    {s.metadata?.studentPhoto ? (
+                                                    {(s.metadata?.studentPhoto || s.metadata?.photo) ? (
                                                         <img
-                                                            src={s.metadata.studentPhoto}
+                                                            src={s.metadata.studentPhoto || s.metadata.photo}
                                                             alt={s.name}
                                                             className="w-full h-full object-cover"
                                                             onError={(e) => {
@@ -5137,8 +5137,8 @@ export default function StudentManagementPage() {
                                     {selectedStudentsForGroup.includes(student.id) && <Plus size={12} className="text-white" />}
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 overflow-hidden">
-                                    {student.metadata?.studentPhoto ? (
-                                        <img src={student.metadata.studentPhoto} alt={student.name} className="w-full h-full object-cover" />
+                                    {(student.metadata?.studentPhoto || student.metadata?.photo) ? (
+                                        <img src={student.metadata.studentPhoto || student.metadata.photo} alt={student.name} className="w-full h-full object-cover" />
                                     ) : student.name?.[0]}
                                 </div>
                                 <div className="flex-1">
@@ -5353,7 +5353,7 @@ export default function StudentManagementPage() {
                 )}
             </Modal>
             {/* Floating Scanner Button (visible in fee-collect mode) */}
-            {viewMode === 'FEES_COLLECT' && activeTab === 'students' && typeof document !== 'undefined' && createPortal(
+            {viewMode === 'FEES_COLLECT' && activeTab === 'students' && pathname?.includes('/dashboard/students') && typeof document !== 'undefined' && createPortal(
                 <>
                     <div className={`fixed right-6 z-[9999] transition-all duration-500 ease-in-out ${showScanButton ? 'bottom-24 translate-y-0 opacity-100 pointer-events-auto' : 'bottom-0 translate-y-full opacity-0 pointer-events-none'}`}>
                         <button

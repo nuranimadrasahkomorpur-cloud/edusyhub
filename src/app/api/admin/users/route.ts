@@ -222,22 +222,48 @@ export async function GET(req: Request) {
         if (search) {
             match.$and = match.$and || [];
             
+            // Number normalization: Bengali to English, English to Bengali
+            const banglaToEnglish: { [key: string]: string } = {
+                '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+                '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9'
+            };
+            const englishToBangla: { [key: string]: string } = {
+                '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
+                '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯'
+            };
+            
+            const normalizedSearch = search.replace(/[০-৯]/g, (m: string) => banglaToEnglish[m]);
+            const searchBangla = normalizedSearch.replace(/[0-9]/g, (m: string) => englishToBangla[m]);
+            
+            const searchTerms = Array.from(new Set([search, normalizedSearch, searchBangla]));
             const searchOrFilters: any[] = [];
-            const isNumericSearch = /^\d+$/.test(search);
-            if (isNumericSearch) {
-                // Exact match on studentId as integer or string in metadata
-                searchOrFilters.push({ 'metadata.studentId': parseInt(search) });
-                searchOrFilters.push({ 'metadata.studentId': search });
-            } else {
-                // Non-numeric searches: exact match on metadata.studentId string or rollNumber
-                searchOrFilters.push({ 'metadata.studentId': search });
-                searchOrFilters.push({ 'metadata.rollNumber': search });
-            }
+            
+            searchTerms.forEach(term => {
+                // Add regex for text fields
+                searchOrFilters.push({ name: { $regex: term, $options: 'i' } });
+                searchOrFilters.push({ email: { $regex: term, $options: 'i' } });
+                searchOrFilters.push({ phone: { $regex: term, $options: 'i' } });
+                searchOrFilters.push({ 'metadata.fathersName': { $regex: term, $options: 'i' } });
+                searchOrFilters.push({ 'metadata.mothersName': { $regex: term, $options: 'i' } });
+                searchOrFilters.push({ 'metadata.studentPhone': { $regex: term, $options: 'i' } });
+                searchOrFilters.push({ 'metadata.guardianPhone': { $regex: term, $options: 'i' } });
 
-            // If the searched value is a valid MongoDB ObjectId, allow direct user lookup too
-            if (/^[a-fA-F0-9]{24}$/.test(search)) {
-                searchOrFilters.push({ _id: { $oid: search } });
-            }
+                const isNumericTerm = /^\d+$/.test(term);
+                if (isNumericTerm) {
+                    // Exact match on studentId or rollNumber as integer
+                    searchOrFilters.push({ 'metadata.studentId': parseInt(term) });
+                    searchOrFilters.push({ 'metadata.rollNumber': parseInt(term) });
+                } 
+                
+                // String matches for studentId/rollNumber
+                searchOrFilters.push({ 'metadata.studentId': term });
+                searchOrFilters.push({ 'metadata.rollNumber': term });
+
+                // If the searched value is a valid MongoDB ObjectId, allow direct user lookup too
+                if (/^[a-fA-F0-9]{24}$/.test(term)) {
+                    searchOrFilters.push({ _id: { $oid: term } });
+                }
+            });
 
             match.$and.push({ $or: searchOrFilters });
         }

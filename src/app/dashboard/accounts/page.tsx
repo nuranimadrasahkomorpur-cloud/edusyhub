@@ -45,6 +45,7 @@ import Toast from '@/components/Toast';
 import { useUI } from '@/components/UIProvider';
 import { getCleanId } from '@/utils/digit-utils';
 import QRBarcodeScanner from '@/components/QRBarcodeScanner';
+import { usePathname } from 'next/navigation';
 
 const getShortCategory = (category: string) => {
     if (!category) return 'অজানা';
@@ -58,6 +59,7 @@ const getShortCategory = (category: string) => {
 };
 
 export default function AccountsPage() {
+    const pathname = usePathname();
     const { activeInstitute } = useSession();
     const [activeMainTab, setActiveMainTab] = useState<'overview' | 'income' | 'expense'>('overview'); 
     const [activeSubTab, setActiveSubTab] = useState<'transactions' | 'pending' | 'categories'>('transactions');
@@ -2498,7 +2500,7 @@ export default function AccountsPage() {
             {/* Floating Action Buttons */}
             {typeof document !== 'undefined' && createPortal(
                 <AnimatePresence>
-                    {showFloatingActions && (
+                    {showFloatingActions && pathname?.includes('/dashboard/accounts') && (
                         <>
                             <motion.button
                                 key="scan-button"

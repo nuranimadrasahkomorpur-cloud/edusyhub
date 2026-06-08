@@ -42,9 +42,10 @@ interface FaceEnrollmentProps {
         previewMiddle?: string;
         previewRight?: string;
     }) => void;
+    action?: 'overwrite' | 'append';
 }
 
-export default function FaceEnrollment({ studentId, studentName, onSuccess, onClose, onCaptureOffline }: FaceEnrollmentProps) {
+export default function FaceEnrollment({ studentId, studentName, onSuccess, onClose, onCaptureOffline, action }: FaceEnrollmentProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -270,7 +271,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                     ctx.fillStyle = '#045c84'; // Premium theme blue
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
                     ctx.lineWidth = Math.max(1.5, img.width / 350);
-                    
+
                     // Connection outlines for each specific facial feature
                     const drawFeatureOutline = (start: number, end: number, isClosed = false) => {
                         ctx.beginPath();
@@ -462,70 +463,42 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                 }
                 if (rightDesc) { setCapturedRight(rightDesc); setPreviewRight(rightPreview); previewsRef.current.right = rightPreview; }
                 
-                if (leftDesc && middleDesc && rightDesc) {
-                    setProgress(90);
-                    await saveFaceDescriptors([leftDesc, middleDesc, rightDesc], middleImageBase64 || undefined);
-                } else {
-                    setError('সবগুলো দিক (বাম, ডান, সোজা) সফলভাবে সনাক্ত করা যায়নি। অনুগ্রহ করে অনুপস্থিত ছবিগুলো আলাদাভাবে আপলোড করুন।');
-                    if (!middleDesc) setCurrentStep('MIDDLE');
-                    else if (!rightDesc) setCurrentStep('RIGHT');
-                    else if (!leftDesc) setCurrentStep('LEFT');
-                    else setCurrentStep('DONE');
+                const descs: number[][] = [];
+                if (leftDesc) descs.push(leftDesc);
+                if (middleDesc) descs.push(middleDesc);
+                if (rightDesc) descs.push(rightDesc);
+                
+                if (descs.length === 0) {
+                    setError('কমপক্ষে একটি ফেস আইডি প্রয়োজন।');
                     setStatus('READY');
+                    return;
                 }
-            } catch (err) {
-                 setError('ছবিগুলো প্রসেস করতে সমস্যা হয়েছে।');
-                 setStatus('READY');
+                
+                await saveFaceDescriptors(descs, middleImageBase64 || undefined);
+            } catch (err: any) {
+                console.error('Batch processing error:', err);
+                setError('ছবি প্রসেস করতে সমস্যা হয়েছে।');
+                setStatus('READY');
             } finally {
-                 setIsUsingPhoto(false);
-                 if (uploadInputRef.current) uploadInputRef.current.value = '';
+                setIsUsingPhoto(false);
             }
             return;
         }
 
-        // Single upload fallback
-        const file = files[0];
-        // Generate and set preview for current step
-        const previewUrl = URL.createObjectURL(file);
-        if (currentStep === 'LEFT') {
-            setPreviewLeft(previewUrl);
-            previewsRef.current.left = previewUrl;
-        } else if (currentStep === 'MIDDLE') {
-            setPreviewMiddle(previewUrl);
-            previewsRef.current.middle = previewUrl;
-            setCapturedMiddleImageBase64(await fileToBase64(file));
-        } else if (currentStep === 'RIGHT') {
-            setPreviewRight(previewUrl);
-            previewsRef.current.right = previewUrl;
+        // Single photo mode
+        try {
+            setIsUsingPhoto(true);
+            await processImage(files[0]);
+        } catch (err) {
+            console.error('Photo upload error:', err);
+        } finally {
+            setIsUsingPhoto(false);
         }
-
-        setIsUsingPhoto(true);
-        await processImage(file);
-        if (uploadInputRef.current) uploadInputRef.current.value = '';
     };
-
 
     const saveFaceDescriptors = async (descriptors: number[][], middleImageBase64Override?: string) => {
         try {
             setStatus('SAVING');
-
-            if (onCaptureOffline) {
-                onCaptureOffline({
-                    descriptors,
-                    middleImageBase64: middleImageBase64Override || capturedMiddleImageBase64 || undefined,
-                    previewLeft: previewsRef.current.left || undefined,
-                    previewMiddle: previewsRef.current.middle || undefined,
-                    previewRight: previewsRef.current.right || undefined
-                });
-                setProgress(100);
-                setStatus('SUCCESS');
-                if (onSuccess) onSuccess();
-                setTimeout(() => {
-                    onClose();
-                }, 2000);
-                return;
-            }
-
             if (!studentId) {
                 throw new Error('Student ID is missing');
             }
@@ -535,11 +508,15 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     descriptor: descriptors,
-                    middleImageBase64: middleImageBase64Override || capturedMiddleImageBase64
+                    middleImageBase64: middleImageBase64Override || capturedMiddleImageBase64,
+                    action: action
                 }),
             });
 
-            if (!response.ok) throw new Error('Failed to save face data');
+            if (!response.ok) {
+                const errData = await response.json().catch(() => null);
+                throw new Error(errData?.error || 'Failed to save face data');
+            }
 
             setProgress(100);
             setStatus('SUCCESS');
@@ -548,25 +525,11 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
             setTimeout(() => {
                 onClose();
             }, 2000);
-
         } catch (err: any) {
-            console.error('Enrollment save error:', err);
-            setError('ফেস ডেটা সেভ করতে সমস্যা হয়েছে।');
+            console.error('Save error:', err);
+            setError(err.message || 'সংরক্ষণ করতে সমস্যা হয়েছে।');
             setStatus('READY');
         }
-    };
-
-    const handleSaveCurrent = () => {
-        const descs: number[][] = [];
-        if (capturedLeft) descs.push(capturedLeft);
-        if (capturedMiddle) descs.push(capturedMiddle);
-        if (capturedRight) descs.push(capturedRight);
-        
-        if (descs.length === 0) {
-            setError('কমপক্ষে একটি ফেস আইডি প্রয়োজন।');
-            return;
-        }
-        saveFaceDescriptors(descs);
     };
 
     const handleEnroll = () => {
@@ -1032,7 +995,45 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                     )}
                                 </div>
 
-                                {/* Slot 2: Right */}
+                                {/* Slot 2: Left */}
+                                <div 
+                                    onClick={() => currentStep === 'LEFT' && !isUsingPhoto && uploadInputRef.current?.click()}
+                                    className={`relative aspect-[3/4] rounded-2xl border-2 flex flex-col items-center justify-center overflow-hidden transition-all bg-white ${
+                                        capturedLeft 
+                                            ? 'border-emerald-500 shadow-md shadow-emerald-50/50' 
+                                            : currentStep === 'LEFT' 
+                                                ? 'border-[#045c84] ring-4 ring-[#045c84]/10 cursor-pointer scale-105 shadow-md shadow-slate-100' 
+                                                : 'border-slate-200 opacity-50 cursor-not-allowed'
+                                    }`}
+                                >
+                                    {previewLeft ? (
+                                        <img src={previewLeft} alt="Left" className="w-full h-full object-cover" />
+                                    ) : capturedLeft ? (
+                                        <div className="flex flex-col items-center gap-1 text-center text-emerald-500 p-2">
+                                            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+                                                <CheckCircle2 size={16} />
+                                            </div>
+                                            <span className="text-[8px] font-black leading-tight">স্ক্যানকৃত</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-1.5 p-2 text-center text-slate-400">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${currentStep === 'LEFT' ? 'bg-[#045c84]/10 text-[#045c84]' : 'bg-slate-50 text-slate-300'}`}>
+                                                <Upload size={14} />
+                                            </div>
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">আপলোড</span>
+                                        </div>
+                                    )}
+                                    <div className={`absolute bottom-0 left-0 right-0 py-1 text-center text-[8px] font-bold text-white uppercase tracking-wider ${capturedLeft ? 'bg-emerald-500' : 'bg-slate-700/80'}`}>
+                                        ২. বাম দিক
+                                    </div>
+                                    {capturedLeft && (
+                                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow">
+                                            <CheckCircle2 size={10} strokeWidth={3} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Slot 3: Right */}
                                 <div 
                                     onClick={() => currentStep === 'RIGHT' && !isUsingPhoto && uploadInputRef.current?.click()}
                                     className={`relative aspect-[3/4] rounded-2xl border-2 flex flex-col items-center justify-center overflow-hidden transition-all bg-white ${
@@ -1127,7 +1128,7 @@ export default function FaceEnrollment({ studentId, studentName, onSuccess, onCl
                                 <motion.div
                                     initial={{ scale: 0 }}
                                     animate={{ scale: [0, 1.2, 1] }}
-                                transition={{ duration: 0.5, ease: 'easeOut' }}
+                                    transition={{ duration: 0.5, ease: 'easeOut' }}
                                     className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/35 border border-emerald-400"
                                 >
                                     <CheckCircle2 size={48} className="text-white" strokeWidth={3} />

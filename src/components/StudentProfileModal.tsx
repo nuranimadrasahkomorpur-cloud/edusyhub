@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, BookOpen, CreditCard, TrendingUp, ChevronRight, User, Edit, ChevronDown, ChevronUp, Printer, Trash2, Loader2, Check, Key, LogIn, Disc, ScanFace, Sparkles, AlertCircle, RefreshCw, Clock, History, Settings, Percent, Camera, QrCode, Download, Barcode, Scan } from 'lucide-react';
+import { X, Calendar, BookOpen, CreditCard, TrendingUp, ChevronRight, User, Edit, ChevronDown, ChevronUp, Printer, Trash2, Loader2, Check, Key, LogIn, Disc, ScanFace, Sparkles, AlertCircle, RefreshCw, Clock, History, Settings, Percent, Camera, QrCode, Download, Barcode, Scan, PlusCircle, XCircle } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import JsBarcode from 'jsbarcode';
 import { useSession } from './SessionProvider';
@@ -92,6 +92,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
     const [barcodeFormat, setBarcodeFormat] = useState<'qr' | 'barcode'>('qr');
     const [showScanner, setShowScanner] = useState(false);
     const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+    const [enrollmentAction, setEnrollmentAction] = useState<'overwrite' | 'append'>('overwrite');
     const printRef = useRef<HTMLDivElement>(null);
     const barcodeRef = useRef<SVGSVGElement>(null);
     const tabButtonsRef = useRef<{ [key: string]: HTMLButtonElement | null }>({});
@@ -157,6 +158,28 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
         } finally {
             setIsSaving(false);
             if (profilePhotoInputRef.current) profilePhotoInputRef.current.value = '';
+        }
+    };
+
+    const handleDeleteFaceData = async (index: number | null) => {
+        if (!confirm(index === null ? 'আপনি কি নিশ্চিত যে আপনি সকল ফেস আইডি মুছে ফেলতে চান?' : 'আপনি কি নিশ্চিত যে আপনি এই ফেস আইডি মুছে ফেলতে চান?')) return;
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/api/students/${student.id}/face${index !== null ? `?index=${index}` : ''}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                alert('ফেস আইডি সফলভাবে মুছে ফেলা হয়েছে।');
+                onUpdate?.();
+            } else {
+                const err = await res.json();
+                alert(err.error || 'ফেস আইডি মুছে ফেলতে ব্যর্থ হয়েছে।');
+            }
+        } catch (error) {
+            console.error('Failed to delete face data:', error);
+            alert('একটি ত্রুটি হয়েছে।');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -1212,8 +1235,12 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                     <div className="bg-[#F0FDF4] p-8 rounded-[32px] text-center border-2 border-emerald-50 relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/30 rounded-full -mr-16 -mt-16 group-hover:scale-125 transition-transform" />
                                         <div className="relative z-10 flex flex-col items-center gap-4">
-                                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center transition-all duration-500 ${hasFaceId ? 'bg-emerald-500 text-white rotate-6' : 'bg-white text-slate-300 shadow-sm'}`}>
-                                                <ScanFace size={40} className={hasFaceId ? 'animate-pulse' : ''} />
+                                            <div className={`w-24 h-24 rounded-3xl flex items-center justify-center transition-all overflow-hidden duration-500 ${hasFaceId ? 'bg-emerald-500 text-white shadow-xl rotate-0 border-4 border-emerald-100' : 'bg-white text-slate-300 shadow-sm'}`}>
+                                                {(hasFaceId && (student.metadata?.photo || student.metadata?.studentPhoto)) ? (
+                                                    <img src={student.metadata.photo || student.metadata.studentPhoto} alt="Face ID" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <ScanFace size={40} className={hasFaceId ? 'animate-pulse' : ''} />
+                                                )}
                                             </div>
                                             <div>
                                                 <h4 className="text-xl font-black text-slate-800">ফেস আইডি স্ট্যাটাস</h4>
@@ -1221,12 +1248,38 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                                     {hasFaceId ? 'সফলভাবে নিবন্ধিত' : 'নিবন্ধিত নয়'}
                                                 </p>
                                             </div>
-                                            <button onClick={() => setShowEnrollment(true)} className="mt-2 px-8 py-3 bg-white text-[#045c84] text-[11px] font-black rounded-2xl shadow-xl shadow-emerald-500/10 border-2 border-emerald-100/50 hover:bg-emerald-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
-                                                <Disc size={16} className="text-emerald-500" />
-                                                নতুন ডাটা যুক্ত করুন
-                                            </button>
+                                            <div className="flex gap-2 mt-4 flex-wrap justify-center">
+                                                <button onClick={() => { setEnrollmentAction('overwrite'); setShowEnrollment(true); }} className="px-6 py-2.5 bg-white text-blue-600 text-[11px] font-black rounded-xl shadow-md border border-blue-100 hover:bg-blue-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
+                                                    <RefreshCw size={14} />
+                                                    আপডেট
+                                                </button>
+                                                <button onClick={() => { setEnrollmentAction('append'); setShowEnrollment(true); }} className="px-6 py-2.5 bg-white text-emerald-600 text-[11px] font-black rounded-xl shadow-md border border-emerald-100 hover:bg-emerald-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
+                                                    <PlusCircle size={14} />
+                                                    নতুন যুক্ত
+                                                </button>
+                                                <button onClick={() => handleDeleteFaceData(null)} className="px-6 py-2.5 bg-white text-rose-600 text-[11px] font-black rounded-xl shadow-md border border-rose-100 hover:bg-rose-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
+                                                    <Trash2 size={14} />
+                                                    মুছুন
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
+                                    
+                                    {hasFaceId && Array.isArray(student.faceDescriptor) && student.faceDescriptor.length > 0 && (
+                                        <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mt-4">
+                                            <h5 className="text-xs font-bold text-slate-500 uppercase mb-3">নিবন্ধিত ফেস ডাটা অংশসমূহ ({(Array.isArray(student.faceDescriptor[0]) ? student.faceDescriptor.length : 1)} টি)</h5>
+                                            <div className="flex flex-wrap gap-2">
+                                                {Array.from({ length: Array.isArray(student.faceDescriptor[0]) ? student.faceDescriptor.length : 1 }).map((_, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
+                                                        <span className="text-xs font-bold text-slate-700">ডাটা #{idx + 1}</span>
+                                                        <button onClick={() => handleDeleteFaceData(idx)} className="text-rose-400 hover:text-rose-600 transition-colors p-1" title="এই অংশটি মুছুন">
+                                                            <XCircle size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}
@@ -1507,7 +1560,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
 
             {showEnrollment && (
                 <div className="fixed inset-0 z-[10000]">
-                    <FaceEnrollment studentId={student.id} studentName={student.name} onClose={() => setShowEnrollment(false)} onSuccess={() => { setShowEnrollment(false); onUpdate?.(); }} />
+                    <FaceEnrollment studentId={student.id} studentName={student.name} action={enrollmentAction} onClose={() => setShowEnrollment(false)} onSuccess={() => { setShowEnrollment(false); onUpdate?.(); }} />
                 </div>
             )}
 
