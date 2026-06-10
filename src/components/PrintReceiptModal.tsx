@@ -436,10 +436,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
         );
     };
 
-    const [mounted, setMounted] = useState(false);
-    
     React.useEffect(() => {
-        setMounted(true);
         setGeneratedAt(new Date());
 
         const fetchDue = async () => {
@@ -479,7 +476,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
         }
     }, [transaction, activeInstitute?.id, isLedger]);
 
-    if (!transaction || !mounted) return null;
+    if (!transaction) return null;
 
     return createPortal(
         <div className="fixed inset-0 z-[10050] flex items-center justify-center p-4 font-bengali">
@@ -487,6 +484,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 onClick={onClose}
                 className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
             />
@@ -495,6 +493,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ duration: 0.2, type: 'spring', bounce: 0 }}
                 className="relative w-full max-w-[96vw] xl:max-w-[1100px] bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
                 {/* Header */}

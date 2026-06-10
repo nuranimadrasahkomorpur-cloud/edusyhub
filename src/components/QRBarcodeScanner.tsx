@@ -63,6 +63,8 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
             return;
         }
 
+        let isEffectActive = true;
+
         const originalConsoleError = console.error;
         const originalConsoleDebug = console.debug;
         const originalOnError = window.onerror;
@@ -228,6 +230,8 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
         };
 
         try {
+            if (!isEffectActive) return;
+
             // Ensure container exists in DOM before rendering
             const container = document.getElementById('qr-scanner-container');
             if (!container) {
@@ -240,6 +244,15 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
 
             isActiveRef.current = true;
             await html5Qrcode.start(cameraId, scannerConfig, onScanSuccess, onScanError);
+            
+            if (!isEffectActive) {
+                console.log('⏸️ Effect unmounted during start, stopping immediately...');
+                html5Qrcode.stop().then(() => {
+                    try { html5Qrcode.clear(); } catch(e) {}
+                }).catch(err => console.error('Error stopping unmounted scanner:', err));
+                return;
+            }
+
             console.log('✅ Scanner started successfully');
             
             isRenderingRef.current = true;
@@ -504,6 +517,7 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
 
         return () => {
             console.log('🧹 Scanner cleanup starting...');
+            isEffectActive = false;
             // Restore console and error handlers
             console.error = originalConsoleError;
             console.debug = originalConsoleDebug;
@@ -607,11 +621,20 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
                     border-radius: 1rem !important;
                     overflow: hidden !important;
                     position: relative !important;
+                    aspect-ratio: 1 / 1 !important;
+                    width: 100% !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
                 }
                 
-                #qr-scanner-container video {
+                #qr-scanner-container video, #qr-scanner-container canvas {
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
                     width: 100% !important;
-                    height: auto !important;
+                    height: 100% !important;
+                    object-fit: cover !important;
                     border-radius: 1rem !important;
                 }
                 

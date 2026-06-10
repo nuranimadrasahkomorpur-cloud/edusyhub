@@ -36,6 +36,7 @@ export default function GlobalUserManagement() {
     const [newUser, setNewUser] = useState({
         name: '',
         email: '',
+        phone: '',
         password: '',
         role: 'ADMIN',
         instituteIds: [] as string[]
@@ -98,7 +99,7 @@ export default function GlobalUserManagement() {
             });
             if (res.ok) {
                 setIsAddModalOpen(false);
-                setNewUser({ name: '', email: '', password: '', role: 'ADMIN', instituteIds: [] });
+                setNewUser({ name: '', email: '', phone: '', password: '', role: 'ADMIN', instituteIds: [] });
                 fetchUsers();
             }
         } catch (error) {
@@ -301,13 +302,24 @@ export default function GlobalUserManagement() {
                                 onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider">ইমেইল</label>
-                            <input
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black"
-                                value={editingUser?.email || ''}
-                                onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-wider">ইমেইল</label>
+                                <input
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black"
+                                    value={editingUser?.email || ''}
+                                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-wider">মোবাইল নম্বর</label>
+                                <input
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black"
+                                    placeholder="01XXXXXXXXX"
+                                    value={editingUser?.phone || ''}
+                                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -371,16 +383,28 @@ export default function GlobalUserManagement() {
                                 required
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider">ইমেইল</label>
-                            <input
-                                type="email"
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black"
-                                placeholder="email@example.com"
-                                value={newUser.email}
-                                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                                required
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-wider">ইমেইল</label>
+                                <input
+                                    type="email"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black"
+                                    placeholder="email@example.com"
+                                    value={newUser.email}
+                                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-wider">মোবাইল নম্বর</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black"
+                                    placeholder="01XXXXXXXXX"
+                                    value={newUser.phone}
+                                    onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">

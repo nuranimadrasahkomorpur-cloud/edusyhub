@@ -640,9 +640,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 top: 0,
                                 left: 0,
                                 width: '100%',
-                                height: '100%'
+                                height: path === activeTab ? 'auto' : '100%',
+                                overflow: path === activeTab ? 'visible' : 'hidden'
                             }}
-                            className="w-full h-full"
+                            className={path === activeTab ? "w-full min-h-full" : "w-full h-full"}
                         >
                             {getKeepAliveComponent(path)}
                         </div>

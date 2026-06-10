@@ -60,6 +60,7 @@ const getShortCategory = (category: string) => {
 
 export default function AccountsPage() {
     const pathname = usePathname();
+
     const { activeInstitute } = useSession();
     const [activeMainTab, setActiveMainTab] = useState<'overview' | 'income' | 'expense'>('overview'); 
     const [activeSubTab, setActiveSubTab] = useState<'transactions' | 'pending' | 'categories'>('transactions');
@@ -161,6 +162,13 @@ export default function AccountsPage() {
     const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
     const [showScanner, setShowScanner] = useState(false);
+
+    // Auto-close scanner when navigating away from Accounts page to prevent background processing
+    useEffect(() => {
+        if (pathname && !pathname.includes('/dashboard/accounts') && showScanner) {
+            setShowScanner(false);
+        }
+    }, [pathname, showScanner]);
     const [openedViaScanner, setOpenedViaScanner] = useState(false);
     const [isScanningStudent, setIsScanningStudent] = useState(false);
     const [showFloatingActions, setShowFloatingActions] = useState(true);

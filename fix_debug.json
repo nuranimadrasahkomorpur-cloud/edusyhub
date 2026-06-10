@@ -1,0 +1,330 @@
+{
+  "success": true,
+  "fixed": [],
+  "teachersCount": 14,
+  "raw": [
+    {
+      "_id": {
+        "$oid": "6990835351ab03d764c14412"
+      },
+      "email": "teacher@edusy.com",
+      "name": "Teacher User",
+      "role": "TEACHER",
+      "password": "password123",
+      "createdAt": {
+        "$date": "2026-02-14T14:14:42.6Z"
+      },
+      "updatedAt": {
+        "$date": "2026-02-14T14:14:42.6Z"
+      },
+      "metadata": {
+        "originalPassword": "password123"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "6994865394955c429e8c5ec9"
+      },
+      "email": "12345@gmail.com",
+      "password": "12345",
+      "name": "mahimn ",
+      "role": "TEACHER",
+      "createdAt": {
+        "$date": "2026-02-17T15:16:35.109Z"
+      },
+      "updatedAt": {
+        "$date": "2026-02-17T15:17:25.883Z"
+      },
+      "metadata": {
+        "originalPassword": "12345"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69ae0fa4c7c0f2a5b35cb915"
+      },
+      "email": "teacher_demo@edusy.com",
+      "password": "demo_password",
+      "name": "Demo Teacher",
+      "phone": "01000000001",
+      "role": "TEACHER",
+      "instituteIds": [
+        {
+          "$oid": "65ea7b2e8c2d1b001d8e1234"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "65ea7b2e8c2d1b001d8e1234"
+      },
+      "createdAt": {
+        "$date": "2026-03-09T00:09:08.503Z"
+      },
+      "updatedAt": {
+        "$date": "2026-04-21T01:56:54.891Z"
+      },
+      "metadata": {
+        "originalPassword": "demo_password"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69ae3b5bd7b5b9a597f1a8b3"
+      },
+      "email": "mdnaim@gmail.com",
+      "password": "123456",
+      "name": "naim",
+      "role": "TEACHER",
+      "createdAt": {
+        "$date": "2026-03-09T03:15:39.201Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-09T03:16:28.419Z"
+      },
+      "metadata": {
+        "originalPassword": "123456"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69afd338598714a148c0d8b7"
+      },
+      "email": "mobashwirkhan560@gmail.com",
+      "password": "12345678",
+      "name": "Mobashwir khan ",
+      "role": "TEACHER",
+      "createdAt": {
+        "$date": "2026-03-10T08:15:52.48Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-10T08:17:17.308Z"
+      },
+      "instituteIds": [
+        {
+          "$oid": "699098a96efcaf26224df245"
+        }
+      ],
+      "metadata": {
+        "originalPassword": "12345678"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69b2d4cec3e9e7bfe42b9d58"
+      },
+      "email": "businesspurposepage7@gmail.com",
+      "password": "12345678",
+      "name": "Abhi",
+      "role": "TEACHER",
+      "createdAt": {
+        "$date": "2026-03-12T14:59:26.775Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T15:02:08.301Z"
+      },
+      "instituteIds": [
+        {
+          "$oid": "699098a96efcaf26224df245"
+        }
+      ],
+      "metadata": {
+        "originalPassword": "12345678"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69cbee55f3f935b6a631e436"
+      },
+      "email": "selim@gmail.com",
+      "password": "$2b$10$Ya8BNJJOIn748WRWRu7y0OhIZtnhWSZOEkl/bIF5D4AjE2mjWoSV.",
+      "name": "জামিদুল ",
+      "phone": "01837521920",
+      "role": "TEACHER",
+      "instituteIds": [
+        {
+          "$oid": "69b03c35b2ae6e1d28ae2137"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-03-31T15:55:01.792Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-04T02:32:54.015Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69ccaf202b5b88aa60995d39"
+      },
+      "email": "mrudro@gmail.com",
+      "password": "$2b$10$h9Rv9D3/jczBVxw8DOdHreMrwUVgBcHacnQ0z4.4ovHIHS6b7o..m",
+      "name": "রুদ্র",
+      "phone": "01876761553",
+      "role": "TEACHER",
+      "instituteIds": [
+        {
+          "$oid": "69b03c35b2ae6e1d28ae2137"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-04-01T05:37:36.654Z"
+      },
+      "updatedAt": {
+        "$date": "2026-04-01T05:37:36.654Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69facb2e1e14c26a07a1b79e"
+      },
+      "email": "the@gmail",
+      "password": "$2b$10$m8gJEHtxPOQv8HjA6Rc1w.ji3SGVWinihijioAZja3Y1dCxIY7uGq",
+      "name": "মৌমি ",
+      "phone": "01790791525",
+      "role": "TEACHER",
+      "instituteIds": [],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-05-06T05:01:34.909Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-04T02:29:28.177Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "69fc9b525c5ce186a60f527d"
+      },
+      "email": "mdmoshiur@gmil.com",
+      "password": "$2b$10$sTvVBxi8FFwqZm666OcQyOmKkMfFu59iw1gk5a1da7aEpUFBwjSlS",
+      "name": "raf",
+      "phone": "01711474155",
+      "role": "TEACHER",
+      "instituteIds": [],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-05-07T14:01:54.198Z"
+      },
+      "updatedAt": {
+        "$date": "2026-05-07T14:01:54.198Z"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "6a1bbb30be219eafe9b59a88"
+      },
+      "email": "sonoya@gmail.com",
+      "password": "$2b$10$F5X5KhfGLgDmsJn00DLd/OFmVlBUpdenUqW9ttkdi9CQxZRlvg7sC",
+      "name": "soniya",
+      "phone": "01970212220",
+      "role": "TEACHER",
+      "instituteIds": [
+        {
+          "$oid": "69b03c35b2ae6e1d28ae2137"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-05-31T04:38:08.645Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-01T16:56:43.889Z"
+      },
+      "metadata": {
+        "originalPassword": "234567"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "6a20e18168bfd11cdbff0da0"
+      },
+      "email": "khadija@gmail.com",
+      "password": "$2b$10$2FgiYqzegIOBF6Utksz15OS7Jl0xpkVnM2BwwedQaCeAySJ5XMYSa",
+      "name": "khadija medam",
+      "phone": "01790370549",
+      "role": "TEACHER",
+      "instituteIds": [
+        {
+          "$oid": "69b03c35b2ae6e1d28ae2137"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-06-04T02:22:57.642Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-04T02:22:57.642Z"
+      },
+      "metadata": {
+        "originalPassword": "123456"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "6a20e9b503127b32a4c0f008"
+      },
+      "email": "lupa@gmil.com",
+      "password": "$2b$10$2QQVJcdZmtKyBz2nak7X1OcQULanq9zVJ/9Vhc1elybOzF/0Qcl.a",
+      "name": "Lupa",
+      "phone": "01868739008",
+      "role": "TEACHER",
+      "instituteIds": [
+        {
+          "$oid": "69b03c35b2ae6e1d28ae2137"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-06-04T02:57:57.34Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-04T02:57:57.34Z"
+      },
+      "metadata": {
+        "originalPassword": "123456"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "6a23a8bb996ed7b054a77912"
+      },
+      "password": "823552",
+      "name": "মায়াবী হুজুর ",
+      "phone": "01404187422",
+      "role": "TEACHER",
+      "createdAt": {
+        "$date": "2026-06-06T04:57:31.288Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-06T05:06:44.573Z"
+      },
+      "metadata": {
+        "originalPassword": "823552"
+      },
+      "email": "samsu@gmail.com",
+      "instituteIds": [
+        {
+          "$oid": "699098e09008db95d6a549e8"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "699098e09008db95d6a549e8"
+      }
+    }
+  ]
+}

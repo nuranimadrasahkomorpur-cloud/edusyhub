@@ -311,12 +311,29 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                    onSuccess(data.message);
-                    onClose();
+                    setResult(data);
+                    if (data.advanceAmount > 0 && !applyAdvanceTo) {
+                        const newPending = pendingFees.filter((f: any) => !selectedFeeIds.has(f.id));
+                        if (newPending.length > 0) {
+                            setStep('advance');
+                            setPendingFees(newPending);
+                        } else {
+                            if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
+                            onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে');
+                            onClose();
+                        }
+                    } else {
+                        if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
+                        onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে');
+                        onClose();
+                    }
+                } else {
+                    console.error('Error submitting fee:', data.error);
+                    alert(data.error || 'ফি গ্রহণে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
                 }
             } catch (err) {
-                console.error(err);
+                console.error('Network or server error:', err);
+                alert('সার্ভারে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
             } finally {
                 setIsSubmitting(false);
             }
@@ -334,8 +351,8 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ duration: 0.2, type: 'spring', bounce: 0.3 }}
-                className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] min-h-[500px]"
+                transition={{ duration: 0.2, type: 'spring', bounce: 0 }}
+                className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col h-[95vh] md:h-[650px]"
                 style={{ willChange: 'transform, opacity' }}
             >
                 {/* Header */}

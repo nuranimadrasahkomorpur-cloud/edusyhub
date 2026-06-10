@@ -86,9 +86,13 @@ export default function TeachersPage() {
     };
 
     useEffect(() => {
-        fetchTeachers();
-        fetchClasses();
-        fetchBooks();
+        const init = async () => {
+            await fetch('/api/admin/fix-teachers');
+            fetchTeachers();
+            fetchClasses();
+            fetchBooks();
+        };
+        init();
     }, [activeInstitute?.id]);
 
     const handleAddTeacher = async (data: any) => {
@@ -152,7 +156,7 @@ export default function TeachersPage() {
     });
 
     const isOwner = (activeInstitute?.adminIds || []).includes(user?.id) || activeInstitute?.isOwner === true;
-    const canManageTeachers = isOwner;
+    const canManageTeachers = isOwner || activeRole === 'ADMIN' || activeRole === 'SUPER_ADMIN';
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-fade-in-up font-bengali min-h-screen pb-20">

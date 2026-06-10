@@ -1,0 +1,43 @@
+{
+  "body": {
+    "email": "01976559098",
+    "phone": "01976559098",
+    "password": "$2b$10$tmfKT2wwol/fH1rFebO1EetiP.v7ASvkatClIEeAcAUJv1D1ksWhW"
+  },
+  "identifier": "01976559098",
+  "rawQueryResults": [
+    {
+      "step": 2,
+      "rawPhone": [
+        {
+          "_id": {
+            "$oid": "69b2ddeeb66279e1d62673c4"
+          },
+          "email": "sazzad@gmail.come",
+          "password": "$2b$10$tmfKT2wwol/fH1rFebO1EetiP.v7ASvkatClIEeAcAUJv1D1ksWhW",
+          "name": "মো: সাজ্জাদ হোসেন",
+          "phone": "01976559098",
+          "role": "TEACHER",
+          "instituteIds": [
+            {
+              "$oid": "69b03c35b2ae6e1d28ae2137"
+            }
+          ],
+          "defaultInstituteId": {
+            "$oid": "69b03c35b2ae6e1d28ae2137"
+          },
+          "createdAt": {
+            "$date": "2026-03-12T15:38:22.914Z"
+          },
+          "updatedAt": {
+            "$date": "2026-06-09T16:50:31.219Z"
+          }
+        }
+      ]
+    }
+  ],
+  "error": "Password mismatch",
+  "storedPassword": "$2b$10$tmfKT2wwol/fH1rFebO1EetiP.v7ASvkatClIEeAcAUJv1D1ksWhW",
+  "inputPassword": "$2b$10$tmfKT2wwol/fH1rFebO1EetiP.v7ASvkatClIEeAcAUJv1D1ksWhW",
+  "userRole": "TEACHER"
+}

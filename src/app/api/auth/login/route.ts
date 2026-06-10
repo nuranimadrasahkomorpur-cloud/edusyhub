@@ -3,6 +3,21 @@ import prisma from '@/utils/db';
 import { normalizeAuthIdentifier, normalizePassword } from '@/utils/digit-utils';
 
 
+async function fixDatabaseTypes() {
+    try {
+        await prisma.$runCommandRaw({
+            update: "User",
+            updates: [ { q: { password: { $type: "number" } }, u: [ { $set: { password: { $toString: "$password" } } } ], multi: true } ]
+        });
+        await prisma.$runCommandRaw({
+            update: "User",
+            updates: [ { q: { phone: { $type: "number" } }, u: [ { $set: { phone: { $toString: "$phone" } } } ], multi: true } ]
+        });
+    } catch (e) {
+        console.error('Failed to fix DB types:', e);
+    }
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -14,12 +29,24 @@ export async function POST(req: Request) {
         }
 
         console.log('🔍 [DEBUG LOGIN] Normalised Identifier:', identifier);
+        
+        const fs = require('fs');
+        const path = require('path');
+        const debugDumpPath = path.join(process.cwd(), 'login_debug.json');
+        
+        let debugData: any = { body, identifier, rawQueryResults: [] };
 
         let user: any = null;
 
         // --- STEP 1: Search by Email (Case Insensitive) ---
         if (identifier.includes('@')) {
             try {
+                // Get raw email result
+                const rawEmail = await (prisma as any).user.findRaw({
+                    filter: { email: { $regex: `^${identifier}$`, $options: 'i' } }
+                });
+                debugData.rawQueryResults.push({ step: 1, rawEmail });
+
                 user = await prisma.user.findFirst({
                     where: { email: { equals: identifier, mode: 'insensitive' } },
                     include: {
@@ -29,12 +56,32 @@ export async function POST(req: Request) {
                 });
             } catch (e) {
                 console.error('⚠️ Email search error:', (e as Error).message);
+                // Attempt DB fix and retry
+                await fixDatabaseTypes();
+                user = await prisma.user.findFirst({
+                    where: { email: { equals: identifier, mode: 'insensitive' } },
+                    include: {
+                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
+                        teacherProfiles: true
+                    }
+                });
             }
         }
 
         // --- STEP 2: Search by Phone (STRING) ---
         if (!user) {
             try {
+                const rawPhone = await (prisma as any).user.findRaw({
+                    filter: { 
+                        $or: [
+                            { phone: identifier },
+                            { phone: `+88${identifier}` },
+                            { phone: `88${identifier}` }
+                        ]
+                    }
+                });
+                debugData.rawQueryResults.push({ step: 2, rawPhone });
+
                 user = await prisma.user.findFirst({
                     where: { 
                         OR: [
@@ -52,6 +99,23 @@ export async function POST(req: Request) {
                 });
             } catch (e) {
                 console.error('⚠️ Phone search error:', (e as Error).message);
+                // Attempt DB fix and retry
+                await fixDatabaseTypes();
+                user = await prisma.user.findFirst({
+                    where: { 
+                        OR: [
+                            { phone: identifier },
+                            { phone: `+88${identifier}` },
+                            { phone: `88${identifier}` },
+                            ...(identifier.startsWith('0') ? [{ phone: identifier.slice(1) }] : []),
+                            ...(!identifier.startsWith('0') ? [{ phone: `0${identifier}` }] : [])
+                        ]
+                    },
+                    include: {
+                        institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
+                        teacherProfiles: true
+                    }
+                });
             }
         }
 
@@ -66,13 +130,24 @@ export async function POST(req: Request) {
                 if (rawResults && Array.isArray(rawResults) && rawResults.length > 0) {
                     const id = rawResults[0]._id?.$oid || rawResults[0]._id?.toString();
                     if (id) {
-                        user = await prisma.user.findUnique({
-                            where: { id },
-                            include: {
-                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
-                                teacherProfiles: true
-                            }
-                        });
+                        try {
+                            user = await prisma.user.findUnique({
+                                where: { id },
+                                include: {
+                                    institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
+                                    teacherProfiles: true
+                                }
+                            });
+                        } catch(e) {
+                            await fixDatabaseTypes();
+                            user = await prisma.user.findUnique({
+                                where: { id },
+                                include: {
+                                    institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
+                                    teacherProfiles: true
+                                }
+                            });
+                        }
                     }
                 }
             } catch (e) {
@@ -98,13 +173,24 @@ export async function POST(req: Request) {
                 if (rawResults && Array.isArray(rawResults) && rawResults.length > 0) {
                     const id = rawResults[0]._id?.$oid || rawResults[0]._id?.toString();
                     if (id) {
-                        user = await prisma.user.findUnique({
-                            where: { id },
-                            include: {
-                                institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
-                                teacherProfiles: true
-                            }
-                        });
+                        try {
+                            user = await prisma.user.findUnique({
+                                where: { id },
+                                include: {
+                                    institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
+                                    teacherProfiles: true
+                                }
+                            });
+                        } catch(e) {
+                            await fixDatabaseTypes();
+                            user = await prisma.user.findUnique({
+                                where: { id },
+                                include: {
+                                    institutes: { select: { id: true, name: true, type: true, logo: true, coverImage: true, address: true, adminIds: true } },
+                                    teacherProfiles: true
+                                }
+                            });
+                        }
                     }
                 }
             } catch (e) {
@@ -139,6 +225,8 @@ export async function POST(req: Request) {
             const debugHint = dbErrorMsg 
                 ? `DB Error: ${dbErrorMsg} (URI: ${maskedDbUrl})`
                 : `Connected DB: ${maskedDbUrl} | Total Users: ${totalUsers} | 'superadmin@edusy.com' exists: ${superadminExists} | Sample: ${JSON.stringify(sampleUsers)}`;
+
+            fs.writeFileSync(debugDumpPath, JSON.stringify(debugData, null, 2));
 
             return NextResponse.json({
                 message: 'আপনার প্রদত্ত আইডি বা ইমেইল পাওয়া যায়নি।',
@@ -192,23 +280,49 @@ export async function POST(req: Request) {
             try {
                 const bcrypt = require('bcryptjs');
                 isPasswordValid = await bcrypt.compare(inputPassword, storedPassword);
+                
+                if (!isPasswordValid && body.password) {
+                    isPasswordValid = await bcrypt.compare(String(body.password), storedPassword);
+                }
+                
+                if (!isPasswordValid) {
+                    const bengaliPassword = inputPassword.replace(/[0-9]/g, (digit: string) => {
+                        const englishToBengali: { [key: string]: string } = {
+                            '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
+                            '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯'
+                        };
+                        return englishToBengali[digit] || digit;
+                    });
+                    isPasswordValid = await bcrypt.compare(bengaliPassword, storedPassword);
+                }
+
+                // If user role is STUDENT or GUARDIAN, maybe they are using their phone number as password and it was hashed
+                if (!isPasswordValid && storedPhone) {
+                    isPasswordValid = await bcrypt.compare(storedPhone, storedPassword);
+                }
+
             } catch (bcryptErr) {
                 console.error('Bcrypt comparison failed, falling back to plaintext check:', bcryptErr);
-                isPasswordValid = storedPassword === inputPassword;
+                isPasswordValid = storedPassword === inputPassword || normalizePassword(storedPassword) === inputPassword;
             }
         } else {
-            isPasswordValid = storedPassword === inputPassword;
+            isPasswordValid = storedPassword === inputPassword || normalizePassword(storedPassword) === inputPassword;
         }
 
         // Fallbacks (Student ID or Phone comparison as password)
         if (!isPasswordValid) {
             isPasswordValid =
-                (user.role === 'STUDENT' && storedStudentId === inputPassword) ||
-                (storedPhone === inputPassword);
+                (user.role === 'STUDENT' && (storedStudentId === inputPassword || normalizePassword(storedStudentId) === inputPassword)) ||
+                (storedPhone === inputPassword || normalizePassword(storedPhone) === inputPassword);
         }
 
         if (!isPasswordValid) {
             console.log('❌ [LOGIN FAIL] Password mismatch for:', identifier);
+            debugData.error = "Password mismatch";
+            debugData.storedPassword = storedPassword;
+            debugData.inputPassword = inputPassword;
+            debugData.userRole = user.role;
+            fs.writeFileSync(debugDumpPath, JSON.stringify(debugData, null, 2));
             return NextResponse.json({ message: 'আপনার পাসওয়ার্ড সঠিক নয়।' }, { status: 401 });
         }
 

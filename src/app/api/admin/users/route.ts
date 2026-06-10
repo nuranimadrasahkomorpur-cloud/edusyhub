@@ -415,8 +415,10 @@ export async function POST(req: Request) {
                 // For other roles (Guardian, etc.), use phone as password
                 password = phone;
             } else if (skipAccountSetup) {
-                // If skipping setup, set a random password as it's required by DB schema
-                password = Math.random().toString(36).slice(-10);
+                // If skipping setup, set a default password instead of a random one
+                password = '123456';
+            } else {
+                password = '123456';
             }
         }
 
@@ -433,9 +435,12 @@ export async function POST(req: Request) {
             finalMetadata.hasFaceId = true;
         }
 
+        const bcrypt = require('bcryptjs');
+        const hashedPassword = await bcrypt.hash(password, 10);
+
         const userDoc: any = {
             name: name || '',
-            password,
+            password: hashedPassword,
             role,
             instituteIds: instIds,
             metadata: finalMetadata,
@@ -451,11 +456,34 @@ export async function POST(req: Request) {
             userDoc.phone = phone;
         }
 
-        await (prisma as any).$runCommandRaw({
+        const createdUserRaw = await (prisma as any).$runCommandRaw({
             insert: 'User',
             documents: [userDoc]
         });
 
+        const newUserId = userDoc._id || createdUserRaw?.insertedIds?.['0'];
+
+        // --- Create TeacherProfile automatically if role is TEACHER ---
+        if (role === 'TEACHER' && instIds.length > 0 && newUserId) {
+            try {
+                await (prisma as any).$runCommandRaw({
+                    insert: 'TeacherProfile',
+                    documents: [
+                        {
+                            userId: { $oid: newUserId.$oid || newUserId.toString() },
+                            instituteId: instIds[0],
+                            status: 'ACTIVE',
+                            permissions: {},
+                            assignedClassIds: [],
+                            createdAt: { $date: new Date().toISOString() },
+                            updatedAt: { $date: new Date().toISOString() }
+                        }
+                    ]
+                });
+            } catch (err) {
+                console.error('Failed to create TeacherProfile during admin user creation:', err);
+            }
+        }
         // -----------------------------------
 
         // --- Guardian Account Automation (for Students) ---
@@ -618,26 +646,30 @@ export async function PATCH(req: Request) {
 
         const set: any = {};
         if (email) set.email = email;
-        if (password) {
-            set.password = password;
-            set['metadata.originalPassword'] = password;
-        }
         if (role) set.role = role;
         if (name) set.name = name;
-        if (metadata) {
-            set.metadata = {
-                ...metadata,
-                originalPassword: password || metadata.originalPassword
-            };
-        }
         if (phone) set.phone = phone;
+
+        // Safely construct the updated metadata to avoid Mongo path conflicts
+        let updatedMetadata = { ...(metadata || {}) };
+        
+        if (password) {
+            // Hash the password for DB security
+            const bcrypt = require('bcryptjs');
+            set.password = await bcrypt.hash(password, 10);
+            
+            // Keep the plaintext available in metadata for admin visibility
+            updatedMetadata.originalPassword = password;
+        }
+
         if (faceDescriptor && Array.isArray(faceDescriptor) && faceDescriptor.length > 0) {
             set.faceDescriptor = faceDescriptor;
-            if (set.metadata) {
-                set.metadata.hasFaceId = true;
-            } else {
-                set['metadata.hasFaceId'] = true;
-            }
+            updatedMetadata.hasFaceId = true;
+        }
+
+        // Only update metadata if it was provided or modified
+        if (metadata || password || faceDescriptor) {
+            set.metadata = updatedMetadata;
         }
 
         await (prisma as any).$runCommandRaw({

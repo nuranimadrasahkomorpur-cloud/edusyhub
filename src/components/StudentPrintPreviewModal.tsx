@@ -18,6 +18,7 @@ import {
     ChevronDown,
     ChevronUp,
     User,
+    Copy,
 } from 'lucide-react';
 import { POSSIBLE_FIELDS } from './FieldLibrary';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -93,6 +94,17 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                     displayValue: false,
                     margin: 2,
                 });
+                
+                // Add viewBox to make SVG responsive without clipping
+                const w = svgEl.getAttribute('width');
+                const h = svgEl.getAttribute('height');
+                if (w && h) {
+                    svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+                    svgEl.setAttribute('preserveAspectRatio', 'none'); // Allows stretching to fit raw cell width/height
+                    svgEl.style.width = '100%';
+                    svgEl.style.height = '100%';
+                }
+                
                 setSvgHtml(svgEl.outerHTML || '');
             } catch (e) {
                 console.error('JsBarcode error', e);
@@ -100,7 +112,17 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
             }
         }, [value, width, height]);
         if (!svgHtml) return <div style={{ width: `calc(${width}px * var(--content-scale, 1))`, height: `calc(${height}px * var(--content-scale, 1))` }} />;
-        return <div dangerouslySetInnerHTML={{ __html: svgHtml }} style={{ width: `calc(${width}px * var(--content-scale, 1))`, height: `calc(${height}px * var(--content-scale, 1))` }} />;
+        return (
+            <div 
+                dangerouslySetInnerHTML={{ __html: svgHtml }} 
+                className="w-full flex justify-center items-center"
+                style={{ 
+                    width: `calc(${width}px * var(--content-scale, 1))`, 
+                    maxWidth: '100%',
+                    height: `calc(${height}px * var(--content-scale, 1))` 
+                }} 
+            />
+        );
     };
     /* ── column order/visibility state ── */
     // Build the full catalogue of columns available
@@ -564,8 +586,55 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     const cellPv = Math.max(2, rowPadding);
     const cellPh = Math.max(6, 12 * columnScale);
 
-    /* ── print handler ── */
+    /* ── print & copy handlers ── */
     const handlePrint = () => window.print();
+
+    const handleCopyToExcel = () => {
+        if (!groupedStudents || groupedStudents.length === 0) return;
+
+        // Create headers
+        const headers = activeColIds.map(colId => {
+            const col = allAvailableCols.find(c => c.id === colId);
+            return col?.label || colId;
+        });
+
+        const rows: string[] = [];
+        // Add header row
+        rows.push(headers.join('\t'));
+
+        // Add data rows
+        let serialCounter = 1;
+        groupedStudents.forEach(group => {
+            group.students.forEach((s) => {
+                const rowData = activeColIds.map(colId => {
+                    let cell: any = s.metadata?.[colId] || '-';
+                    if (colId === 'sl') cell = serialCounter++;
+                    else if (colId === 'rollNumber') cell = s.metadata?.rollNumber || '-';
+                    else if (colId === 'studentId') cell = s.metadata?.studentId || s.id.substring(0, 6);
+                    else if (colId === 'photo') cell = ''; // skip photo for excel
+                    else if (colId === 'student') cell = s.name;
+                    else if (colId === 'className') cell = `${classes.find(c => c.id === s.metadata?.classId)?.name || '-'}${s.metadata?.groupId ? ` • ${groups.find(g => g.id === s.metadata?.groupId)?.name || ''}` : ''}`;
+                    else if (colId === 'contact') cell = s.phone || s.metadata?.phone || '-';
+                    else if (colId === 'qr') cell = s.metadata?.studentId || s.id;
+                    else if (colId === 'barcode') cell = s.metadata?.studentId || s.id;
+                    
+                    // clean up newlines and tabs
+                    const cleaned = String(cell).replace(/\n/g, ' ').replace(/\t/g, ' ').trim();
+                    return cleaned;
+                });
+                rows.push(rowData.join('\t'));
+            });
+        });
+
+        const tsv = rows.join('\n');
+        
+        navigator.clipboard.writeText(tsv).then(() => {
+            alert('সফলভাবে এক্সেল ফরম্যাটে কপি হয়েছে! এখন Excel বা Google Sheets-এ পেস্ট করতে পারেন।');
+        }).catch(err => {
+            console.error('Copy failed:', err);
+            alert('কপি করতে সমস্যা হয়েছে।');
+        });
+    };
 
     /* ── empty state ── */
     if (!payload) return null;
@@ -610,10 +679,17 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                     ব্যক্তিগত ভিউ
                 </button>
 
-                {/* Title removed per request */}
-
                 {/* Right group */}
                 <div className="flex items-center gap-1.5 md:gap-2 ml-auto pl-2 flex-shrink-0">
+                    <button
+                        onClick={handleCopyToExcel}
+                        className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"
+                        style={{ background: '#10b981' }}
+                    >
+                        <Copy size={15} />
+                        এক্সেল কপি
+                    </button>
+
                     <button
                         onClick={handlePrint}
                         className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm text-white transition-all hover:opacity-90 active:scale-95 shadow-sm"

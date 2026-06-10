@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
         if (!phone && metadata?.studentPhone) phone = metadata.studentPhone;
 
-        const password = studentPassword || (skipAccountSetup ? Math.random().toString(36).slice(-10) : finalMetadata.studentId);
+        const password = studentPassword || (skipAccountSetup ? '123456' : finalMetadata.studentId);
         if (skipAccountSetup) finalMetadata.skipAccountSetup = true;
 
         const instIds = [instituteId];

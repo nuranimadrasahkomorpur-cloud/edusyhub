@@ -25,22 +25,31 @@ export async function GET(request: Request) {
             include: { groups: true }
         });
 
-        // Fetch Students
-        const students = await prisma.user.findMany({
-            where: {
-                role: 'STUDENT',
-                instituteIds: { has: instituteId }
-            },
-            select: {
-                id: true,
-                name: true,
-                phone: true,
-                email: true,
-                role: true,
-                metadata: true,
-                createdAt: true,
+        // Fetch Students using raw query to handle ObjectId array
+        let students: any[] = [];
+        try {
+            const rawStudents: any = await prisma.$runCommandRaw({
+                find: "User",
+                filter: { 
+                    role: "STUDENT",
+                    instituteIds: { "$oid": instituteId }
+                }
+            });
+            
+            if (rawStudents && rawStudents.cursor && rawStudents.cursor.firstBatch) {
+                students = rawStudents.cursor.firstBatch.map((doc: any) => ({
+                    id: doc._id?.$oid || doc._id,
+                    name: doc.name,
+                    phone: doc.phone,
+                    email: doc.email,
+                    role: doc.role,
+                    metadata: doc.metadata,
+                    createdAt: doc.createdAt?.$date || doc.createdAt,
+                }));
             }
-        });
+        } catch (e) {
+            console.error("Failed to fetch students in sync:", e);
+        }
 
         // Fetch Books
         const books = await prisma.book.findMany({
@@ -100,16 +109,23 @@ export async function POST(request: Request) {
 
         if (type === 'student') {
             // Need to generate random password for new user
+            const tempPassword = '123456';
+            const metadata: any = {
+                ...data,
+                provider: 'EASY_Q',
+                originalPassword: tempPassword,
+                status: 'ACTIVE'
+            };
             await prisma.user.create({
                 data: {
                     id: data.id,
                     name: data.name,
-                    phone: data.mobile || data.phone || data.roll || Math.random().toString(),
+                    phone: data.mobile || data.phone || data.roll || '123456',
                     password: "password123", // Default password
                     role: 'STUDENT',
                     instituteIds: [instituteId],
                     defaultInstituteId: instituteId,
-                    metadata: data
+                    metadata: metadata
                 }
             });
         } else if (type === 'book') {
