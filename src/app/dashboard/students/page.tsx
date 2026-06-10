@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { useSession } from '@/components/SessionProvider';
 import { usePathname } from 'next/navigation';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import {
     Users,
@@ -774,7 +775,9 @@ export default function StudentManagementPage() {
                     studentUniqueId: local.metadata?.studentId || local.id,
                     studentPhoto: local.metadata?.studentPhoto || local.metadata?.photo || null,
                     items: [],
-                    totalAmount: 0
+                    totalAmount: 0,
+                    advanceBalance: 0,
+                    upcomingFees: []
                 });
                 setIsFeeModalOpen(true);
                 setOpenedViaScanner(true);
@@ -798,7 +801,9 @@ export default function StudentManagementPage() {
                         studentUniqueId: s.metadata?.studentId || s.id,
                         studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
                         items: [],
-                        totalAmount: 0
+                        totalAmount: 0,
+                        advanceBalance: 0,
+                        upcomingFees: []
                     });
                     setIsFeeModalOpen(true);
                     setOpenedViaScanner(true);
@@ -818,7 +823,7 @@ export default function StudentManagementPage() {
     };
 
     useEffect(() => {
-        const handler = (evt: any) => {
+        const handler = async (evt: any) => {
             const detail = evt?.detail || {};
             if (detail.student) {
                 const s = detail.student;
@@ -828,7 +833,9 @@ export default function StudentManagementPage() {
                     studentUniqueId: s.metadata?.studentId || s.id,
                     studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
                     items: [],
-                    totalAmount: 0
+                    totalAmount: 0,
+                    advanceBalance: 0,
+                    upcomingFees: []
                 });
                 setIsFeeModalOpen(true);
                 return;
@@ -2839,13 +2846,14 @@ export default function StudentManagementPage() {
                                     return (
                                         <div
                                             key={s.id}
-                                            onClick={() => {
+                                            onClick={(e) => {
+
                                                 if (isFeesMode) {
                                                     setSelectedStudentForFee({
                                                         studentId: s.id,
-                                                        studentName: s.name,
+                                                        studentName: s.name || '',
                                                         studentUniqueId: s.metadata?.studentId || s.id,
-                                                        studentPhoto: s.metadata?.studentPhoto || null,
+                                                        studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
                                                         items: [],
                                                         totalAmount: 0
                                                     });
@@ -2855,7 +2863,7 @@ export default function StudentManagementPage() {
                                                     setIsProfileModalOpen(true);
                                                 }
                                             }}
-                                            className={`bg-white p-3.5 rounded-[24px] border shadow-sm transition-all flex items-center gap-3 md:gap-4 relative group cursor-pointer animate-staggered-fade-in w-full min-w-[280px] overflow-hidden ${
+                                            className={`bg-white p-3.5 rounded-[24px] border shadow-sm transition-all duration-200 ease-out flex items-center gap-3 md:gap-4 relative group cursor-pointer animate-staggered-fade-in w-full min-w-[280px] overflow-hidden active:scale-[0.98] ${
                                                 isFeesMode ? 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-100/50 hover:bg-emerald-50/10' : 'border-slate-100 hover:shadow-lg hover:border-blue-100'
                                             }`}
                                             style={{ animationDelay: `${(index % 15) * 30}ms` }}
@@ -5385,7 +5393,7 @@ export default function StudentManagementPage() {
                             setOpenedViaScanner(false);
                         }
                     }}
-                    onSuccess={(msg) => {
+                    onSuccess={(msg: string) => {
                         setIsFeeModalOpen(false);
                         setToast({ message: msg, type: 'success' });
                         if (openedViaScanner) {
@@ -5394,9 +5402,7 @@ export default function StudentManagementPage() {
                         }
                         fetchFeesData();
                     }}
-                    onPrintReceipt={(txn) => {
-                        setIsFeeModalOpen(false);
-                        setSelectedStudentForFee(null);
+                    onPrintReceipt={(txn: any) => {
                         setSelectedTransactionForPrint(txn);
                     }}
                 />

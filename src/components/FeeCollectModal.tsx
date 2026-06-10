@@ -29,32 +29,30 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     const { activeInstitute } = useSession();
 
     const [mounted, setMounted] = useState(false);
+
     useEffect(() => setMounted(true), []);
 
-    // Emit modal open/close events to pause smooth scroll
-    useEffect(() => {
-        if (student && mounted) {
-            window.dispatchEvent(new Event('modalOpen'));
-            return () => {
-                window.dispatchEvent(new Event('modalClose'));
-            };
-        }
-    }, [student, mounted]);
+    // Removed modal open/close events to keep main page scroll bar visible
 
     // Tab state
     const [activeTab, setActiveTab] = useState<'dues' | 'history'>('dues');
 
     // Data state
-    const [pendingFees, setPendingFees] = useState<any[]>([]);
+    const [pendingFees, setPendingFees] = useState<any[]>(student?.items || []);
     const [upcomingFees, setUpcomingFees] = useState<any[]>([]);
     const [historyTxns, setHistoryTxns] = useState<any[]>([]);
     const [advanceBalance, setAdvanceBalance] = useState(0);
-    const [loadingData, setLoadingData] = useState(true);
+    const [loadingData, setLoadingData] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     // Form state
-    const [selectedFeeIds, setSelectedFeeIds] = useState<Set<string>>(new Set());
-    const [paidAmount, setPaidAmount] = useState('');
+    const [selectedFeeIds, setSelectedFeeIds] = useState<Set<string>>(
+        new Set((student?.items || []).map((f: any) => f?.id).filter(Boolean))
+    );
+    const [paidAmount, setPaidAmount] = useState(() => {
+        const total = (student?.items || []).reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0);
+        return total > 0 ? String(total) : '';
+    });
     const [paymentNote, setPaymentNote] = useState('');
     const [applyAdvanceTo, setApplyAdvanceTo] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,7 +62,9 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     const [keepAsAdvance, setKeepAsAdvance] = useState(true);
     const [showNote, setShowNote] = useState(false);
     const [useAdvanceBalance, setUseAdvanceBalance] = useState(true);
-    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+        new Set((student?.items || []).map((f: any) => f?.category?.replace(/\s*\(.*?\)\s*/g, '').trim()).filter(Boolean))
+    );
     const [localWaivers, setLocalWaivers] = useState<Record<string, { amount: number, applyToFuture: boolean }>>({});
     const [activeWaiverId, setActiveWaiverId] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -75,20 +75,29 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     // Fetch pending fees + advance balance
     useEffect(() => {
         if (!student || !activeInstitute?.id) return;
-        setLoadingData(true);
+        
         fetch(`/api/admin/accounts/collect-fee?studentId=${student.studentId}&instituteId=${activeInstitute.id}`)
             .then(r => r.json())
                 .then(data => {
                 const fees = data?.pendingFees || data?.items || [];
-                console.debug('collect-fee.pendingFees', fees);
-                setPendingFees(fees);
+                
+                // If items were preloaded from the parent component, do not overwrite them and ruin the UI
+                if (!student?.items || student.items.length === 0) {
+                    setPendingFees(fees);
+                    const allIds = new Set<string>(fees.map((f: any) => f.id).filter(Boolean));
+                    setSelectedFeeIds(allIds);
+                    
+                    // Update paid amount based on the newly fetched fees
+                    const total = fees.reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0);
+                    setPaidAmount(total > 0 ? String(total) : '');
+                    
+                    // Auto-expand all category groups
+                    const baseNames = new Set<string>(fees.map((f: any) => f.category?.replace(/\s*\(.*?\)\s*/g, '').trim()).filter(Boolean));
+                    setExpandedGroups(baseNames);
+                }
+                
                 setUpcomingFees(data?.upcomingFees || []);
                 setAdvanceBalance(data?.advanceBalance || 0);
-                const allIds = new Set<string>(fees.map((f: any) => f.id).filter(Boolean));
-                setSelectedFeeIds(allIds);
-                // Auto-expand all category groups
-                const baseNames = new Set<string>(fees.map((f: any) => f.category?.replace(/\s*\(.*?\)\s*/g, '').trim()).filter(Boolean));
-                setExpandedGroups(baseNames);
             })
             .catch((err) => {
                 console.error('Error fetching fees:', err);
@@ -103,9 +112,9 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
             .finally(() => setLoadingData(false));
     }, [student?.studentId, activeInstitute?.id]);
 
-    // Fetch history when history tab is opened
+    // Fetch history in the background when modal opens
     useEffect(() => {
-        if (activeTab !== 'history' || !student || !activeInstitute?.id) return;
+        if (!student || !activeInstitute?.id) return;
         setLoadingHistory(true);
         fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}`)
             .then(r => r.json())
@@ -322,7 +331,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                             onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে');
                             onClose();
                         }
-                    } else {
+                                    } else {
                         if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
                         onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে');
                         onClose();
@@ -344,16 +353,11 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
         return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <div
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
                 onClick={onClose}
             />
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ duration: 0.2, type: 'spring', bounce: 0 }}
-                className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col h-[95vh] md:h-[650px]"
-                style={{ willChange: 'transform, opacity' }}
+            <div
+                className="relative w-full max-w-3xl bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col h-[95vh] md:h-[80vh] lg:h-[85vh]"
             >
                 {/* Header */}
                 <div className="bg-gradient-to-r from-[#045c84] to-[#067ab0] px-6 py-5 text-white flex-shrink-0">
@@ -402,14 +406,13 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
 
                 {/* Advance Balance Banner */}
                 {advanceBalance > 0 && step === 'select' && activeTab === 'dues' && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-                        className="bg-emerald-50 border-b border-emerald-100 px-6 py-3 flex items-center gap-3 flex-shrink-0">
+                    <div className="bg-emerald-50 border-b border-emerald-100 px-6 py-3 flex items-center gap-3 flex-shrink-0">
                         <Wallet size={16} className="text-emerald-600 flex-shrink-0" />
                         <p className="text-xs font-black text-emerald-700">
                             অগ্রিম ব্যালেন্স: <span className="text-emerald-600">৳ {advanceBalance.toLocaleString()}</span>
                             <span className="font-bold text-emerald-500 ml-2">— স্বয়ংক্রিয়ভাবে প্রয়োগ হবে</span>
                         </p>
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* ── ADVANCE STEP ── */}
@@ -462,20 +465,22 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                 {/* ── DUES TAB ── */}
                 {step === 'select' && activeTab === 'dues' && (
                     <>
-                        <div className="flex-1 overflow-y-auto min-h-0" data-lenis-prevent>
-                            {loadingData ? (
-                                <div className="p-10 flex items-center justify-center">
-                                    <div className="w-8 h-8 border-2 border-[#045c84] border-t-transparent rounded-full animate-spin" />
-                                </div>
-                            ) : (
-                                <div className="p-6 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <button onClick={handleSelectAll} className="text-[10px] font-black text-[#045c84] uppercase tracking-widest hover:underline">
-                                            {selectedFeeIds.size === pendingFees.length ? 'সব বাতিল করুন' : 'সব নির্বাচন করুন'}
-                                        </button>
-                                        <span className="text-[10px] font-bold text-slate-400">{pendingFees.length} টি বকেয়া</span>
+                        <div className="flex-1 overflow-y-auto min-h-0 relative" data-lenis-prevent>
+                            <div className="p-6 space-y-3 opacity-100">
+                                {loadingData ? (
+                                    <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                                        <div className="w-8 h-8 border-4 border-slate-100 border-t-[#045c84] rounded-full animate-spin" />
+                                        <p className="text-xs font-bold text-slate-500">বকেয়া ফি লোড হচ্ছে...</p>
                                     </div>
-                                    {(() => {
+                                ) : (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <button onClick={handleSelectAll} className="text-[10px] font-black text-[#045c84] uppercase tracking-widest hover:underline">
+                                                {selectedFeeIds.size === pendingFees.length ? 'সব বাতিল করুন' : 'সব নির্বাচন করুন'}
+                                            </button>
+                                            <span className="text-[10px] font-bold text-slate-400">{pendingFees.length} টি বকেয়া</span>
+                                        </div>
+                                        {(() => {
                                         // Group fees by base category name (strip date suffix in parens)
                                         const groups: Record<string, any[]> = {};
                                         pendingFees.forEach(fee => {
@@ -722,8 +727,9 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            )}
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {/* Payment Panel */}
@@ -859,11 +865,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                         </div>
 
                         <div className="flex-1 overflow-y-auto flex flex-col" data-lenis-prevent>
-                            {loadingHistory ? (
-                                <div className="flex-1 min-h-[400px] p-10 flex items-center justify-center">
-                                    <div className="w-8 h-8 border-2 border-[#045c84] border-t-transparent rounded-full animate-spin" />
-                                </div>
-                            ) : historyTxns.length === 0 ? (
+                            {historyTxns.length === 0 ? (
                                 <div className="flex-1 min-h-[400px] p-12 flex flex-col items-center justify-center text-center">
                                     <History size={40} className="mx-auto mb-3 text-slate-200" />
                                     <p className="text-xs font-black text-slate-400">কোন পেমেন্ট ইতিহাস পাওয়া যায়নি</p>
@@ -908,10 +910,10 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                         </div>
                     </div>
                 )}
-            </motion.div>
+            </div>
         </div>,
         document.body
     );
-}
+};
 
 export default FeeCollectModal;

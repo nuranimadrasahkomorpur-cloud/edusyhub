@@ -77,7 +77,7 @@ export default function PrintLayout({ title, institute, children, date = new Dat
             </div>
 
             {/* Signature Area */}
-            <div className="flex items-end justify-between mt-12 pt-4 signature-area shrink-0 relative">
+            <div className="flex items-end justify-between mt-auto pt-12 signature-area shrink-0 relative w-full">
                 <div className="text-center w-40 z-10">
                     <div className="w-full border-t border-slate-400 mb-1.5 mx-auto"></div>
                     <p className="font-bold text-slate-600 text-[13px]">আদায়কারীর স্বাক্ষর</p>
@@ -98,7 +98,7 @@ export default function PrintLayout({ title, institute, children, date = new Dat
             <style jsx global>{`
                 @media print {
                     @page {
-                        size: ${pageSize} portrait;
+                        size: auto;
                         margin: 0.25in;
                     }
                     body, html {
@@ -122,18 +122,20 @@ export default function PrintLayout({ title, institute, children, date = new Dat
                         width: 100% !important;
                         max-width: none !important;
                         height: auto !important;
+                        min-height: 98vh !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
-                        display: block !important;
+                        display: flex !important;
+                        flex-direction: column !important;
                         transform: none !important;
-                        page-break-after: always;
-                        break-after: page;
+                        page-break-after: auto;
+                        break-after: auto;
                         box-sizing: border-box;
                     }
                     .print-min-h {
-                        min-height: calc(100vh - 250px) !important;
+                        min-height: auto !important;
                     }
                     .print-area table { width: 100% !important; border-collapse: collapse; }
                     .print-area img { max-width: 100% !important; height: auto !important; }

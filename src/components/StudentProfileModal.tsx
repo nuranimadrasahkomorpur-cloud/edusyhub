@@ -279,7 +279,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                 setTimeout(() => {
                     // This will be handled by parent component
                     window.dispatchEvent(new CustomEvent('openFeeCollection', { detail: { studentId: cleanedValue } }));
-                }, 300);
+                }, 10);
                 return;
             }
 
@@ -294,7 +294,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                     onClose();
                     setTimeout(() => {
                         window.dispatchEvent(new CustomEvent('openFeeCollection', { detail: { student: data, studentId: cleanedValue } }));
-                    }, 300);
+                    }, 10);
                     return;
                 }
             }

@@ -424,23 +424,35 @@ export default function AccountsPage() {
                 const apiStudent = Array.isArray(students) ? students[0] : students;
                 
                 if (apiStudent && apiStudent.id) {
-                    const studentForFee = {
-                        studentId: apiStudent.id,
-                        studentName: apiStudent.name || '',
-                        studentUniqueId: apiStudent.metadata?.studentId || apiStudent.id,
-                        studentPhoto: null,
-                        scannedId: cleanedValue,
-                        email: apiStudent.email || '',
-                        phone: apiStudent.phone || '',
-                        items: [],
-                        totalAmount: 0,
-                        scannedAt: new Date().toISOString()
-                    };
+                    try {
+                        const feeRes = await fetch(`/api/admin/accounts/collect-fee?studentId=${apiStudent.id}&instituteId=${activeInstitute?.id || ''}`);
+                        const feeData = await feeRes.json();
+                        const items = feeData?.pendingFees || feeData?.items || [];
+                        const totalAmount = items.reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0);
+                        
+                        const studentForFee = {
+                            studentId: apiStudent.id,
+                            studentName: apiStudent.name || '',
+                            studentUniqueId: apiStudent.metadata?.studentId || apiStudent.id,
+                            studentPhoto: null,
+                            scannedId: cleanedValue,
+                            email: apiStudent.email || '',
+                            phone: apiStudent.phone || '',
+                            items: items,
+                            totalAmount: totalAmount,
+                            advanceBalance: feeData?.advanceBalance || 0,
+                            upcomingFees: feeData?.upcomingFees || [],
+                            scannedAt: new Date().toISOString()
+                        };
 
-                    setFeeCollectStudent(studentForFee);
-                    setOpenedViaScanner(true);
-                    setShowScanner(false);
-                    setToast({ message: 'ছাত্র পাওয়া গেছে - ফি সংগ্রহের জন্য প্রস্তুত', type: 'success' });
+                        setFeeCollectStudent(studentForFee);
+                        setOpenedViaScanner(true);
+                        setShowScanner(false);
+                        setToast({ message: 'ছাত্র পাওয়া গেছে - ফি সংগ্রহের জন্য প্রস্তুত', type: 'success' });
+                    } catch (e) {
+                        setToast({ message: 'ফি এর বিস্তারিত তথ্য পেতে সমস্যা হয়েছে।', type: 'error' });
+                        setShowScanner(false);
+                    }
                 } else {
                     setToast({ message: 'ছাত্র খুঁজে পাওয়া যায়নি', type: 'error' });
                     setShowScanner(false);
@@ -2467,7 +2479,6 @@ export default function AccountsPage() {
             )}
 
             {/* Fee Collect Modal */}
-            <AnimatePresence>
                 {feeCollectStudent && !showScanner && (
                     <FeeCollectModal
                         student={feeCollectStudent}
@@ -2493,7 +2504,6 @@ export default function AccountsPage() {
                         }}
                     />
                 )}
-            </AnimatePresence>
 
             {/* Print Receipt Modal */}
             <AnimatePresence>
@@ -2881,13 +2891,15 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
                 )}
             </div>
 
-            {isModalOpen && (
-                <AddCategoryModal 
-                    onClose={() => setIsModalOpen(false)}
-                    initialData={selectedCategory}
-                    onSave={handleSave}
-                />
-            )}
+            <AnimatePresence>
+                {isModalOpen && (
+                    <AddCategoryModal 
+                        onClose={() => setIsModalOpen(false)}
+                        initialData={selectedCategory}
+                        onSave={handleSave}
+                    />
+                )}
+            </AnimatePresence>
 
             {categoryToDelete && (
                 <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4">

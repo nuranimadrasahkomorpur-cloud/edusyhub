@@ -515,7 +515,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto bg-slate-200/50 flex justify-center items-start py-8 px-4" data-lenis-prevent>
+                <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-200/50 flex justify-center items-start py-8 px-4" data-lenis-prevent="true">
                     <div className="shadow-2xl bg-white flex-shrink-0 rounded-xl border border-slate-200 overflow-hidden" style={{ width: isLedger ? 'min(210mm, 90vw)' : 'min(148mm, 84vw)', minHeight: isLedger ? '297mm' : '210mm' }}>
                         {renderReceiptContent(true)}
                     </div>

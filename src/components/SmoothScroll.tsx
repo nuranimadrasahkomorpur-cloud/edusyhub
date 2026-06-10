@@ -49,6 +49,7 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
                 if (el.dataset && el.dataset.lenisAttached) return;
                 try {
                     const instance = new Lenis({ ...(options as any), el } as any);
+                    (instance as any)._el = el;
                     instancesRef.current.push(instance);
                     el.dataset.lenisAttached = 'true';
                 } catch (e) {
@@ -79,8 +80,18 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
         observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
         observerRef.current = observer;
 
-        const stopAll = () => instancesRef.current.forEach((i) => i && i.stop && i.stop());
-        const startAll = () => instancesRef.current.forEach((i) => i && i.start && i.start());
+        const gc = () => {
+            instancesRef.current = instancesRef.current.filter((i) => {
+                if (i && i._el && !document.contains(i._el)) {
+                    i.destroy && i.destroy();
+                    return false;
+                }
+                return true;
+            });
+        };
+
+        const stopAll = () => { gc(); instancesRef.current.forEach((i) => i && i.stop && i.stop()); };
+        const startAll = () => { gc(); instancesRef.current.forEach((i) => i && i.start && i.start()); };
 
         window.addEventListener('modalOpen', stopAll);
         window.addEventListener('modalClose', startAll);

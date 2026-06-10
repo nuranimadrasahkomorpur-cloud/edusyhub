@@ -59,88 +59,11 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
     // Initialize scanner when permission is granted
     useEffect(() => {
         if (!isOpen || permissionStatus !== 'granted' || !scannerRef.current) {
-            console.log('⏸️ Scanner init skipped:', { isOpen, permissionStatus, hasRef: !!scannerRef.current });
             return;
         }
 
         let isEffectActive = true;
-
-        const originalConsoleError = console.error;
-        const originalConsoleDebug = console.debug;
-        const originalOnError = window.onerror;
-
-        const isExpectedError = (...args: any[]) => {
-            const fullMessage = args.map(arg => String(arg || '')).join(' ').toLowerCase();
-            return fullMessage.includes('qr code parse error') ||
-                   fullMessage.includes('no multiformat readers') ||
-                   fullMessage.includes('cannot clear while scan is ongoing');
-        };
-
-        console.error = (...args: any[]) => {
-            if (!isExpectedError(...args)) {
-                originalConsoleError.apply(console, args);
-            }
-        };
-        console.debug = (...args: any[]) => {
-            const message = args[0]?.toString() || '';
-            if (!message.includes('QR scan error') && !message.includes('Scanner stop error')) {
-                originalConsoleDebug.apply(console, args);
-            }
-        };
-
-        window.onerror = (message, source, lineno, colno, error) => {
-            const msgStr = String(message || '').toLowerCase();
-            const srcStr = String(source || '').toLowerCase();
-            const errorStack = String(error?.stack || '').toLowerCase();
-
-            if (msgStr.includes('cannot clear while scan is ongoing')) {
-                console.debug('Suppressed html5-qrcode scan state error');
-                return true;
-            }
-            if (msgStr.includes('cannot read properties of null') &&
-                (srcStr.includes('html5-qrcode') || errorStack.includes('showHideScanTypeSwapLink'))) {
-                console.debug('Suppressed html5-qrcode DOM element error');
-                return true;
-            }
-            if (msgStr.includes('cannot set properties of null') || msgStr.includes('cannot read properties of null')) {
-                if (srcStr.includes('html5-qrcode') || srcStr.includes('node_modules') || errorStack.includes('setheadermessage')) {
-                    console.debug('Suppressed html5-qrcode DOM error');
-                    return true;
-                }
-            }
-            if (msgStr.includes('setheadermessage') || errorStack.includes('setheadermessage')) {
-                console.debug('Suppressed setHeaderMessage error');
-                return true;
-            }
-            return originalOnError?.(message, source, lineno, colno, error) ?? false;
-        };
-
-        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-            const msg = String(event.reason?.message || event.reason || '').toLowerCase();
-            const stack = String(event.reason?.stack || '').toLowerCase();
-
-            if (msg.includes('cannot clear while scan is ongoing')) {
-                console.debug('Suppressed html5-qrcode scan state error');
-                event.preventDefault();
-                return;
-            }
-            if (msg.includes('cannot read properties of null') && stack.includes('showHideScanTypeSwapLink')) {
-                console.debug('Suppressed html5-qrcode DOM element access error');
-                event.preventDefault();
-                return;
-            }
-            if (msg.includes('cannot set properties of null') || msg.includes('cannot read properties of null') || msg.includes('setheadermessage')) {
-                console.debug('Suppressed html5-qrcode promise rejection');
-                event.preventDefault();
-                return;
-            }
-            if (stack.includes('html5-qrcode') || stack.includes('setHeaderMessage')) {
-                console.debug('Suppressed html5-qrcode promise rejection from stack');
-                event.preventDefault();
-            }
-        };
-        window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
+        
         // Reset scan state each time we open the scanner
         if (scanDelayRef.current) {
             clearTimeout(scanDelayRef.current);
@@ -150,389 +73,99 @@ export default function QRBarcodeScanner({ isOpen, onClose, onScan }: QRBarcodeS
         lastScannedRef.current = '';
 
         const initScanner = async () => {
-            console.log('🚀 Initializing scanner...');
             setError('');
-            setIsScanning(false);  // Keep false until video actually loads
+            setIsScanning(false);
             setScannedCount(0);
             isRenderingRef.current = false;
 
-        const html5Qrcode = new Html5Qrcode('qr-scanner-container');
-
-        const cameras = await Html5Qrcode.getCameras();
-        if (!cameras || cameras.length === 0) {
-            throw new Error('No camera devices found');
-        }
-
-        const selectedCamera = useFrontCamera
-            ? cameras.find(cam => /front|user|face/i.test(cam.label)) || cameras[0]
-            : cameras.find(cam => /back|rear|environment/i.test(cam.label)) || cameras[0];
-
-        const cameraId = selectedCamera.id;
-        const scannerConfig = {
-            fps: 30,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-            disableFlip: false
-        } as any;
-
-        const onScanSuccess = async (decodedText: string) => {
-            if (!isActiveRef.current || !isRenderingRef.current || !scannerInstanceRef.current) {
-                console.debug('Scan ignored: scanner not active or not rendering');
-                return;
-            }
-
-            const normalizedText = decodedText?.trim();
-            if (!normalizedText) {
-                console.debug('Scan ignored: empty decoded text');
-                return;
-            }
-
-            // Prevent concurrent scans and duplicate detections
-            if (isProcessingRef.current) return;
-            
-            if (normalizedText !== lastScannedRef.current) {
-                isProcessingRef.current = true;
-                lastScannedRef.current = normalizedText;
-                setScannedCount(prev => prev + 1);
-                
-                // Clear any pending scan delay
-                if (scanDelayRef.current) {
-                    clearTimeout(scanDelayRef.current);
-                    scanDelayRef.current = null;
-                }
-                
-                // Trigger callback after 100ms to prevent rapid successive calls but keep it fast
-                scanDelayRef.current = setTimeout(async () => {
-                    try {
-                        await onScan(normalizedText);
-                    } catch (err) {
-                        console.debug('Scan callback error:', err);
-                    } finally {
-                        scanDelayRef.current = null;
-                        // Close scanner only after async operation completes
-                        setTimeout(() => {
-                            if (scannerInstanceRef.current && isRenderingRef.current) {
-                                if (typeof scannerInstanceRef.current.stop === 'function') {
-                                    scannerInstanceRef.current.stop().catch(err => console.debug('Scanner stop error:', err));
-                                }
-                                scannerInstanceRef.current = null;
-                            }
-                            onClose();
-                            isProcessingRef.current = false;
-                        }, 100);
-                    }
-                }, 100);
-            }
-        };
-
-        const onScanError = (error: string) => {
-            // Silently ignore QR scanning errors
-        };
-
-        try {
-            if (!isEffectActive) return;
-
-            // Ensure container exists in DOM before rendering
-            const container = document.getElementById('qr-scanner-container');
-            if (!container) {
-                console.error('❌ Scanner container not found in DOM');
-                setError('Failed to initialize scanner - container not ready');
-                return;
-            }
-
-            console.log('📦 Container found, starting scanner...');
-
-            isActiveRef.current = true;
-            await html5Qrcode.start(cameraId, scannerConfig, onScanSuccess, onScanError);
-            
-            if (!isEffectActive) {
-                console.log('⏸️ Effect unmounted during start, stopping immediately...');
-                html5Qrcode.stop().then(() => {
-                    try { html5Qrcode.clear(); } catch(e) {}
-                }).catch(err => console.error('Error stopping unmounted scanner:', err));
-                return;
-            }
-
-            console.log('✅ Scanner started successfully');
-            
-            isRenderingRef.current = true;
-            scannerInstanceRef.current = html5Qrcode;
-            setIsScanning(true);
-            console.log('🎬 Scanner instance stored, customizing UI...');
-            
-            // Customize scanner UI - with proper null checks
-            setTimeout(() => {
-                // Only proceed if scanner still exists and is rendered
-                if (!scannerInstanceRef.current || !isRenderingRef.current) {
-                    console.log('⏸️ UI customization skipped - scanner not rendering');
+            try {
+                // Ensure container exists
+                if (!document.getElementById('qr-scanner-container')) {
+                    setError('Failed to initialize scanner - container not ready');
                     return;
                 }
-                
-                const container = document.getElementById('qr-scanner-container');
-                if (!container) {
-                    console.log('⏸️ Container disappeared, skipping customization');
-                    return;
+
+                const html5Qrcode = new Html5Qrcode('qr-scanner-container');
+                scannerInstanceRef.current = html5Qrcode;
+
+                const cameras = await Html5Qrcode.getCameras();
+                if (!cameras || cameras.length === 0) {
+                    throw new Error('No camera devices found');
                 }
-                
-                console.log('🎨 Customizing scanner UI...');
-                
-                // FIRST: Disable and hide file input elements (don't remove them)
-                const fileInputs = container.querySelectorAll('input[type="file"]');
-                fileInputs.forEach((input: any) => {
-                    if (!input) return;
-                    try {
-                        input.disabled = true;
-                        input.style.display = 'none';
-                        input.style.visibility = 'hidden';
-                        input.style.pointerEvents = 'none';
-                        input.setAttribute('disabled', 'disabled');
-                        // Prevent any interaction
-                        input.addEventListener('click', (e: Event) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                        }, true);
-                    } catch (err) {
-                        console.debug('Error handling file input:', err);
-                    }
-                });
-                
-                const buttons = container.querySelectorAll('button');
-                console.log(`🔘 Found ${buttons.length} buttons in scanner UI`);
-                
-                // Find start button (first button that doesn't say upload/file)
-                let startBtn = null;
-                for (let i = 0; i < buttons.length; i++) {
-                    const btn = buttons[i];
-                    const btnText = btn.textContent?.toLowerCase() || '';
-                    console.log(`  Button ${i}: "${btnText.substring(0, 30)}..."`);
-                    if (!btnText.includes('upload') && !btnText.includes('file')) {
-                        startBtn = btn as HTMLButtonElement;
-                        console.log(`✓ Selected button ${i} as start button`);
-                        break;
-                    }
-                }
-                
-                // Hide the start button and auto-click it
-                if (startBtn) {
-                    try {
-                        startBtn.style.display = 'none'; // Hide the start button
-                        console.log('🔘 Start button hidden');
+
+                const selectedCamera = useFrontCamera
+                    ? cameras.find(cam => /front|user|face/i.test(cam.label)) || cameras[0]
+                    : cameras.find(cam => /back|rear|environment/i.test(cam.label)) || cameras[0];
+
+                const scannerConfig = {
+                    fps: 10, // Optimized from 30 to 10 for better battery and performance
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0,
+                    disableFlip: false
+                };
+
+                const onScanSuccess = async (decodedText: string) => {
+                    if (!isActiveRef.current || !isRenderingRef.current || !scannerInstanceRef.current) return;
+
+                    const normalizedText = decodedText?.trim();
+                    if (!normalizedText || isProcessingRef.current) return;
+                    
+                    if (normalizedText !== lastScannedRef.current) {
+                        isProcessingRef.current = true;
+                        lastScannedRef.current = normalizedText;
+                        setScannedCount(prev => prev + 1);
                         
-                        // Auto-click the button to start scanning
-                        setTimeout(() => {
-                            if (scannerInstanceRef.current && isRenderingRef.current && startBtn && startBtn.parentElement) {
-                                try {
-                                    console.log('👆 Clicking start button...');
-                                    startBtn.click();
-                                    console.log('✅ Start button clicked, waiting for video...');
-                                    
-                                    // Wait for video element to appear and play
-                                    let videoCheckCount = 0;
-                                    let retryCount = 0;
-                                    const maxRetries = 2;
-                                    
-                                    const checkVideo = setInterval(() => {
-                                        videoCheckCount++;
-                                        const video = container?.querySelector('video');
-                                        if (video && video.readyState > 1) {
-                                            console.log('🎥 Video is ready! Setting isScanning=true');
-                                            setIsScanning(true);
-                                            clearInterval(checkVideo);
-                                        } else if (videoCheckCount > 100) {
-                                            clearInterval(checkVideo);
-                                            const video = container?.querySelector('video');
-                                            
-                                            if (!video) {
-                                                // Video element not found, try retry
-                                                console.warn(`⚠️ Video element not found after 10s. Retry ${retryCount + 1}/${maxRetries}`);
-                                                
-                                                if (retryCount < maxRetries) {
-                                                    retryCount++;
-                                                    
-                                                    // Try restarting the scanner
-                                                    try {
-                                                        console.log('🔄 Attempting to restart scanner...');
-                                                        if (scannerInstanceRef.current?.stop) {
-                                                            scannerInstanceRef.current.stop().then(() => {
-                                                                console.log('⏹️ Scanner stopped, restarting...');
-                                                                setTimeout(() => {
-                                                                    if (startBtn && startBtn.parentElement) {
-                                                                        startBtn.click();
-                                                                        console.log('👆 Clicked start button again');
-                                                                        // Check again for video after 1 second
-                                                                        setTimeout(() => {
-                                                                            const newVideo = container?.querySelector('video');
-                                                                            if (newVideo && newVideo.readyState > 0) {
-                                                                                console.log('✅ Video found on retry!');
-                                                                                setIsScanning(true);
-                                                                            } else {
-                                                                                console.warn('❌ Still no video after retry');
-                                                                                setIsScanning(true); // Show scanner anyway
-                                                                            }
-                                                                        }, 1000);
-                                                                    }
-                                                                }, 300);
-                                                            }).catch(err => {
-                                                                console.error('Error stopping scanner:', err);
-                                                                setIsScanning(true);
-                                                            });
-                                                        }
-                                                    } catch (err) {
-                                                        console.error('❌ Error restarting scanner:', err);
-                                                        setIsScanning(true);
-                                                    }
-                                                } else {
-                                                    console.error('❌ Video not found after all retries, showing scanner anyway');
-                                                    setIsScanning(true);
-                                                }
-                                            } else {
-                                                console.warn('⏱️ Video exists but not ready after 10s, showing scanner anyway');
-                                                setIsScanning(true);
-                                            }
-                                        }
-                                    }, 100);
-                                } catch (err) {
-                                    console.error('❌ Error auto-starting scanner:', err);
-                                }
+                        if (scanDelayRef.current) clearTimeout(scanDelayRef.current);
+                        
+                        scanDelayRef.current = setTimeout(async () => {
+                            try {
+                                await onScan(normalizedText);
+                            } catch (err) {
+                                console.debug('Scan callback error:', err);
+                            } finally {
+                                scanDelayRef.current = null;
+                                setTimeout(() => {
+                                    if (scannerInstanceRef.current && isRenderingRef.current) {
+                                        try { scannerInstanceRef.current.stop().catch(() => {}); } catch(e) {}
+                                        scannerInstanceRef.current = null;
+                                    }
+                                    onClose();
+                                    isProcessingRef.current = false;
+                                }, 100);
                             }
                         }, 100);
-                    } catch (err) {
-                        console.error('❌ Error with start button:', err);
                     }
-                } else {
-                    console.warn('⚠️ Start button not found in scanner UI - using fallback to ensure video plays');
-                    try {
-                        const video = container.querySelector('video') as HTMLVideoElement | null;
-                        if (video) {
-                            if (video.paused) {
-                                video.play().then(() => {
-                                    console.log('✅ Video play invoked via fallback');
-                                    setIsScanning(true);
-                                }).catch((err: any) => {
-                                    console.debug('⏳ Video play fallback failed:', err);
-                                    setIsScanning(true);
-                                });
-                            } else {
-                                setIsScanning(true);
-                            }
-                        } else {
-                            console.warn('⚠️ Video element not found in fallback; showing scanner UI anyway');
-                            setIsScanning(true);
-                        }
-                    } catch (err) {
-                        console.error('❌ Error in fallback start logic:', err);
-                        setIsScanning(true);
-                    }
+                };
+
+                isActiveRef.current = true;
+                
+                await html5Qrcode.start(selectedCamera.id, scannerConfig, onScanSuccess, () => {});
+                
+                if (!isEffectActive) {
+                    try { await html5Qrcode.stop(); html5Qrcode.clear(); } catch(e) {}
+                    return;
                 }
                 
-                // Hide unwanted elements (don't remove, just hide)
-                const select = container.querySelector('select');
-                const fileLink = container.querySelector('a');
-                const allButtons = container.querySelectorAll('button');
+                isRenderingRef.current = true;
+                setIsScanning(true);
                 
-                if (select) {
-                    try {
-                        select.style.display = 'none';
-                        select.style.pointerEvents = 'none';
-                    } catch (err) {
-                        console.debug('Error hiding select:', err);
-                    }
-                }
-                if (fileLink) {
-                    try {
-                        fileLink.style.display = 'none';
-                        fileLink.style.pointerEvents = 'none';
-                    } catch (err) {
-                        console.debug('Error hiding file link:', err);
-                    }
-                }
-                
-                // Hide any buttons that might trigger file upload (usually 2nd, 3rd buttons)
-                allButtons.forEach((btn, index) => {
-                    if (btn && index > 0) { // Skip first button (start button)
-                        try {
-                            btn.style.display = 'none';
-                            btn.style.pointerEvents = 'none';
-                            (btn as HTMLButtonElement).disabled = true;
-                        } catch (err) {
-                            console.debug('Error hiding button:', err);
-                        }
-                    }
-                });
-                
-                // Hide (not remove) potential file upload sections
-                const allDivs = container.querySelectorAll('div');
-                allDivs.forEach((div: any) => {
-                    if (!div) return;
-                    try {
-                        const text = div.textContent?.toLowerCase() || '';
-                        if (text.includes('upload') || (text.includes('file') && text.includes('choose'))) {
-                            div.style.display = 'none';
-                            div.style.pointerEvents = 'none';
-                        }
-                    } catch (err) {
-                        console.debug('Error hiding div:', err);
-                    }
-                });
-            }, 500);
-            
-            // Additional safety: prevent any file upload attempts after scanner is ready
-            setTimeout(() => {
-                const container = document.getElementById('qr-scanner-container');
-                if (!container) return;
-                
-                // Add click handler to prevent file input clicks
-                const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-                if (fileInput) {
-                    const preventClick = (e: Event) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        e.stopImmediatePropagation();
-                        return false;
-                    };
-                    fileInput.addEventListener('click', preventClick, true);
-                    fileInput.addEventListener('change', preventClick, true);
-                }
-                
-                // Prevent clicks on upload-related elements
-                const allElements = container.querySelectorAll('button, a, div');
-                allElements.forEach((el: any) => {
-                    const text = el.textContent?.toLowerCase() || '';
-                    if (text.includes('upload') || text.includes('file') || text.includes('choose')) {
-                        el.addEventListener('click', (e: Event) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            e.stopImmediatePropagation();
-                        }, true);
-                    }
-                });
-            }, 500);
-        } catch (err) {
-            console.debug('Scanner initialization error:', err);
-            setError('Failed to initialize scanner');
-        }
+            } catch (err) {
+                console.debug('Scanner initialization error:', err);
+                setError('Failed to initialize scanner');
+            }
         };
 
         initScanner();
 
         return () => {
-            console.log('🧹 Scanner cleanup starting...');
             isEffectActive = false;
-            // Restore console and error handlers
-            console.error = originalConsoleError;
-            console.debug = originalConsoleDebug;
-            window.onerror = originalOnError;
-            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
             
-            // Clear pending timeouts
             if (scanDelayRef.current) {
                 clearTimeout(scanDelayRef.current);
                 scanDelayRef.current = null;
             }
             
             stopScanner();
-            
-            console.log('✅ Scanner cleanup complete');
         };
     }, [isOpen, permissionStatus, onScan, onClose, useFrontCamera]);
 
