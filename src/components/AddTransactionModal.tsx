@@ -7,7 +7,7 @@ interface AddTransactionModalProps {
     isOpen: boolean;
     onClose: () => void;
     defaultType: 'income' | 'expense';
-    onSuccess: () => void;
+    onSuccess: (newTxn?: any) => void;
 }
 
 export default function AddTransactionModal({ isOpen, onClose, defaultType, onSuccess }: AddTransactionModalProps) {
@@ -107,7 +107,8 @@ export default function AddTransactionModal({ isOpen, onClose, defaultType, onSu
             });
 
             if (res.ok) {
-                onSuccess();
+                const data = await res.json();
+                onSuccess(data);
                 onClose();
             } else {
                 const data = await res.json();

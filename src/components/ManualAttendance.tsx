@@ -119,6 +119,14 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const [bulkScope, setBulkScope] = useState<'ALL' | 'UNMARKED'>('ALL');
     const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(12);
+
+    // Reset visible count when filters change
+    useEffect(() => {
+        setVisibleCount(12);
+    }, [statusFilter, searchQuery, sortConfig, viewMode]);
+
+
 
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -841,13 +849,23 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         return list;
     }, [studentsWithStats, searchQuery, statusFilter, sortConfig, activeClassDays]);
 
+    // Incrementally load more cards for "one by one" smooth effect
+    useEffect(() => {
+        if (viewMode === 'CARD' && visibleCount < filteredStudents?.length) {
+            const timer = setTimeout(() => {
+                setVisibleCount(prev => prev + 12);
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [visibleCount, filteredStudents?.length, viewMode]);
+
     const hasChanges = students.some(s => s.attendance !== s.initialAttendance);
     const savedCount = students.filter(s => s.initialAttendance !== 'ABSENT' || s.updatedAt).length;
 
     return (
         <div className="space-y-6">
             {/* Redesigned Toolbar */}
-            <div className="flex flex-col gap-3 bg-white/95 backdrop-blur-md p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-40 relative">
+            <div className="flex flex-col gap-3 bg-white p-3 rounded-[24px] border border-slate-200 shadow-sm sticky top-[73px] z-40 relative">
                 {/* Float Save Button at the top-right corner */}
                 {!isReadOnlyAttendance && (
                     <button
@@ -1379,11 +1397,11 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                             animate={{ opacity: 1 }}
                             className="grid gap-4 justify-center"
                             style={{ 
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))',
                                 maxWidth: '100%' 
                             }}
                         >
-                            {filteredStudents.map((student) => {
+                            {filteredStudents.slice(0, visibleCount).map((student) => {
                                 const status = student.attendance;
 
                                 const getStatusConfig = (s: string | undefined) => {
@@ -1412,10 +1430,20 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                 const presentPct = total > 0 ? (stats.presentDays / total) * 100 : 0;
                                 const absentPct = total > 0 ? (stats.absentDays / total) * 100 : 0;
 
+                                const getThumbnailUrl = (url: string | undefined) => {
+                                    if (!url) return '';
+                                    if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+                                        return url.replace('/upload/', '/upload/w_100,h_100,c_fill,q_auto,f_auto/');
+                                    }
+                                    return url;
+                                };
+
+                                const optimizedPhoto = getThumbnailUrl(student.photo);
+
                                 return (
-                                    <motion.div
+                                    <div
                                         key={student.id}
-                                        className="bg-white rounded-[20px] p-2 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-between gap-3 relative group"
+                                        className="bg-white rounded-[20px] p-2 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center justify-between gap-3 relative group"
                                     >
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="relative shrink-0">
@@ -1423,8 +1451,8 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                     className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center overflow-hidden border border-slate-100 italic font-black text-slate-400 text-[10px] shadow-inner cursor-pointer"
                                                     onClick={() => setSelectedStudentForModal(student)}
                                                 >
-                                                    {student.photo ? (
-                                                        <img src={student.photo} alt={student.name} className="w-full h-full object-cover" />
+                                                    {optimizedPhoto ? (
+                                                        <img src={optimizedPhoto} alt={student.name} loading="lazy" className="w-full h-full object-cover" />
                                                     ) : (
                                                         <Users size={20} />
                                                     )}
@@ -1566,7 +1594,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 </>
                                             )}
                                         </div>
-                                    </motion.div>
+                                    </div>
                                 );
                             })}
                         </motion.div>

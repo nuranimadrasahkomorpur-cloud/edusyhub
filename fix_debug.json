@@ -1,7 +1,7 @@
 {
   "success": true,
   "fixed": [],
-  "teachersCount": 14,
+  "teachersCount": 15,
   "raw": [
     {
       "_id": {
@@ -324,6 +324,33 @@
       ],
       "defaultInstituteId": {
         "$oid": "699098e09008db95d6a549e8"
+      }
+    },
+    {
+      "_id": {
+        "$oid": "6a2a1fe858d71b04296db3a0"
+      },
+      "email": "notu@gmail.com",
+      "password": "$2b$10$X0O5urrgsVcxJc4lEjBEQeOmV9rVJpEg8XflIpbz1qrx3ZhxS97Pq",
+      "name": "নতুন স্যার",
+      "phone": "01954330865",
+      "role": "TEACHER",
+      "instituteIds": [
+        {
+          "$oid": "69b03c35b2ae6e1d28ae2137"
+        }
+      ],
+      "defaultInstituteId": {
+        "$oid": "69b03c35b2ae6e1d28ae2137"
+      },
+      "createdAt": {
+        "$date": "2026-06-11T02:39:36.926Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-11T02:39:36.926Z"
+      },
+      "metadata": {
+        "originalPassword": "330865"
       }
     }
   ]

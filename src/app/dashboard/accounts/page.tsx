@@ -226,9 +226,9 @@ export default function AccountsPage() {
         };
     }, [isDeletingProgress, orphanedCategoryToDelete]);
 
-    const fetchAccounts = async () => {
+    const fetchAccounts = async (silent = false) => {
         if (!activeInstitute?.id) return;
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const res = await fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&_cb=${Date.now()}`, { cache: 'no-store' });
             const data = await res.json();
@@ -238,20 +238,25 @@ export default function AccountsPage() {
         } catch (err) {
             console.error("Fetch accounts error:", err);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
     useEffect(() => {
         fetchAccounts();
         
+        // Auto-refresh data silently every 2 seconds for near-instant updates across devices
+        const intervalId = setInterval(() => {
+            fetchAccounts(true);
+        }, 2000);
+        
         // Auto-sync missing dues in the background
         if (activeInstitute?.id) {
             const syncKey = `sync_${activeInstitute.id}`;
-            if (sessionStorage.getItem(syncKey)) return;
-            sessionStorage.setItem(syncKey, 'true');
+            if (!sessionStorage.getItem(syncKey)) {
+                sessionStorage.setItem(syncKey, 'true');
 
-            fetch('/api/admin/accounts/sync-dues', {
+                fetch('/api/admin/accounts/sync-dues', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ instituteId: activeInstitute.id })
@@ -267,7 +272,10 @@ export default function AccountsPage() {
                   console.error('Failed to sync dues:', err);
                   sessionStorage.removeItem(syncKey); // Allow retry on failure
               });
+            }
         }
+        
+        return () => clearInterval(intervalId);
     }, [activeInstitute?.id]);
 
 
@@ -349,7 +357,7 @@ export default function AccountsPage() {
             });
             const data = await res.json();
             if (res.ok) {
-                await fetchAccounts();
+                await fetchAccounts(true);
                 setToast({ message: 'সফলভাবে বকেয়া ফি মুছে ফেলা হয়েছে।', type: 'success' });
                 setOrphanedCategoryToDelete(null);
                 setIsDeletingProgress(false);
@@ -381,8 +389,12 @@ export default function AccountsPage() {
                             body: JSON.stringify({ instituteId: activeInstitute.id })
                         }).catch(err => console.error('Background sync-dues failed:', err));
                     }
+                    setAccountData(prev => ({
+                        ...prev,
+                        transactions: prev.transactions.filter(t => t.id !== transactionToDelete.id)
+                    }));
                     // Refresh UI data (don't await sync-dues)
-                    fetchAccounts();
+                    fetchAccounts(true);
                     setTransactionToDelete(null);
                 } else {
                 const data = await res.json();
@@ -2489,14 +2501,32 @@ export default function AccountsPage() {
                                 setOpenedViaScanner(false);
                             }
                         }}
-                        onSuccess={(msg: string) => {
+                        onSuccess={(msg: string, receiptDetails?: any) => {
                             setToast({ message: msg, type: 'success' });
                             setFeeCollectStudent(null);
                             if (openedViaScanner) {
                                 setShowScanner(true);
                                 setOpenedViaScanner(false);
                             }
-                            fetchAccounts();
+                            if (receiptDetails && receiptDetails.subTransactions) {
+                                setAccountData(prev => {
+                                    // Add new transactions instantly, creating a copy of the receiptDetails to maintain structure
+                                    const baseTxn = { ...receiptDetails };
+                                    delete baseTxn.subTransactions;
+                                    const newTxns = receiptDetails.subTransactions.map((sub: any) => ({
+                                        ...baseTxn,
+                                        ...sub,
+                                        receiptNo: receiptDetails.receiptNo,
+                                        studentId: receiptDetails.studentId,
+                                        studentName: receiptDetails.studentName
+                                    }));
+                                    return {
+                                        ...prev,
+                                        transactions: [...newTxns, ...prev.transactions]
+                                    };
+                                });
+                            }
+                            fetchAccounts(true);
                         }}
                         onPrintReceipt={(txn: any) => {
                             setFeeCollectStudent(null);
@@ -2572,14 +2602,19 @@ export default function AccountsPage() {
                 onScan={handleScanResult}
             />
 
-            {/* Add Transaction Modal */}
             <AddTransactionModal
                 isOpen={isTransactionModalOpen}
                 onClose={() => setIsTransactionModalOpen(false)}
                 defaultType={activeMainTab === 'income' ? 'income' : activeMainTab === 'expense' ? 'expense' : 'income'}
-                onSuccess={() => {
+                onSuccess={(newTxn) => {
                     setToast({ message: 'সফলভাবে লেনদেন যুক্ত করা হয়েছে', type: 'success' });
-                    fetchAccounts();
+                    if (newTxn) {
+                        setAccountData(prev => ({
+                            ...prev,
+                            transactions: [newTxn, ...prev.transactions]
+                        }));
+                    }
+                    fetchAccounts(true);
                 }}
             />
 

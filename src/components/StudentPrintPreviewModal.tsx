@@ -23,6 +23,7 @@ import {
 import { POSSIBLE_FIELDS } from './FieldLibrary';
 import { QRCodeCanvas } from 'qrcode.react';
 import JsBarcode from 'jsbarcode';
+import { Reorder } from 'framer-motion';
 
 /* ─────────────────────────────────────────────
    Types
@@ -78,52 +79,135 @@ const COL_LABELS: Record<string, string> = {
 /* ─────────────────────────────────────────────
    Component
 ───────────────────────────────────────────── */
-export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
-
-    // Small helper component for rendering barcode SVGs using JsBarcode
-    const BarcodeSVG: React.FC<{ value: string; width?: number; height?: number }> = ({ value, width = 120, height = 36 }) => {
-        const [svgHtml, setSvgHtml] = useState<string>('');
-        useEffect(() => {
-            try {
-                const ns = 'http://www.w3.org/2000/svg';
-                const svgEl = document.createElementNS(ns, 'svg') as SVGSVGElement;
-                JsBarcode(svgEl, String(value || ''), {
-                    format: 'CODE128',
-                    width: Math.max(1, Math.min(2.2, width / 100)),
-                    height: height,
-                    displayValue: false,
-                    margin: 2,
-                });
-                
-                // Add viewBox to make SVG responsive without clipping
-                const w = svgEl.getAttribute('width');
-                const h = svgEl.getAttribute('height');
-                if (w && h) {
-                    svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
-                    svgEl.setAttribute('preserveAspectRatio', 'none'); // Allows stretching to fit raw cell width/height
-                    svgEl.style.width = '100%';
-                    svgEl.style.height = '100%';
-                }
-                
-                setSvgHtml(svgEl.outerHTML || '');
-            } catch (e) {
-                console.error('JsBarcode error', e);
-                setSvgHtml('');
+// Small helper component for rendering barcode SVGs using JsBarcode
+const BarcodeSVG = React.memo(({ value, width = 120, height = 36 }: { value: string; width?: number; height?: number }) => {
+    const [svgHtml, setSvgHtml] = useState<string>('');
+    useEffect(() => {
+        try {
+            const ns = 'http://www.w3.org/2000/svg';
+            const svgEl = document.createElementNS(ns, 'svg') as SVGSVGElement;
+            JsBarcode(svgEl, String(value || ''), {
+                format: 'CODE128',
+                width: Math.max(1, Math.min(2.2, width / 100)),
+                height: height,
+                displayValue: false,
+                margin: 2,
+            });
+            
+            // Add viewBox to make SVG responsive without clipping
+            const w = svgEl.getAttribute('width');
+            const h = svgEl.getAttribute('height');
+            if (w && h) {
+                svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+                svgEl.setAttribute('preserveAspectRatio', 'none'); // Allows stretching to fit raw cell width/height
+                svgEl.style.width = '100%';
+                svgEl.style.height = '100%';
             }
-        }, [value, width, height]);
-        if (!svgHtml) return <div style={{ width: `calc(${width}px * var(--content-scale, 1))`, height: `calc(${height}px * var(--content-scale, 1))` }} />;
-        return (
-            <div 
-                dangerouslySetInnerHTML={{ __html: svgHtml }} 
-                className="w-full flex justify-center items-center"
-                style={{ 
-                    width: `calc(${width}px * var(--content-scale, 1))`, 
-                    maxWidth: '100%',
-                    height: `calc(${height}px * var(--content-scale, 1))` 
-                }} 
-            />
-        );
-    };
+            
+            setSvgHtml(svgEl.outerHTML || '');
+        } catch (e) {
+            console.error('JsBarcode error', e);
+            setSvgHtml('');
+        }
+    }, [value, width, height]);
+    if (!svgHtml) return <div style={{ width: `calc(${width}px * var(--content-scale, 1))`, height: `calc(${height}px * var(--content-scale, 1))` }} />;
+    return (
+        <div 
+            dangerouslySetInnerHTML={{ __html: svgHtml }} 
+            className="w-full flex justify-center items-center"
+            style={{ 
+                width: `calc(${width}px * var(--content-scale, 1))`, 
+                maxWidth: '100%',
+                height: `calc(${height}px * var(--content-scale, 1))` 
+            }} 
+        />
+    );
+});
+
+const MemoizedQRCodeCanvas = React.memo(({ value }: { value: string }) => (
+    <QRCodeCanvas value={value} size={56} level="H" bgColor="#ffffff" fgColor="#000000" style={{ width: 'calc(56px * var(--content-scale, 1))', height: 'calc(56px * var(--content-scale, 1))' }} />
+));
+
+const PrintTableRow = React.memo(({ s, idx, activeColIds, classes, groups, cellPv, cellPh, isHighlighted }: any) => {
+    return (
+        <tr
+            data-student-id={s.id}
+            className={`transition-colors ${isHighlighted ? 'ring-2 ring-[#0d9488]/30 bg-[#e0faf7]' : ''}`}
+        >
+            {activeColIds.map((colId: string) => {
+                let cell: React.ReactNode = s.metadata?.[colId] || '-';
+                if (colId === 'sl') cell = idx + 1;
+                else if (colId === 'rollNumber') cell = s.metadata?.rollNumber || '-';
+                else if (colId === 'studentId') cell = s.metadata?.studentId || s.id.substring(0, 6);
+                else if (colId === 'photo') {
+                    const imgSrc = s.metadata?.studentPhoto || s.metadata?.photo || null;
+                    cell = (
+                        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {imgSrc ? (
+                                <img
+                                    src={imgSrc}
+                                    alt={s.name}
+                                    style={{ width: 'calc(52px * var(--content-scale, 1))', height: 'calc(52px * var(--content-scale, 1))', borderRadius: 4, objectFit: 'cover', border: '1px solid #cbd5e1', display: 'block' }}
+                                />
+                            ) : (
+                                <div style={{ width: 'calc(52px * var(--content-scale, 1))', height: 'calc(52px * var(--content-scale, 1))', borderRadius: 4, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #cbd5e1' }} >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth={1.5} style={{ width: '55%', height: '55%' }}>
+                                        <circle cx="12" cy="8" r="4" />
+                                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
+                    );
+                }
+                else if (colId === 'student') cell = s.name;
+                else if (colId === 'className') cell = `${classes.find((c: any) => c.id === s.metadata?.classId)?.name || '-'}${s.metadata?.groupId ? ` • ${groups.find((g: any) => g.id === s.metadata?.groupId)?.name || ''}` : ''}`;
+                else if (colId === 'contact') cell = s.phone || s.metadata?.phone || '-';
+                else if (colId === 'qr') cell = (
+                    <div className="flex items-center justify-center">
+                        <MemoizedQRCodeCanvas value={s.metadata?.studentId || s.id} />
+                    </div>
+                );
+                else if (colId === 'barcode') cell = (
+                    <div className="flex items-center justify-center">
+                        <BarcodeSVG value={s.metadata?.studentId || s.id} width={120} height={36} />
+                    </div>
+                );
+                return (
+                    <td key={colId} style={{ padding: colId === 'photo' ? `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)` : `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)`, fontSize: 'inherit' }} className={`text-black ${colId === 'student' ? 'text-left' : 'text-center'}`}>
+                        {cell}
+                    </td>
+                );
+            })}
+        </tr>
+    );
+});
+
+const SidebarStudentItem = React.memo(({ s, isSelected, roll, dotColor, onToggle, onScrollTo }: any) => {
+    return (
+        <div
+            className="flex items-center gap-3 px-3 py-2 mx-1 mb-2 rounded-xl cursor-pointer transition-colors border shadow-sm"
+            style={isSelected ? { background: '#eff6ff', borderColor: '#3b82f6' } : { background: '#fff', borderColor: '#e2e8f0' }}
+            onClick={() => { onToggle(s.id); onScrollTo(s.id); }}
+        >
+            <div
+                className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
+                style={isSelected
+                    ? { background: '#4f46e5' }
+                    : { background: '#f1f5f9', border: '1px solid #cbd5e1' }}
+            >
+                {isSelected && <Check size={11} color="white" strokeWidth={3} />}
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-800 truncate">{s.name}</p>
+                {roll && <p className="text-xs text-slate-400">রোল: {roll}</p>}
+            </div>
+            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: dotColor }} />
+        </div>
+    );
+});
+
+export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     /* ── column order/visibility state ── */
     // Build the full catalogue of columns available
     const allAvailableCols = React.useMemo(() => {
@@ -176,6 +260,12 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     const [rightOpen, setRightOpen] = useState(false);
     const [rightTab, setRightTab] = useState<'layout' | 'font'>('layout');
     const [filterText, setFilterText] = useState('');
+    const [debouncedFilterText, setDebouncedFilterText] = useState('');
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedFilterText(filterText), 300);
+        return () => clearTimeout(t);
+    }, [filterText]);
+
     const [selectedClassId, setSelectedClassId] = useState<string>('all');
     const [highlightId, setHighlightId] = useState<string | null>(null);
 
@@ -479,26 +569,25 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
         return next;
     });
 
-    const handleColDragStart = (id: string) => { dragColRef.current = id; };
-    const handleColDragOver = (e: React.DragEvent, overId: string) => {
-        e.preventDefault();
-        const dragged = dragColRef.current;
-        if (!dragged || dragged === overId) return;
-        setActiveColIds(prev => {
-            const arr = [...prev];
-            const fromIdx = arr.indexOf(dragged);
-            const toIdx = arr.indexOf(overId);
-            if (fromIdx < 0 || toIdx < 0) return prev;
-            arr.splice(fromIdx, 1);
-            arr.splice(toIdx, 0, dragged);
-            try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(arr)); } catch { }
-            return arr;
-        });
+    const [dragOrder, setDragOrder] = useState<string[]>(activeColIds);
+    
+    useEffect(() => {
+        setDragOrder(activeColIds);
+    }, [activeColIds]);
+
+    const handleReorderCols = (newOrder: string[]) => {
+        setDragOrder(newOrder);
     };
-    const handleColDragEnd = () => { dragColRef.current = null; };
+
+    const handleDragEnd = () => {
+        if (JSON.stringify(dragOrder) !== JSON.stringify(activeColIds)) {
+            setActiveColIds(dragOrder);
+            try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(dragOrder)); } catch { }
+        }
+    };
 
     /* ── helpers ── */
-    const scrollTo = (id: string) => {
+    const scrollTo = useCallback((id: string) => {
         if (!contentRef.current) return;
         const el = contentRef.current.querySelector(`[data-student-id="${id}"]`);
         if (el) {
@@ -506,19 +595,61 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
             setHighlightId(id);
             setTimeout(() => setHighlightId(null), 2800);
         }
-    };
+    }, []);
 
     const toggleCol = (id: string) => {}; // legacy no-op – replaced by addCol/removeCol
 
-    const toggleStudent = (id: string) => {
+    const toggleStudent = useCallback((id: string) => {
         setSelectedStudentIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id); else next.add(id);
             return next;
         });
-    };
+    }, []);
 
-    const toggleAll = () => {
+    const toggleAll = useCallback(() => {
+        setSelectedStudentIds(prev => {
+            const next = new Set(prev);
+            // We use allStudents so we don't have to reference visibleStudents in dependency array which might be tricky if it changes often. But actually toggleAll needs visibleStudents.
+            return next;
+        });
+    }, []); // We will fix toggleAll below by not using useCallback if it depends on visibleStudents.
+
+    /* ── derived lists ── */
+    const allStudents: Student[] = payload?.students || [];
+    const classes: ClassItem[] = payload?.classes || [];
+    const groups: GroupItem[] = payload?.groups || [];
+
+    const visibleStudents = React.useMemo(() => {
+        return allStudents.filter(s => {
+            const matchClass = selectedClassId === 'all' || s.metadata?.classId === selectedClassId;
+            if (!matchClass) return false;
+
+            if (debouncedFilterText && !(s.name || '').toLowerCase().includes(debouncedFilterText.toLowerCase())) return false;
+            
+            const sg = (s.metadata?.gender || '').toLowerCase();
+            if (filterGender !== 'all') {
+                if (filterGender === 'Male' && !['male', 'ছেলে', 'ছাত্র'].includes(sg)) return false;
+                if (filterGender === 'Female' && !['female', 'মেয়ে', 'ছাত্রী'].includes(sg)) return false;
+            }
+
+            if (filterMinAge || filterMaxAge) {
+                const dob = s.metadata?.dob || s.metadata?.dateOfBirth;
+                if (!dob) return false;
+                const age = (new Date().getTime() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+                if (filterMinAge && age < Number(filterMinAge)) return false;
+                if (filterMaxAge && age > Number(filterMaxAge)) return false;
+            }
+
+            if (filterBloodGroup !== 'all' && (s.metadata?.bloodGroup || '').toLowerCase() !== filterBloodGroup.toLowerCase()) return false;
+            if (filterReligion !== 'all' && (s.metadata?.religion || '').toLowerCase() !== filterReligion.toLowerCase()) return false;
+
+            return true;
+        });
+    }, [allStudents, selectedClassId, debouncedFilterText, filterGender, filterMinAge, filterMaxAge, filterBloodGroup, filterReligion]);
+
+    // Redefining toggleAll here where visibleStudents is available
+    const handleToggleAll = () => {
         const visible = visibleStudents.map(s => s.id);
         const allSelected = visible.every(id => selectedStudentIds.has(id));
         setSelectedStudentIds(prev => {
@@ -529,50 +660,45 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
         });
     };
 
-    /* ── derived lists ── */
-    const allStudents: Student[] = payload?.students || [];
-    const classes: ClassItem[] = payload?.classes || [];
-    const groups: GroupItem[] = payload?.groups || [];
+    const printStudents = React.useMemo(() => {
+        return allStudents.filter(s => {
+            if (!selectedStudentIds.has(s.id)) return false;
 
-    const matchStudent = (s: Student) => {
-        if (filterText && !(s.name || '').toLowerCase().includes(filterText.toLowerCase())) return false;
-        
-        const sg = (s.metadata?.gender || '').toLowerCase();
-        if (filterGender !== 'all') {
-            if (filterGender === 'Male' && !['male', 'ছেলে', 'ছাত্র'].includes(sg)) return false;
-            if (filterGender === 'Female' && !['female', 'মেয়ে', 'ছাত্রী'].includes(sg)) return false;
-        }
+            const matchClass = selectedClassId === 'all' || s.metadata?.classId === selectedClassId;
+            if (!matchClass) return false;
 
-        if (filterMinAge || filterMaxAge) {
-            const dob = s.metadata?.dob || s.metadata?.dateOfBirth;
-            if (!dob) return false;
-            const age = (new Date().getTime() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-            if (filterMinAge && age < Number(filterMinAge)) return false;
-            if (filterMaxAge && age > Number(filterMaxAge)) return false;
-        }
+            if (debouncedFilterText && !(s.name || '').toLowerCase().includes(debouncedFilterText.toLowerCase())) return false;
+            
+            const sg = (s.metadata?.gender || '').toLowerCase();
+            if (filterGender !== 'all') {
+                if (filterGender === 'Male' && !['male', 'ছেলে', 'ছাত্র'].includes(sg)) return false;
+                if (filterGender === 'Female' && !['female', 'মেয়ে', 'ছাত্রী'].includes(sg)) return false;
+            }
 
-        if (filterBloodGroup !== 'all' && (s.metadata?.bloodGroup || '').toLowerCase() !== filterBloodGroup.toLowerCase()) return false;
-        if (filterReligion !== 'all' && (s.metadata?.religion || '').toLowerCase() !== filterReligion.toLowerCase()) return false;
+            if (filterMinAge || filterMaxAge) {
+                const dob = s.metadata?.dob || s.metadata?.dateOfBirth;
+                if (!dob) return false;
+                const age = (new Date().getTime() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+                if (filterMinAge && age < Number(filterMinAge)) return false;
+                if (filterMaxAge && age > Number(filterMaxAge)) return false;
+            }
 
-        return true;
-    };
+            if (filterBloodGroup !== 'all' && (s.metadata?.bloodGroup || '').toLowerCase() !== filterBloodGroup.toLowerCase()) return false;
+            if (filterReligion !== 'all' && (s.metadata?.religion || '').toLowerCase() !== filterReligion.toLowerCase()) return false;
 
-    const visibleStudents = allStudents.filter(s => {
-        const matchClass = selectedClassId === 'all' || s.metadata?.classId === selectedClassId;
-        return matchClass && matchStudent(s);
-    });
-
-    const printStudents = allStudents.filter(s => selectedStudentIds.has(s.id) && matchStudent(s));
+            return true;
+        });
+    }, [allStudents, selectedStudentIds, selectedClassId, debouncedFilterText, filterGender, filterMinAge, filterMaxAge, filterBloodGroup, filterReligion]);
 
     const groupedStudents = React.useMemo(() => {
         if (!payload || printStudents.length === 0) return [];
-        const groups: Record<string, Student[]> = {};
+        const groupsRec: Record<string, Student[]> = {};
         printStudents.forEach((s: any) => {
             const cid = s.metadata?.classId || 'unknown';
-            if (!groups[cid]) groups[cid] = [];
-            groups[cid].push(s);
+            if (!groupsRec[cid]) groupsRec[cid] = [];
+            groupsRec[cid].push(s);
         });
-        return Object.entries(groups).map(([cid, students]) => {
+        return Object.entries(groupsRec).map(([cid, students]) => {
             const cName = classes.find(c => c.id === cid)?.name || 'অজানা ক্লাস';
             return { classId: cid, className: cName, students };
         }).sort((a, b) => {
@@ -841,7 +967,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                             শিক্ষার্থী <span className="font-black text-slate-700">{selectedCount}/{totalCount}</span>
                         </span>
                         <button
-                            onClick={toggleAll}
+                            onClick={handleToggleAll}
                             className="text-xs font-bold text-[#4f46e5] hover:underline bg-[#e0e7ff] px-2.5 py-1 rounded-md"
                         >
                             {visibleStudents.every(s => selectedStudentIds.has(s.id)) ? 'সব বাদ দিন' : 'সব নাম দিন'}
@@ -856,31 +982,15 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                             // Alternating dot colors for visual interest
                             const dotColor = isSelected ? '#10b981' : '#f87171';
                             return (
-                                <div
+                                <SidebarStudentItem
                                     key={s.id}
-                                    className="flex items-center gap-3 px-3 py-2 mx-1 mb-2 rounded-xl cursor-pointer transition-colors border shadow-sm"
-                                    style={isSelected ? { background: '#eff6ff', borderColor: '#3b82f6' } : { background: '#fff', borderColor: '#e2e8f0' }}
-                                    onClick={() => { toggleStudent(s.id); scrollTo(s.id); }}
-                                >
-                                    {/* Checkbox */}
-                                    <div
-                                        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
-                                        style={isSelected
-                                            ? { background: '#4f46e5' }
-                                            : { background: '#f1f5f9', border: '1px solid #cbd5e1' }}
-                                    >
-                                        {isSelected && <Check size={11} color="white" strokeWidth={3} />}
-                                    </div>
-
-                                    {/* Name & roll */}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-slate-800 truncate">{s.name}</p>
-                                        {roll && <p className="text-xs text-slate-400">রোল: {roll}</p>}
-                                    </div>
-
-                                    {/* Status dot */}
-                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: dotColor }} />
-                                </div>
+                                    s={s}
+                                    isSelected={isSelected}
+                                    roll={roll}
+                                    dotColor={dotColor}
+                                    onToggle={toggleStudent}
+                                    onScrollTo={scrollTo}
+                                />
                             );
                         })}
                         {visibleStudents.length === 0 && (
@@ -972,57 +1082,17 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                                 </thead>
                                                 <tbody>
                                                     {group.students.map((s, idx) => (
-                                                        <tr
+                                                        <PrintTableRow
                                                             key={s.id}
-                                                            data-student-id={s.id}
-                                                            className={`transition-colors ${highlightId === s.id ? 'ring-2 ring-[#0d9488]/30 bg-[#e0faf7]' : ''}`}
-                                                        >
-                                                            {activeColIds.map(colId => {
-                                                                let cell: React.ReactNode = s.metadata?.[colId] || '-';
-                                                                if (colId === 'sl') cell = idx + 1;
-                                                                else if (colId === 'rollNumber') cell = s.metadata?.rollNumber || '-';
-                                                                else if (colId === 'studentId') cell = s.metadata?.studentId || s.id.substring(0, 6);
-                                                                else if (colId === 'photo') {
-                                                                    const imgSrc = s.metadata?.studentPhoto || s.metadata?.photo || null;
-                                                                    cell = (
-                                                                        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                            {imgSrc ? (
-                                                                                <img
-                                                                                    src={imgSrc}
-                                                                                    alt={s.name}
-                                                                                    style={{ width: 'calc(52px * var(--content-scale, 1))', height: 'calc(52px * var(--content-scale, 1))', borderRadius: 4, objectFit: 'cover', border: '1px solid #cbd5e1', display: 'block' }}
-                                                                                />
-                                                                            ) : (
-                                                                                <div style={{ width: 'calc(52px * var(--content-scale, 1))', height: 'calc(52px * var(--content-scale, 1))', borderRadius: 4, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #cbd5e1' }}>
-                                                                                    <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth={1.5} style={{ width: '55%', height: '55%' }}>
-                                                                                        <circle cx="12" cy="8" r="4" />
-                                                                                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-                                                                                    </svg>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                else if (colId === 'student') cell = s.name;
-                                                                else if (colId === 'className') cell = `${classes.find(c => c.id === s.metadata?.classId)?.name || '-'}${s.metadata?.groupId ? ` • ${groups.find(g => g.id === s.metadata?.groupId)?.name || ''}` : ''}`;
-                                                                else if (colId === 'contact') cell = s.phone || s.metadata?.phone || '-';
-                                                                else if (colId === 'qr') cell = (
-                                                                    <div className="flex items-center justify-center">
-                                                                        <QRCodeCanvas value={s.metadata?.studentId || s.id} size={56} level="H" bgColor="#ffffff" fgColor="#000000" style={{ width: 'calc(56px * var(--content-scale, 1))', height: 'calc(56px * var(--content-scale, 1))' }} />
-                                                                    </div>
-                                                                );
-                                                                else if (colId === 'barcode') cell = (
-                                                                    <div className="flex items-center justify-center">
-                                                                        <BarcodeSVG value={s.metadata?.studentId || s.id} width={120} height={36} />
-                                                                    </div>
-                                                                );
-                                                                        return (
-                                                                    <td key={colId} style={{ padding: colId === 'photo' ? `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)` : `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)`, fontSize: 'inherit' }} className={`text-black ${colId === 'student' ? 'text-left' : 'text-center'}`}>
-                                                                        {cell}
-                                                                    </td>
-                                                                );
-                                                            })}
-                                                        </tr>
+                                                            s={s}
+                                                            idx={idx}
+                                                            activeColIds={activeColIds}
+                                                            classes={classes}
+                                                            groups={groups}
+                                                            cellPv={cellPv}
+                                                            cellPh={cellPh}
+                                                            isHighlighted={highlightId === s.id}
+                                                        />
                                                     ))}
                                                 </tbody>
                                             </table>
@@ -1095,28 +1165,28 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                                 className={`grid transition-all duration-300 ease-in-out ${isSelectedColsExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0'}`}
                                             >
                                                 <div className="overflow-hidden flex flex-col gap-1">
-                                                    {activeColIds.map(colId => {
+                                                    <Reorder.Group axis="y" values={dragOrder} onReorder={handleReorderCols} className="flex flex-col gap-1">
+                                                    {dragOrder.map(colId => {
                                                         const col = allAvailableCols.find(c => c.id === colId);
                                                         return (
-                                                            <div
+                                                            <Reorder.Item
                                                                 key={colId}
-                                                                draggable
-                                                                onDragStart={() => handleColDragStart(colId)}
-                                                                onDragOver={e => handleColDragOver(e, colId)}
-                                                                onDragEnd={handleColDragEnd}
+                                                                value={colId}
+                                                                onDragEnd={handleDragEnd}
                                                                 className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50 cursor-grab active:cursor-grabbing select-none"
                                                             >
                                                                 <GripVertical size={13} className="text-indigo-300 flex-shrink-0" />
                                                                 <span className="flex-1 text-xs font-semibold text-indigo-800 truncate">{col?.label || colId}</span>
                                                                 <button
-                                                                    onClick={() => removeCol(colId)}
+                                                                    onClick={(e) => { e.stopPropagation(); removeCol(colId); }}
                                                                     className="p-0.5 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
                                                                 >
                                                                     <X size={11} />
                                                                 </button>
-                                                            </div>
+                                                            </Reorder.Item>
                                                         );
                                                     })}
+                                                    </Reorder.Group>
                                                 </div>
                                             </div>
                                         </div>

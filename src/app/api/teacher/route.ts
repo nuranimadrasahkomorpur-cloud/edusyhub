@@ -11,83 +11,54 @@ export async function GET(request: Request) {
     }
 
     try {
-        // Find all Users who are TEACHERs and belong to this institute
-        const rawUsers = await (prisma as any).$runCommandRaw({
-            find: 'User',
-            filter: { 
-                role: 'TEACHER',
-                instituteIds: { $oid: instituteId }
+        // Fetch all TeacherProfiles for this institute
+        const teacherProfiles = await prisma.teacherProfile.findMany({
+            where: {
+                instituteId: instituteId
             }
         });
 
-        // Also try pure string matching just in case
-        const rawUsersString = await (prisma as any).$runCommandRaw({
-            find: 'User',
-            filter: { 
-                role: 'TEACHER',
-                instituteIds: instituteId
+        // Extract userIds
+        const userIds = teacherProfiles.map(p => p.userId);
+
+        // Fetch valid users
+        const users = await prisma.user.findMany({
+            where: {
+                id: { in: userIds }
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+                role: true
             }
         });
 
-        let allUsers = [];
-        if (rawUsers.cursor?.firstBatch) {
-            allUsers.push(...rawUsers.cursor.firstBatch);
-        }
-        if (rawUsersString.cursor?.firstBatch) {
-            allUsers.push(...rawUsersString.cursor.firstBatch);
-        }
+        // Create a map for quick lookup
+        const userMap = new Map(users.map(u => [u.id, u]));
 
-        // Deduplicate
-        const uniqueUsersMap = new Map();
-        allUsers.forEach((u: any) => {
-            const idStr = u._id.$oid || u._id.toString();
-            uniqueUsersMap.set(idStr, u);
-        });
-
-        const finalUsers = Array.from(uniqueUsersMap.values());
-
-        const profileMap = new Map();
-
-        if (finalUsers.length > 0) {
-            // Now fetch their TeacherProfiles (if any exist)
-            const userIdsForProfile = finalUsers.map(u => ({ $oid: u._id.$oid || u._id.toString() }));
-            const rawProfiles = await (prisma as any).$runCommandRaw({
-                find: 'TeacherProfile',
-                filter: { 
-                    userId: { $in: userIdsForProfile },
-                    $or: [
-                        { instituteId: instituteId },
-                        { instituteId: { $oid: instituteId } }
-                    ]
-                }
+        // Filter out orphaned profiles and format the response
+        const teachers = teacherProfiles
+            .filter(profile => userMap.has(profile.userId))
+            .map((profile) => {
+                const user = userMap.get(profile.userId)!;
+                return {
+                    id: profile.id,
+                    instituteId: profile.instituteId,
+                    userId: profile.userId,
+                    status: profile.status || 'ACTIVE',
+                    assignedClassIds: profile.assignedClassIds || [],
+                    permissions: profile.permissions || {},
+                    user: {
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                        phone: user.phone,
+                        role: user.role
+                    }
+                };
             });
-
-            if (rawProfiles.cursor?.firstBatch) {
-                rawProfiles.cursor.firstBatch.forEach((p: any) => {
-                    profileMap.set(p.userId.$oid || p.userId.toString(), p);
-                });
-            }
-        }
-
-        const teachers = finalUsers.map((u: any) => {
-            const idStr = u._id.$oid || u._id.toString();
-            const profile = profileMap.get(idStr);
-
-            return {
-                id: profile?._id?.$oid || profile?._id?.toString() || idStr, // Use profile ID if exists, otherwise fallback to user ID
-                instituteId: instituteId,
-                userId: idStr,
-                status: profile?.status || 'ACTIVE',
-                assignedClassIds: profile?.assignedClassIds || [],
-                permissions: profile?.permissions || {},
-                user: {
-                    id: idStr,
-                    name: u.name,
-                    email: u.email,
-                    phone: u.phone
-                }
-            };
-        });
 
         return NextResponse.json(teachers);
     } catch (error) {

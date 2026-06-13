@@ -101,7 +101,8 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
     // --- FEE & TRANSACTION LOGIC ---
     const dueTransactions = transactions.filter(t => 
         (t.status?.toString().toUpperCase() === 'PENDING') && 
-        (t.type?.toString().toUpperCase() === 'INCOME')
+        (t.type?.toString().toUpperCase() === 'INCOME') &&
+        !t.isArchived
     );
     const totalDue = dueTransactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
@@ -789,7 +790,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                             });
 
                                             const groupedByType = (transactions || []).reduce((acc: any, t: any) => {
-                                                if (t.status?.toString().toUpperCase() === 'PENDING' && t.type?.toString().toUpperCase() === 'INCOME') {
+                                                if (t.status?.toString().toUpperCase() === 'PENDING' && t.type?.toString().toUpperCase() === 'INCOME' && !t.isArchived) {
                                                     const key = t.originalCategory || t.category || 'অন্যান্য';
                                                     if (!acc[key]) acc[key] = { items: [], total: 0 };
                                                     acc[key].items.push(t);

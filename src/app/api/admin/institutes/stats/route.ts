@@ -27,10 +27,13 @@ export async function GET(req: Request) {
         const pendingStudentCount = allStudents.filter((s: any) => s.metadata?.admissionStatus === 'PENDING').length;
 
         // --- Teachers Count ---
-        const teacherCount = await (prisma as any).teacherProfile.count({
-            where: {
-                instituteId: instituteId
-            }
+        const teacherProfiles = await prisma.teacherProfile.findMany({
+            where: { instituteId: instituteId },
+            select: { userId: true }
+        });
+        const teacherUserIds = teacherProfiles.map((p: any) => p.userId);
+        const teacherCount = await prisma.user.count({
+            where: { id: { in: teacherUserIds } }
         });
 
         // --- Admission Trends (Last 7 Days) ---

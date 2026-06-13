@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -160,6 +162,18 @@ export async function GET(req: Request) {
                 }
             }
 
+            let isArchived = false;
+            if (catInfo) {
+                isArchived = catInfo.config?.isArchived || false;
+            } else {
+                for (const cat of categoryMap.values()) {
+                    if (cat.name === rawTx.category && cat.config?.isArchived) {
+                        isArchived = true;
+                        break;
+                    }
+                }
+            }
+
             const isExcludedFromSummary = catInfo?.config?.isExcludedFromSummary || false;
 
             return {
@@ -169,7 +183,8 @@ export async function GET(req: Request) {
                 dueDate: dueDate.toISOString(),
                 ...studentInfo,
                 categoryExists: !!categoryExists,
-                isExcludedFromSummary
+                isExcludedFromSummary,
+                isArchived
             };
         });
 
@@ -188,7 +203,7 @@ export async function GET(req: Request) {
             .reduce((sum: number, t: any) => sum + t.amount, 0);
 
         const pendingFees = transactionsWithStudentInfo
-            .filter((t: any) => t.type === 'INCOME' && t.status === 'PENDING' && !t.isExcludedFromSummary)
+            .filter((t: any) => t.type === 'INCOME' && t.status === 'PENDING' && !t.isExcludedFromSummary && !t.isArchived)
             .reduce((sum: number, t: any) => sum + t.amount, 0);
 
         const balance = totalIncome - totalExpense;

@@ -727,7 +727,7 @@ export default function StudentManagementPage() {
                             } else if (!t.isExcludedFromSummary) {
                                 feesMap[sId].totalPaid += t.amount;
                             }
-                        } else if (t.status === 'PENDING' && !t.isExcludedFromSummary) {
+                        } else if (t.status === 'PENDING' && !t.isExcludedFromSummary && !t.isArchived) {
                             feesMap[sId].totalDue += t.amount;
                         }
                     }
@@ -761,6 +761,50 @@ export default function StudentManagementPage() {
         }
     }, [viewMode, activeInstitute?.id]);
 
+    const handleOpenFeeCollect = async (student: any, isFromScanner = false) => {
+        setIsSearchingStudent(true);
+        try {
+            const feeRes = await fetch(`/api/admin/accounts/collect-fee?studentId=${student.id || student.studentId}&instituteId=${activeInstitute?.id || ''}`);
+            const feeData = await feeRes.json();
+            const items = feeData?.pendingFees || feeData?.items || [];
+            
+            setSelectedStudentForFee({
+                studentId: student.id || student.studentId,
+                studentName: student.name || student.studentName || '',
+                studentUniqueId: student.metadata?.studentId || student.studentUniqueId || student.id,
+                studentPhoto: student.metadata?.studentPhoto || student.metadata?.photo || student.studentPhoto || null,
+                items: items,
+                totalAmount: items.reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0),
+                advanceBalance: feeData?.advanceBalance || 0,
+                upcomingFees: feeData?.upcomingFees || []
+            });
+            setIsFeeModalOpen(true);
+            if (isFromScanner) {
+                setOpenedViaScanner(true);
+                setShowScanner(false);
+            }
+        } catch (error) {
+            console.error("Failed to load fees", error);
+            setSelectedStudentForFee({
+                studentId: student.id || student.studentId,
+                studentName: student.name || student.studentName || '',
+                studentUniqueId: student.metadata?.studentId || student.studentUniqueId || student.id,
+                studentPhoto: student.metadata?.studentPhoto || student.metadata?.photo || student.studentPhoto || null,
+                items: [],
+                totalAmount: 0,
+                advanceBalance: 0,
+                upcomingFees: []
+            });
+            setIsFeeModalOpen(true);
+            if (isFromScanner) {
+                setOpenedViaScanner(true);
+                setShowScanner(false);
+            }
+        } finally {
+            setIsSearchingStudent(false);
+        }
+    };
+
     // Handle scanner results and external scan events (from StudentProfileModal)
     const handleScanResult = async (scannedValue: string) => {
         const cleanedValue = scannedValue.trim();
@@ -769,19 +813,7 @@ export default function StudentManagementPage() {
             // Try local list first
             const local = students.find(s => String(s.metadata?.studentId || s.id) === cleanedValue);
             if (local) {
-                setSelectedStudentForFee({
-                    studentId: local.id,
-                    studentName: local.name,
-                    studentUniqueId: local.metadata?.studentId || local.id,
-                    studentPhoto: local.metadata?.studentPhoto || local.metadata?.photo || null,
-                    items: [],
-                    totalAmount: 0,
-                    advanceBalance: 0,
-                    upcomingFees: []
-                });
-                setIsFeeModalOpen(true);
-                setOpenedViaScanner(true);
-                setShowScanner(false);
+                await handleOpenFeeCollect(local, true);
                 return;
             }
 
@@ -795,19 +827,7 @@ export default function StudentManagementPage() {
                 const data = await res.json();
                 const s = Array.isArray(data) ? data[0] : data;
                 if (s) {
-                    setSelectedStudentForFee({
-                        studentId: s.id,
-                        studentName: s.name,
-                        studentUniqueId: s.metadata?.studentId || s.id,
-                        studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
-                        items: [],
-                        totalAmount: 0,
-                        advanceBalance: 0,
-                        upcomingFees: []
-                    });
-                    setIsFeeModalOpen(true);
-                    setOpenedViaScanner(true);
-                    setShowScanner(false);
+                    await handleOpenFeeCollect(s, true);
                     return;
                 }
             }
@@ -826,18 +846,7 @@ export default function StudentManagementPage() {
         const handler = async (evt: any) => {
             const detail = evt?.detail || {};
             if (detail.student) {
-                const s = detail.student;
-                setSelectedStudentForFee({
-                    studentId: s.id,
-                    studentName: s.name,
-                    studentUniqueId: s.metadata?.studentId || s.id,
-                    studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
-                    items: [],
-                    totalAmount: 0,
-                    advanceBalance: 0,
-                    upcomingFees: []
-                });
-                setIsFeeModalOpen(true);
+                await handleOpenFeeCollect(detail.student, false);
                 return;
             }
             if (detail.studentId) {
@@ -2849,15 +2858,7 @@ export default function StudentManagementPage() {
                                             onClick={(e) => {
 
                                                 if (isFeesMode) {
-                                                    setSelectedStudentForFee({
-                                                        studentId: s.id,
-                                                        studentName: s.name || '',
-                                                        studentUniqueId: s.metadata?.studentId || s.id,
-                                                        studentPhoto: s.metadata?.studentPhoto || s.metadata?.photo || null,
-                                                        items: [],
-                                                        totalAmount: 0
-                                                    });
-                                                    setIsFeeModalOpen(true);
+                                                    handleOpenFeeCollect(s, false);
                                                 } else {
                                                     setSelectedStudent(s);
                                                     setIsProfileModalOpen(true);
@@ -5393,14 +5394,42 @@ export default function StudentManagementPage() {
                             setOpenedViaScanner(false);
                         }
                     }}
-                    onSuccess={(msg: string) => {
+                    onSuccess={async (msg: string) => {
                         setIsFeeModalOpen(false);
                         setToast({ message: msg, type: 'success' });
                         if (openedViaScanner) {
                             setShowScanner(true);
                             setOpenedViaScanner(false);
                         }
-                        fetchFeesData();
+                        
+                        // Optimized: Only fetch the updated dues for this specific student 
+                        // instead of fetching all transactions for the entire institute
+                        if (selectedStudentForFee?.studentId && activeInstitute?.id) {
+                            try {
+                                const feeRes = await fetch(`/api/admin/accounts/collect-fee?studentId=${selectedStudentForFee.studentId}&instituteId=${activeInstitute.id}`);
+                                const feeData = await feeRes.json();
+                                const items = feeData?.pendingFees || feeData?.items || [];
+                                const newTotalDue = items.reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0);
+                                const advance = feeData?.advanceBalance || 0;
+                                
+                                setFeesData(prev => {
+                                    const currentData = prev?.[selectedStudentForFee.studentId] || { totalPaid: 0, totalDue: 0, advance: 0 };
+                                    return {
+                                        ...prev,
+                                        [selectedStudentForFee.studentId]: {
+                                            ...currentData,
+                                            totalDue: newTotalDue,
+                                            advance: advance
+                                        }
+                                    };
+                                });
+                            } catch (err) {
+                                console.error('Failed to update single student fee data', err);
+                                fetchFeesData(); // Fallback
+                            }
+                        } else {
+                            fetchFeesData();
+                        }
                     }}
                     onPrintReceipt={(txn: any) => {
                         setSelectedTransactionForPrint(txn);

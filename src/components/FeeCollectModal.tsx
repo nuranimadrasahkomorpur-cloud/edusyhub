@@ -15,13 +15,14 @@ interface FeeCollectModalProps {
         studentName: string;
         studentUniqueId: string;
         studentPhoto?: string | null;
+
         items: any[];
         totalAmount: number;
         scannedAt?: string; // ISO timestamp when QR code was scanned
         scannedId?: string; // The actual scanned QR/barcode value
     } | null;
     onClose: () => void;
-    onSuccess: (msg: string) => void;
+    onSuccess: (msg: string, receiptDetails?: any) => void;
     onPrintReceipt?: (txn: any) => void;
 }
 
@@ -49,10 +50,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     const [selectedFeeIds, setSelectedFeeIds] = useState<Set<string>>(
         new Set((student?.items || []).map((f: any) => f?.id).filter(Boolean))
     );
-    const [paidAmount, setPaidAmount] = useState(() => {
-        const total = (student?.items || []).reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0);
-        return total > 0 ? String(total) : '';
-    });
+    const [paidAmount, setPaidAmount] = useState<string>('');
     const [paymentNote, setPaymentNote] = useState('');
     const [applyAdvanceTo, setApplyAdvanceTo] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,10 +84,6 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                     setPendingFees(fees);
                     const allIds = new Set<string>(fees.map((f: any) => f.id).filter(Boolean));
                     setSelectedFeeIds(allIds);
-                    
-                    // Update paid amount based on the newly fetched fees
-                    const total = fees.reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0);
-                    setPaidAmount(total > 0 ? String(total) : '');
                     
                     // Auto-expand all category groups
                     const baseNames = new Set<string>(fees.map((f: any) => f.category?.replace(/\s*\(.*?\)\s*/g, '').trim()).filter(Boolean));
@@ -163,7 +157,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
         const selectedFees = useMemo(() => allFees.filter((f: any) => selectedFeeIds.has(f.id)), [allFees, selectedFeeIds]);
         const selectedTotal = useMemo(() => selectedFees.reduce((sum: number, f: any) => sum + getFeeAmount(f), 0), [selectedFees, localWaivers]);
         const pendingTotal = useMemo(() => pendingFees.reduce((sum: number, f: any) => sum + getFeeAmount(f), 0), [pendingFees, localWaivers]);
-        const numericPaid = parseFloat(paidAmount) || 0;
+        const numericPaid = paidAmount === '' ? Math.max(0, selectedTotal - (useAdvanceBalance ? advanceBalance : 0)) : (parseFloat(paidAmount) || 0);
         const totalAvailable = numericPaid + (useAdvanceBalance ? advanceBalance : 0);
 
         const visibleUpcomingFees = useMemo(() => {
@@ -191,10 +185,6 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                 const next = new Set(prev);
                 if (next.has(id)) next.delete(id);
                 else next.add(id);
-                // Auto-update paid amount to match new selected total
-                const newTotal = allFees.filter((f: any) => next.has(f.id)).reduce((sum: number, f: any) => sum + getFeeAmount(f), 0);
-                const netAmount = Math.max(0, newTotal - (useAdvanceBalance ? advanceBalance : 0));
-                setPaidAmount(netAmount > 0 ? String(netAmount) : '0');
                 return next;
             });
         };
@@ -202,18 +192,15 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
         const handleSelectAll = () => {
             if (selectedFeeIds.size === pendingFees.length) {
                 setSelectedFeeIds(new Set());
-                setPaidAmount('0');
             } else {
                 const allPendingIds = new Set(pendingFees.map((f: any) => f.id));
                 setSelectedFeeIds(allPendingIds);
-                const total = pendingFees.reduce((sum: number, f: any) => sum + getFeeAmount(f), 0);
-                const netAmount = Math.max(0, total - (useAdvanceBalance ? advanceBalance : 0));
-                setPaidAmount(netAmount > 0 ? String(netAmount) : '0');
             }
         };
 
         const handleAmountChange = (val: string, autoAllocate = autoAllocateUpcoming, useAdv = useAdvanceBalance) => {
             setPaidAmount(val);
+            if (val === '') return;
             const numeric = parseFloat(val) || 0;
             let remaining = numeric + (useAdv ? advanceBalance : 0);
             const newSelected = new Set<string>();
@@ -284,12 +271,12 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                             setPendingFees(newPending);
                         } else {
                             if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                            onSuccess(data.message);
+                            onSuccess(data.message, data.receiptDetails);
                             onClose();
                         }
                     } else {
                         if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                        onSuccess(data.message);
+                        onSuccess(data.message, data.receiptDetails);
                         onClose();
                     }
                 } else {
@@ -328,12 +315,12 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                             setPendingFees(newPending);
                         } else {
                             if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                            onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে');
+                            onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে', data.receiptDetails);
                             onClose();
                         }
                                     } else {
                         if (data.receiptDetails && onPrintReceipt) onPrintReceipt(data.receiptDetails);
-                        onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে');
+                        onSuccess(data.message || 'ফি সফলভাবে গ্রহণ করা হয়েছে', data.receiptDetails);
                         onClose();
                     }
                 } else {
@@ -449,7 +436,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                         <div className="flex gap-3">
                             <button onClick={() => { 
                                 if (result.receiptDetails && onPrintReceipt) onPrintReceipt(result.receiptDetails);
-                                onSuccess(result.message); onClose(); 
+                                onSuccess(result.message, result.receiptDetails); onClose(); 
                             }} className="flex-1 py-3 bg-slate-100 text-slate-600 font-black text-xs rounded-xl hover:bg-slate-200 transition-colors">
                                 সংরক্ষণ করুন ও রশিদ দেখুন
                             </button>
@@ -517,9 +504,6 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                                                     fees.forEach(f => newSet.add(f.id));
                                                 }
                                                 setSelectedFeeIds(newSet);
-                                                const newTotal = allFees.filter(f => newSet.has(f.id)).reduce((s, f) => s + getFeeAmount(f), 0);
-                                                const net = Math.max(0, newTotal - (useAdvanceBalance ? advanceBalance : 0));
-                                                setPaidAmount(net > 0 ? String(net) : '0');
                                             };
 
                                             return (
@@ -638,19 +622,10 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                                                                                                     const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
                                                                                                     const clampedVal = Math.min(val, fee.amount);
                                                                                                     setLocalWaivers(prev => {
-                                                                                                        const next = {
+                                                                                                        return {
                                                                                                             ...prev,
                                                                                                             [fee.id]: { amount: clampedVal, applyToFuture: prev[fee.id]?.applyToFuture || false }
                                                                                                         };
-                                                                                                        if (selectedFeeIds.has(fee.id)) {
-                                                                                                            const newTotal = selectedFees.reduce((s, f) => {
-                                                                                                                const w = f.id === fee.id ? clampedVal : ((next as Record<string, { amount: number, applyToFuture: boolean }>)[f.id]?.amount || 0);
-                                                                                                                return s + Math.max(0, f.amount - w);
-                                                                                                            }, 0);
-                                                                                                            const net = Math.max(0, newTotal - (useAdvanceBalance ? advanceBalance : 0));
-                                                                                                            setPaidAmount(net > 0 ? String(net) : '0');
-                                                                                                        }
-                                                                                                        return next;
                                                                                                     });
                                                                                                 }}
                                                                                                 className="w-[110px] flex-shrink-0 h-[54px] bg-white border-2 border-emerald-200 rounded-lg px-3 text-lg font-bold text-slate-800 focus:outline-none focus:border-[#045c84] transition-colors [&::-webkit-search-cancel-button]:hidden [&::-ms-clear]:hidden [&::-webkit-contacts-auto-fill-button]:hidden"
@@ -745,8 +720,9 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                             <div className="flex items-center gap-2">
                                 <input
                                     type="number" min="0" step="1" value={paidAmount}
-                                    onChange={e => handleAmountChange(e.target.value)} placeholder="0"
-                                    className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 bg-white focus:border-[#045c84] focus:ring-4 focus:ring-[#045c84]/10 transition-all font-black text-xl text-slate-800 text-center"
+                                    onChange={e => handleAmountChange(e.target.value)} 
+                                    placeholder={Math.max(0, selectedTotal - (useAdvanceBalance ? advanceBalance : 0)).toString()}
+                                    className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 bg-white focus:border-[#045c84] focus:ring-4 focus:ring-[#045c84]/10 transition-all font-black text-xl text-slate-800 text-center placeholder:text-slate-400"
                                 />
                                 {!showNote && (
                                     <button 
