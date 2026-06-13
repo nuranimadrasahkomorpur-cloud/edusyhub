@@ -5,6 +5,7 @@ import { Building2 } from 'lucide-react';
 
 interface PrintLayoutProps {
     title: string;
+    subtitle?: string;
     institute?: any;
     children: React.ReactNode;
     date?: string;
@@ -14,17 +15,19 @@ interface PrintLayoutProps {
     hideTitle?: boolean;
     pagePadding?: number;
     hideLogo?: boolean;
+    hideHeader?: boolean;
     footerCenterContent?: React.ReactNode;
 }
 
-export default function PrintLayout({ title, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding, hideLogo = false, footerCenterContent }: PrintLayoutProps) {
+export default function PrintLayout({ title, subtitle, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding, hideLogo = false, hideHeader = false, footerCenterContent }: PrintLayoutProps) {
     const isA5 = pageSize === 'A5';
     const baseClass = `${previewOnly ? '' : 'print-area'} bg-white p-4 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 flex flex-col`;
     const sizeClass = previewOnly ? (isA5 ? 'min-h-[210mm] w-full mx-auto' : 'min-h-[10.5in] w-full') : 'w-full';
     return (
         <div className={`${baseClass} ${sizeClass}`} style={{ padding: `${pagePadding ?? 16}px` }}>
             {/* Institute Header: logo flush-left, institute text centered */}
-            <div className={`mb-0 border-b-2 border-slate-800 ${hideTitle ? 'pb-4' : 'pb-8'}`} style={{ display: 'grid', gridTemplateColumns: hideLogo ? '1fr' : '96px 1fr 96px', alignItems: 'center' }}>
+            {!hideHeader && (
+                <div className={`mb-0 border-b-2 border-slate-800 ${hideTitle ? 'pb-4' : 'pb-8'}`} style={{ display: 'grid', gridTemplateColumns: hideLogo ? '1fr' : '96px 1fr 96px', alignItems: 'center' }}>
                 {/* left logo column */}
                 {!hideLogo && (
                     <div className="pl-4 flex items-center justify-start">
@@ -50,14 +53,20 @@ export default function PrintLayout({ title, institute, children, date = new Dat
 
                 {/* right placeholder column (keeps center truly centered) */}
                 {!hideLogo && <div className="pr-4" />}
-            </div>
+                </div>
+            )}
 
             {/* Document Title overlapping the break line */}
             {!hideTitle && (
-                <div className="flex justify-center mb-3" style={{ marginTop: '-18px' }}>
+                <div className="flex flex-col items-center justify-center mb-3" style={{ marginTop: '-18px' }}>
                     <div className="inline-block bg-slate-900 text-white px-3 py-1 rounded-full font-black text-[14px] uppercase tracking-widest relative z-10 border-4 border-white">
                         {title}
                     </div>
+                    {subtitle && (
+                        <div className="inline-block bg-slate-100 text-slate-700 px-3 py-0.5 mt-[-6px] rounded-full font-bold text-[12px] relative z-0 border-2 border-white shadow-sm">
+                            {subtitle}
+                        </div>
+                    )}
                 </div>
             )}
 

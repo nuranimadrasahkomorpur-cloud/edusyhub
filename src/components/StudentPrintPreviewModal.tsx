@@ -19,9 +19,12 @@ import {
     ChevronUp,
     User,
     Copy,
+    List,
+    QrCode,
+    Barcode,
 } from 'lucide-react';
 import { POSSIBLE_FIELDS } from './FieldLibrary';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import JsBarcode from 'jsbarcode';
 import { Reorder } from 'framer-motion';
 
@@ -95,13 +98,17 @@ const BarcodeSVG = React.memo(({ value, width = 120, height = 36 }: { value: str
             });
             
             // Add viewBox to make SVG responsive without clipping
-            const w = svgEl.getAttribute('width');
-            const h = svgEl.getAttribute('height');
+            const wAttr = svgEl.getAttribute('width');
+            const hAttr = svgEl.getAttribute('height');
+            const w = wAttr ? wAttr.replace(/px/g, '') : null;
+            const h = hAttr ? hAttr.replace(/px/g, '') : null;
             if (w && h) {
                 svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
-                svgEl.setAttribute('preserveAspectRatio', 'none'); // Allows stretching to fit raw cell width/height
+                svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet'); // Centers the barcode
                 svgEl.style.width = '100%';
                 svgEl.style.height = '100%';
+                svgEl.removeAttribute('width');
+                svgEl.removeAttribute('height');
             }
             
             setSvgHtml(svgEl.outerHTML || '');
@@ -124,8 +131,8 @@ const BarcodeSVG = React.memo(({ value, width = 120, height = 36 }: { value: str
     );
 });
 
-const MemoizedQRCodeCanvas = React.memo(({ value }: { value: string }) => (
-    <QRCodeCanvas value={value} size={56} level="H" bgColor="#ffffff" fgColor="#000000" style={{ width: 'calc(56px * var(--content-scale, 1))', height: 'calc(56px * var(--content-scale, 1))' }} />
+const MemoizedQRCodeSVG = React.memo(({ value }: { value: string }) => (
+    <QRCodeSVG value={value} size={256} level="H" bgColor="#ffffff" fgColor="#000000" style={{ width: 'calc(56px * var(--content-scale, 1))', height: 'calc(56px * var(--content-scale, 1))' }} />
 ));
 
 const PrintTableRow = React.memo(({ s, idx, activeColIds, classes, groups, cellPv, cellPh, isHighlighted }: any) => {
@@ -165,7 +172,7 @@ const PrintTableRow = React.memo(({ s, idx, activeColIds, classes, groups, cellP
                 else if (colId === 'contact') cell = s.phone || s.metadata?.phone || '-';
                 else if (colId === 'qr') cell = (
                     <div className="flex items-center justify-center">
-                        <MemoizedQRCodeCanvas value={s.metadata?.studentId || s.id} />
+                        <MemoizedQRCodeSVG value={s.metadata?.studentId || s.id} />
                     </div>
                 );
                 else if (colId === 'barcode') cell = (
@@ -256,6 +263,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
 
 
     /* ── ui state ── */
+    const [viewMode, setViewMode] = useState<'list' | 'qr' | 'barcode'>('list');
+    const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
     const [leftOpen, setLeftOpen] = useState(false);
     const [rightOpen, setRightOpen] = useState(false);
     const [rightTab, setRightTab] = useState<'layout' | 'font'>('layout');
@@ -797,13 +806,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                     শিক্ষার্থী
                 </button>
 
-                <button
-                    className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 flex-shrink-0 rounded-full font-bold text-xs md:text-sm transition-all hover:opacity-90 active:scale-95 shadow-sm"
-                    style={{ background: '#ecfdf5', color: '#059669' }}
-                >
-                    <User size={15} />
-                    ব্যক্তিগত ভিউ
-                </button>
+
 
                 {/* Right group */}
                 <div className="flex items-center gap-1.5 md:gap-2 ml-auto pl-2 flex-shrink-0">
@@ -1066,37 +1069,80 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                                 <h3 className="text-lg font-bold text-slate-800">{group.className}</h3>
                                             </div>
                                         )}
-                                        <div className="print-overflow-reset overflow-x-auto">
-                                            <table className="w-full text-left border-collapse [&_th]:border-[0.5px] [&_th]:border-gray-800 [&_td]:border-[0.5px] [&_td]:border-gray-800" style={{ fontSize: 'calc(var(--font-size, 14px) * var(--content-scale, 1))' }}>
-                                                <thead>
-                                                    <tr>
-                                                        {activeColIds.map(colId => {
-                                                            const col = allAvailableCols.find(c => c.id === colId);
-                                                                    return (
-                                                                        <th key={colId} style={{ padding: `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)`, fontSize: 'inherit' }} className="font-black text-black text-center">
-                                                                            {col?.label || colId}
-                                                                        </th>
-                                                                    );
-                                                        })}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {group.students.map((s, idx) => (
-                                                        <PrintTableRow
-                                                            key={s.id}
-                                                            s={s}
-                                                            idx={idx}
-                                                            activeColIds={activeColIds}
-                                                            classes={classes}
-                                                            groups={groups}
-                                                            cellPv={cellPv}
-                                                            cellPh={cellPh}
-                                                            isHighlighted={highlightId === s.id}
-                                                        />
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        {viewMode === 'list' ? (
+                                            <div className="print-overflow-reset overflow-x-auto">
+                                                <table className="w-full text-left border-collapse [&_th]:border-[0.5px] [&_th]:border-gray-800 [&_td]:border-[0.5px] [&_td]:border-gray-800" style={{ fontSize: 'calc(var(--font-size, 14px) * var(--content-scale, 1))' }}>
+                                                    <thead>
+                                                        <tr>
+                                                            {activeColIds.map(colId => {
+                                                                const col = allAvailableCols.find(c => c.id === colId);
+                                                                        return (
+                                                                            <th key={colId} style={{ padding: `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)`, fontSize: 'inherit' }} className="font-black text-black text-center">
+                                                                                {col?.label || colId}
+                                                                            </th>
+                                                                        );
+                                                            })}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {group.students.map((s, idx) => (
+                                                            <PrintTableRow
+                                                                key={s.id}
+                                                                s={s}
+                                                                idx={idx}
+                                                                activeColIds={activeColIds}
+                                                                classes={classes}
+                                                                groups={groups}
+                                                                cellPv={cellPv}
+                                                                cellPh={cellPh}
+                                                                isHighlighted={highlightId === s.id}
+                                                            />
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div 
+                                                className="grid gap-6 print-grid-container" 
+                                                style={{ 
+                                                    gridTemplateColumns: `repeat(auto-fill, minmax(calc(220px * var(--content-scale, 1)), 1fr))`,
+                                                    fontSize: 'calc(var(--font-size, 14px) * var(--content-scale, 1))'
+                                                }}
+                                            >
+                                                {group.students.map((s, idx) => {
+                                                    const classNameText = `${classes.find((c: any) => c.id === s.metadata?.classId)?.name || '-'}${s.metadata?.groupId ? `- ${groups.find((g: any) => g.id === s.metadata?.groupId)?.name || ''}` : ''}`;
+                                                    return (
+                                                        <div key={s.id} className="flex flex-col items-center justify-center p-6 border border-slate-300 rounded-xl bg-white" style={{ pageBreakInside: 'avoid' }}>
+                                                            {viewMode === 'barcode' ? (
+                                                                <>
+                                                                    <div className="flex flex-col items-center justify-center w-full mb-3">
+                                                                        <BarcodeSVG value={s.metadata?.studentId || s.id} width={160} height={50} />
+                                                                        <span className="text-[0.9em] font-bold mt-1 text-slate-800">{s.metadata?.studentId || s.id.substring(0, 6)}</span>
+                                                                    </div>
+                                                                    <div className="text-center w-full">
+                                                                        <div className="font-bold text-[1.2em] text-slate-900 leading-tight mb-1 truncate">{s.name}</div>
+                                                                        <div className="text-[0.9em] text-slate-600 font-medium">শ্রেণি- {classNameText}  Roll: {s.metadata?.rollNumber || '-'}</div>
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex justify-center w-full mb-4">
+                                                                        <div style={{ transform: 'scale(1.5)', transformOrigin: 'top center', marginBottom: '30px' }}>
+                                                                            <MemoizedQRCodeSVG value={s.metadata?.studentId || s.id} />
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-center w-full">
+                                                                        <div className="font-bold text-[1.2em] text-slate-900 leading-tight mb-1 truncate">{s.name}</div>
+                                                                        <div className="text-[0.9em] text-slate-600 font-medium">শ্রেণি- {classNameText}</div>
+                                                                        <div className="text-[0.9em] text-slate-600 font-medium mt-0.5">Roll: {s.metadata?.rollNumber || '-'}</div>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
 
                                     </PrintLayout>
                                 ))}
@@ -1128,6 +1174,33 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                         <button onClick={() => setRightOpen(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
                             <X size={15} />
                         </button>
+                    </div>
+
+                    {/* View Mode Toggle */}
+                    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                        <div className="flex bg-slate-200/50 p-1 rounded-lg border border-slate-200">
+                            <button 
+                                onClick={() => setViewMode('list')} 
+                                className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-indigo-100' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <List size={14} />
+                                <span>তালিকা</span>
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('qr')} 
+                                className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${viewMode === 'qr' ? 'bg-white shadow-sm text-emerald-600 ring-1 ring-emerald-100' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <QrCode size={14} />
+                                <span>কিউআর</span>
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('barcode')} 
+                                className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${viewMode === 'barcode' ? 'bg-white shadow-sm text-amber-600 ring-1 ring-amber-100' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Barcode size={14} />
+                                <span>বারকোড</span>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Tabs */}
