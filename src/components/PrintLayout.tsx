@@ -17,9 +17,10 @@ interface PrintLayoutProps {
     hideLogo?: boolean;
     hideHeader?: boolean;
     footerCenterContent?: React.ReactNode;
+    hideSignature?: boolean;
 }
 
-export default function PrintLayout({ title, subtitle, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding, hideLogo = false, hideHeader = false, footerCenterContent }: PrintLayoutProps) {
+export default function PrintLayout({ title, subtitle, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding, hideLogo = false, hideHeader = false, footerCenterContent, hideSignature = false }: PrintLayoutProps) {
     const isA5 = pageSize === 'A5';
     const baseClass = `${previewOnly ? '' : 'print-area'} bg-white p-4 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 flex flex-col`;
     const sizeClass = previewOnly ? (isA5 ? 'min-h-[210mm] w-full mx-auto' : 'min-h-[10.5in] w-full') : 'w-full';
@@ -86,23 +87,25 @@ export default function PrintLayout({ title, subtitle, institute, children, date
             </div>
 
             {/* Signature Area */}
-            <div className="flex items-end justify-between mt-auto pt-12 signature-area shrink-0 relative w-full">
-                <div className="text-center w-40 z-10">
-                    <div className="w-full border-t border-slate-400 mb-1.5 mx-auto"></div>
-                    <p className="font-bold text-slate-600 text-[13px]">আদায়কারীর স্বাক্ষর</p>
-                </div>
-                
-                {footerCenterContent && (
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-0 z-0">
-                        {footerCenterContent}
+            {!hideSignature && (
+                <div className="flex items-end justify-between mt-auto pt-12 signature-area shrink-0 relative w-full">
+                    <div className="text-center w-40 z-10">
+                        <div className="w-full border-t border-slate-400 mb-1.5 mx-auto"></div>
+                        <p className="font-bold text-slate-600 text-[13px]">আদায়কারীর স্বাক্ষর</p>
                     </div>
-                )}
-                
-                <div className="text-center w-40 z-10">
-                    <div className="w-full border-t border-slate-400 mb-1.5 mx-auto"></div>
-                    <p className="font-bold text-slate-600 text-[13px]">প্রধান শিক্ষকের স্বাক্ষর</p>
+                    
+                    {footerCenterContent && (
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 z-0">
+                            {footerCenterContent}
+                        </div>
+                    )}
+                    
+                    <div className="text-center w-40 z-10">
+                        <div className="w-full border-t border-slate-400 mb-1.5 mx-auto"></div>
+                        <p className="font-bold text-slate-600 text-[13px]">প্রধান শিক্ষকের স্বাক্ষর</p>
+                    </div>
                 </div>
-            </div>
+            )}
 
             <style jsx global>{`
                 @media print {

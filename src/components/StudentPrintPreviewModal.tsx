@@ -131,8 +131,8 @@ const BarcodeSVG = React.memo(({ value, width = 120, height = 36 }: { value: str
     );
 });
 
-const MemoizedQRCodeSVG = React.memo(({ value }: { value: string }) => (
-    <QRCodeSVG value={value} size={256} level="H" bgColor="#ffffff" fgColor="#000000" style={{ width: 'calc(56px * var(--content-scale, 1))', height: 'calc(56px * var(--content-scale, 1))' }} />
+const MemoizedQRCodeSVG = React.memo(({ value, scale = 1 }: { value: string; scale?: number }) => (
+    <QRCodeSVG value={value} size={256} level="H" bgColor="#ffffff" fgColor="#000000" style={{ width: `calc(56px * 1.5 * ${scale} * var(--content-scale, 1))`, height: `calc(56px * 1.5 * ${scale} * var(--content-scale, 1))` }} />
 ));
 
 const PrintTableRow = React.memo(({ s, idx, activeColIds, classes, groups, cellPv, cellPh, isHighlighted }: any) => {
@@ -295,6 +295,10 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
     const [pagePadding, setPagePadding] = useState<number>(16);
     const [pageSize, setPageSize] = useState<'A4' | 'A3' | 'A5' | 'Letter' | 'Legal'>('A4');
     const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+    const [codeScale, setCodeScale] = useState<number>(1);
+    const [cardOrientation, setCardOrientation] = useState<'vertical' | 'horizontal'>('vertical');
+    const [gridColumns, setGridColumns] = useState<number>(3);
+    const [continuousPrint, setContinuousPrint] = useState<boolean>(false);
 
     /* ── zoom ── */
     const [isAutoFit, setIsAutoFit] = useState(true);
@@ -837,12 +841,6 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                         সেটিংস
                     </button>
                     
-                    <button
-                        onClick={onClose}
-                        className="p-2 ml-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all shadow-sm"
-                    >
-                        <X size={16} />
-                    </button>
                 </div>
             </header>
 
@@ -1054,15 +1052,124 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                             >
                                 {/* Ensure CSS variables reflect current settings for instant preview */}
                                 {/* These are updated on slider input as well */}
-                                {groupedStudents.map((group, groupIdx) => (
+                                {continuousPrint ? (
                                     <PrintLayout
-                                        key={group.classId}
                                         title={payload.title || 'শিক্ষার্থী তালিকা'}
                                         institute={payload.institute}
                                         hideDate={true}
                                         hideTitle={true}
                                         previewOnly={false}
                                         pagePadding={pagePadding}
+                                        hideHeader={viewMode === 'qr' || viewMode === 'barcode'}
+                                        hideSignature={viewMode === 'qr' || viewMode === 'barcode'}
+                                    >
+                                        {viewMode === 'list' ? (
+                                            groupedStudents.map((group, groupIdx) => (
+                                                <div key={group.classId} className={groupIdx > 0 ? "mt-8" : ""}>
+                                                    {group.className && (
+                                                        <div className="text-center mb-3 mt-1">
+                                                            <h3 className="text-lg font-bold text-slate-800">{group.className}</h3>
+                                                        </div>
+                                                    )}
+                                                    <div className="print-overflow-reset overflow-x-auto">
+                                                        <table className="w-full text-left border-collapse [&_th]:border-[0.5px] [&_th]:border-gray-800 [&_td]:border-[0.5px] [&_td]:border-gray-800" style={{ fontSize: 'calc(var(--font-size, 14px) * var(--content-scale, 1))' }}>
+                                                            <thead>
+                                                                <tr>
+                                                                    {activeColIds.map(colId => {
+                                                                        const col = allAvailableCols.find(c => c.id === colId);
+                                                                                return (
+                                                                                    <th key={colId} style={{ padding: `var(--cell-pv, ${cellPv}px) var(--cell-ph, ${cellPh}px)`, fontSize: 'inherit' }} className="font-black text-black text-center">
+                                                                                        {col?.label || colId}
+                                                                                    </th>
+                                                                                );
+                                                                    })}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {group.students.map((s, idx) => (
+                                                                    <PrintTableRow
+                                                                        key={s.id}
+                                                                        s={s}
+                                                                        idx={idx}
+                                                                        activeColIds={activeColIds}
+                                                                        classes={classes}
+                                                                        groups={groups}
+                                                                        cellPv={cellPv}
+                                                                        cellPh={cellPh}
+                                                                        isHighlighted={highlightId === s.id}
+                                                                    />
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div 
+                                                className="grid gap-6 print-grid-container" 
+                                                style={{ 
+                                                    gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+                                                    fontSize: 'calc(var(--font-size, 14px) * var(--content-scale, 1))'
+                                                }}
+                                            >
+                                                {groupedStudents.flatMap(group => group.students).map((s, idx) => {
+                                                    const classNameText = `${classes.find((c: any) => c.id === s.metadata?.classId)?.name || '-'}${s.metadata?.groupId ? `- ${groups.find((g: any) => g.id === s.metadata?.groupId)?.name || ''}` : ''}`;
+                                                    return (
+                                                        <div key={s.id} className={`flex ${cardOrientation === 'horizontal' ? 'flex-row text-left gap-4' : 'flex-col text-center'} items-center justify-center p-6 border border-slate-300 rounded-xl bg-white`} style={{ pageBreakInside: 'avoid' }}>
+                                                            {viewMode === 'barcode' ? (
+                                                                <div className={`flex flex-col items-center justify-center flex-shrink-0 ${cardOrientation === 'horizontal' ? 'w-auto' : 'w-full mb-3'}`}>
+                                                                    <BarcodeSVG value={s.metadata?.studentId || s.id} width={160 * codeScale} height={50 * codeScale} />
+                                                                    <span className="text-[0.9em] font-bold mt-1 text-slate-800" style={{ fontSize: `${codeScale}em` }}>{s.metadata?.studentId || s.id.substring(0, 6)}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className={`flex justify-center flex-shrink-0 ${cardOrientation === 'horizontal' ? 'w-auto' : 'w-full mb-4'}`}>
+                                                                    <MemoizedQRCodeSVG value={s.metadata?.studentId || s.id} scale={codeScale} />
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <div className={`flex flex-col gap-1 ${cardOrientation === 'horizontal' ? 'flex-1 min-w-0 items-start' : 'w-full items-center'}`}>
+                                                                {activeColIds.filter(id => !['qr', 'barcode', 'photo', 'sl'].includes(id)).map(colId => {
+                                                                    const isName = colId === 'student' || colId === 'name';
+                                                                    let displayValue: any = s.metadata?.[colId] || '-';
+                                                                    if (colId === 'student' || colId === 'name') displayValue = s.name;
+                                                                    else if (colId === 'className') displayValue = `শ্রেণি: ${classNameText}`;
+                                                                    else if (colId === 'rollNumber') displayValue = `রোল: ${s.metadata?.rollNumber || '-'}`;
+                                                                    else if (colId === 'contact') displayValue = `যোগাযোগ: ${s.phone || s.metadata?.phone || '-'}`;
+                                                                    else if (colId === 'studentId') displayValue = `আইডি: ${s.metadata?.studentId || s.id.substring(0, 6)}`;
+                                                                    else {
+                                                                        const colLabel = allAvailableCols.find(c => c.id === colId)?.label;
+                                                                        displayValue = `${colLabel}: ${displayValue}`;
+                                                                    }
+                                                                    
+                                                                    return (
+                                                                        <div key={colId} className={isName ? "font-bold text-[1.2em] text-slate-900 leading-tight mb-1" : "text-[0.9em] text-slate-600 font-medium"}>
+                                                                            {displayValue}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                                {activeColIds.filter(id => !['qr', 'barcode', 'photo', 'sl'].includes(id)).length === 0 && (
+                                                                    <div className="text-xs text-slate-400 italic">কোনো তথ্য নির্বাচিত নেই</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+
+                                    </PrintLayout>
+                                ) : (
+                                    groupedStudents.map((group, groupIdx) => (
+                                        <PrintLayout
+                                            key={group.classId}
+                                        title={payload.title || 'শিক্ষার্থী তালিকা'}
+                                        institute={payload.institute}
+                                        hideDate={true}
+                                        hideTitle={true}
+                                        previewOnly={false}
+                                        pagePadding={pagePadding}
+                                        hideHeader={viewMode === 'qr' || viewMode === 'barcode'}
+                                        hideSignature={viewMode === 'qr' || viewMode === 'barcode'}
                                     >
                                         {group.className && (
                                             <div className="text-center mb-3 mt-1">
@@ -1105,39 +1212,49 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                             <div 
                                                 className="grid gap-6 print-grid-container" 
                                                 style={{ 
-                                                    gridTemplateColumns: `repeat(auto-fill, minmax(calc(220px * var(--content-scale, 1)), 1fr))`,
+                                                    gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
                                                     fontSize: 'calc(var(--font-size, 14px) * var(--content-scale, 1))'
                                                 }}
                                             >
                                                 {group.students.map((s, idx) => {
                                                     const classNameText = `${classes.find((c: any) => c.id === s.metadata?.classId)?.name || '-'}${s.metadata?.groupId ? `- ${groups.find((g: any) => g.id === s.metadata?.groupId)?.name || ''}` : ''}`;
                                                     return (
-                                                        <div key={s.id} className="flex flex-col items-center justify-center p-6 border border-slate-300 rounded-xl bg-white" style={{ pageBreakInside: 'avoid' }}>
+                                                        <div key={s.id} className={`flex ${cardOrientation === 'horizontal' ? 'flex-row text-left gap-4' : 'flex-col text-center'} items-center justify-center p-6 border border-slate-300 rounded-xl bg-white`} style={{ pageBreakInside: 'avoid' }}>
                                                             {viewMode === 'barcode' ? (
-                                                                <>
-                                                                    <div className="flex flex-col items-center justify-center w-full mb-3">
-                                                                        <BarcodeSVG value={s.metadata?.studentId || s.id} width={160} height={50} />
-                                                                        <span className="text-[0.9em] font-bold mt-1 text-slate-800">{s.metadata?.studentId || s.id.substring(0, 6)}</span>
-                                                                    </div>
-                                                                    <div className="text-center w-full">
-                                                                        <div className="font-bold text-[1.2em] text-slate-900 leading-tight mb-1 truncate">{s.name}</div>
-                                                                        <div className="text-[0.9em] text-slate-600 font-medium">শ্রেণি- {classNameText}  Roll: {s.metadata?.rollNumber || '-'}</div>
-                                                                    </div>
-                                                                </>
+                                                                <div className={`flex flex-col items-center justify-center flex-shrink-0 ${cardOrientation === 'horizontal' ? 'w-auto' : 'w-full mb-3'}`}>
+                                                                    <BarcodeSVG value={s.metadata?.studentId || s.id} width={160 * codeScale} height={50 * codeScale} />
+                                                                    <span className="text-[0.9em] font-bold mt-1 text-slate-800" style={{ fontSize: `${codeScale}em` }}>{s.metadata?.studentId || s.id.substring(0, 6)}</span>
+                                                                </div>
                                                             ) : (
-                                                                <>
-                                                                    <div className="flex justify-center w-full mb-4">
-                                                                        <div style={{ transform: 'scale(1.5)', transformOrigin: 'top center', marginBottom: '30px' }}>
-                                                                            <MemoizedQRCodeSVG value={s.metadata?.studentId || s.id} />
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="text-center w-full">
-                                                                        <div className="font-bold text-[1.2em] text-slate-900 leading-tight mb-1 truncate">{s.name}</div>
-                                                                        <div className="text-[0.9em] text-slate-600 font-medium">শ্রেণি- {classNameText}</div>
-                                                                        <div className="text-[0.9em] text-slate-600 font-medium mt-0.5">Roll: {s.metadata?.rollNumber || '-'}</div>
-                                                                    </div>
-                                                                </>
+                                                                <div className={`flex justify-center flex-shrink-0 ${cardOrientation === 'horizontal' ? 'w-auto' : 'w-full mb-4'}`}>
+                                                                    <MemoizedQRCodeSVG value={s.metadata?.studentId || s.id} scale={codeScale} />
+                                                                </div>
                                                             )}
+                                                            
+                                                            <div className={`flex flex-col gap-1 ${cardOrientation === 'horizontal' ? 'flex-1 min-w-0 items-start' : 'w-full items-center'}`}>
+                                                                {activeColIds.filter(id => !['qr', 'barcode', 'photo', 'sl'].includes(id)).map(colId => {
+                                                                    const isName = colId === 'student' || colId === 'name';
+                                                                    let displayValue: any = s.metadata?.[colId] || '-';
+                                                                    if (colId === 'student' || colId === 'name') displayValue = s.name;
+                                                                    else if (colId === 'className') displayValue = `শ্রেণি: ${classNameText}`;
+                                                                    else if (colId === 'rollNumber') displayValue = `রোল: ${s.metadata?.rollNumber || '-'}`;
+                                                                    else if (colId === 'contact') displayValue = `যোগাযোগ: ${s.phone || s.metadata?.phone || '-'}`;
+                                                                    else if (colId === 'studentId') displayValue = `আইডি: ${s.metadata?.studentId || s.id.substring(0, 6)}`;
+                                                                    else {
+                                                                        const colLabel = allAvailableCols.find(c => c.id === colId)?.label;
+                                                                        displayValue = `${colLabel}: ${displayValue}`;
+                                                                    }
+                                                                    
+                                                                    return (
+                                                                        <div key={colId} className={isName ? "font-bold text-[1.2em] text-slate-900 leading-tight mb-1" : "text-[0.9em] text-slate-600 font-medium"}>
+                                                                            {displayValue}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                                {activeColIds.filter(id => !['qr', 'barcode', 'photo', 'sl'].includes(id)).length === 0 && (
+                                                                    <div className="text-xs text-slate-400 italic">কোনো তথ্য নির্বাচিত নেই</div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     )
                                                 })}
@@ -1145,7 +1262,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                         )}
 
                                     </PrintLayout>
-                                ))}
+                                    ))
+                                )}
                                 {groupedStudents.length === 0 && (
                                     <PrintLayout
                                         title={payload.title || 'শিক্ষার্থী তালিকা'}
@@ -1154,6 +1272,8 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                                         hideTitle={true}
                                         previewOnly={false}
                                         pagePadding={pagePadding}
+                                        hideHeader={viewMode === 'qr' || viewMode === 'barcode'}
+                                        hideSignature={viewMode === 'qr' || viewMode === 'barcode'}
                                     >
                                         <div className="text-center text-sm text-slate-400 py-10">কোনো শিক্ষার্থী নির্বাচিত নেই</div>
                                     </PrintLayout>
@@ -1223,7 +1343,7 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
                         {rightTab === 'layout' && (
                             <>
                                 {/* Column order — split selected / available */}
-                                <Section title="কলাম সাজান">
+                                <Section title={viewMode === 'list' ? "কলাম সাজান" : "প্রদর্শিত তথ্য"}>
                                     {/* Selected columns (draggable) */}
                                     {activeColIds.length > 0 && (
                                         <div className="mb-3">
@@ -1293,51 +1413,116 @@ export default function StudentPrintPreviewModal({ payload, onClose }: Props) {
 
 
 
-                                {/* Row density / column scale */}
-                                <Section title="কলামের আকার">
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="range" min={0.6} max={1.6} step={0.01}
-                                            defaultValue={columnScale}
-                                            ref={colScaleInputRef}
-                                            onPointerDown={() => disablePreviewTransitions()}
-                                            onInput={e => {
-                                                const v = parseFloat((e.target as HTMLInputElement).value);
-                                                columnScaleRef.current = v;
-                                                setCssVarRAF('--cell-ph', `${(12 * v) * (contentScaleRef.current || contentScale)}px`);
-                                                if (colScaleLabelRef.current) colScaleLabelRef.current.textContent = `${(v * 100).toFixed(1)}%`;
-                                            }}
-                                            onPointerUp={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
-                                            onMouseUp={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
-                                            onTouchEnd={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
-                                            onKeyUp={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
-                                            className="flex-1 accent-teal-600"
-                                        />
-                                        <span ref={colScaleLabelRef} className="text-xs font-bold text-slate-600 w-10 text-right">{(columnScale * 100).toFixed(1)}%</span>
-                                    </div>
-                                </Section>
+                                {viewMode === 'list' ? (
+                                    <>
+                                        {/* Row density / column scale */}
+                                        <Section title="কলামের আকার">
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range" min={0.6} max={1.6} step={0.01}
+                                                    defaultValue={columnScale}
+                                                    ref={colScaleInputRef}
+                                                    onPointerDown={() => disablePreviewTransitions()}
+                                                    onInput={e => {
+                                                        const v = parseFloat((e.target as HTMLInputElement).value);
+                                                        columnScaleRef.current = v;
+                                                        setCssVarRAF('--cell-ph', `${(12 * v) * (contentScaleRef.current || contentScale)}px`);
+                                                        if (colScaleLabelRef.current) colScaleLabelRef.current.textContent = `${(v * 100).toFixed(1)}%`;
+                                                    }}
+                                                    onPointerUp={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
+                                                    onMouseUp={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
+                                                    onTouchEnd={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
+                                                    onKeyUp={() => { const v = parseFloat(colScaleInputRef.current?.value || String(columnScaleRef.current)); setColumnScale(v); enablePreviewTransitions(); }}
+                                                    className="flex-1 accent-teal-600"
+                                                />
+                                                <span ref={colScaleLabelRef} className="text-xs font-bold text-slate-600 w-10 text-right">{(columnScale * 100).toFixed(1)}%</span>
+                                            </div>
+                                        </Section>
 
-                                {/* Row height */}
-                                <Section title="সারি উচ্চতা">
+                                        {/* Row height */}
+                                        <Section title="সারি উচ্চতা">
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range" min={2} max={40} step={0.1}
+                                                    defaultValue={rowPadding}
+                                                    ref={rowPaddingInputRef}
+                                                    onPointerDown={() => disablePreviewTransitions()}
+                                                    onInput={e => {
+                                                        const v = parseFloat((e.target as HTMLInputElement).value);
+                                                        rowPaddingRef.current = v;
+                                                        setCssVarRAF('--cell-pv', `${v * (contentScaleRef.current || contentScale)}px`);
+                                                        if (rowPaddingLabelRef.current) rowPaddingLabelRef.current.textContent = v % 1 === 0 ? `${v}px` : `${v.toFixed(1)}px`;
+                                                    }}
+                                                    onPointerUp={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
+                                                    onMouseUp={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
+                                                    onTouchEnd={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
+                                                    onKeyUp={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
+                                                    className="flex-1 accent-teal-600"
+                                                />
+                                                <span ref={rowPaddingLabelRef} className="text-xs font-bold text-slate-600 w-12 text-right">{rowPadding % 1 === 0 ? `${rowPadding}px` : `${rowPadding.toFixed(1)}px`}</span>
+                                            </div>
+                                        </Section>
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Code Scale */}
+                                        <Section title="কোডের আকার">
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range" min={0.5} max={2.5} step={0.1}
+                                                    defaultValue={codeScale}
+                                                    onInput={e => setCodeScale(parseFloat((e.target as HTMLInputElement).value))}
+                                                    className="flex-1 accent-teal-600"
+                                                />
+                                                <span className="text-xs font-bold text-slate-600 w-10 text-right">{codeScale.toFixed(1)}x</span>
+                                            </div>
+                                        </Section>
+                                        
+                                        {/* Card Style */}
+                                        <Section title="কার্ড স্টাইল">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {([['vertical', 'উল্লম্ব'], ['horizontal', 'অনুভূমিক']] as const).map(([val, label]) => (
+                                                    <button
+                                                        key={val}
+                                                        onClick={() => setCardOrientation(val)}
+                                                        className="py-2.5 rounded-xl text-xs font-bold border-2 transition-all"
+                                                        style={cardOrientation === val
+                                                            ? { background: '#4f46e5', color: '#fff', borderColor: '#4f46e5' }
+                                                            : { background: '#fff', color: '#64748b', borderColor: '#e2e8f0' }}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </Section>
+                                        
+                                        {/* Grid Columns */}
+                                        <Section title="প্রতি সারিতে কার্ড">
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range" min={1} max={8} step={1}
+                                                    defaultValue={gridColumns}
+                                                    onInput={e => setGridColumns(parseInt((e.target as HTMLInputElement).value))}
+                                                    className="flex-1 accent-teal-600"
+                                                />
+                                                <span className="text-xs font-bold text-slate-600 w-10 text-right">{gridColumns}</span>
+                                            </div>
+                                        </Section>
+                                    </>
+                                )}
+
+                                {/* Continuous Print */}
+                                <Section title="প্রিন্ট মোড">
                                     <div className="flex items-center gap-3">
-                                        <input
-                                            type="range" min={2} max={40} step={0.1}
-                                            defaultValue={rowPadding}
-                                            ref={rowPaddingInputRef}
-                                            onPointerDown={() => disablePreviewTransitions()}
-                                            onInput={e => {
-                                                const v = parseFloat((e.target as HTMLInputElement).value);
-                                                rowPaddingRef.current = v;
-                                                setCssVarRAF('--cell-pv', `${v * (contentScaleRef.current || contentScale)}px`);
-                                                if (rowPaddingLabelRef.current) rowPaddingLabelRef.current.textContent = v % 1 === 0 ? `${v}px` : `${v.toFixed(1)}px`;
-                                            }}
-                                            onPointerUp={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
-                                            onMouseUp={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
-                                            onTouchEnd={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
-                                            onKeyUp={() => { const v = parseFloat(rowPaddingInputRef.current?.value || String(rowPaddingRef.current)); setRowPadding(v); enablePreviewTransitions(); }}
-                                            className="flex-1 accent-teal-600"
-                                        />
-                                        <span ref={rowPaddingLabelRef} className="text-xs font-bold text-slate-600 w-12 text-right">{rowPadding % 1 === 0 ? `${rowPadding}px` : `${rowPadding.toFixed(1)}px`}</span>
+                                        <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={continuousPrint} 
+                                                onChange={(e) => setContinuousPrint(e.target.checked)}
+                                                className="w-4 h-4 accent-indigo-600 rounded border-slate-300"
+                                            />
+                                            একসাথে সব ক্লাস (পেইজ ব্রেক ছাড়া)
+                                        </label>
                                     </div>
                                 </Section>
 
