@@ -50,7 +50,8 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
         studentWaivers: initialData?.config?.studentWaivers || {},
         thresholdDays: initialData?.config?.thresholdDays || 0,
         isExcludedFromSummary: initialData?.config?.isExcludedFromSummary || false,
-        isOptional: initialData?.config?.isOptional || false
+        isOptional: initialData?.config?.isOptional || false,
+        residentialStatus: initialData?.config?.residentialStatus || 'all'
     });
 
     const [targetCycles, setTargetCycles] = useState(1);
