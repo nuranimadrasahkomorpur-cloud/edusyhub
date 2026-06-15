@@ -1289,7 +1289,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 {/* SL / Roll */}
                                                 <td className={`sticky left-0 z-10 px-1.5 py-1.5 font-black text-slate-400 text-center border-r border-slate-100 ${
                                                     idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
-                                                }`}>{student.assignedRoll}</td>
+                                                }`}>{student.metadata?.rollNumber || student.assignedRoll}</td>
                                                 {/* Name & ID */}
                                                 <td className={`sticky left-8 z-10 px-2 py-1.5 font-bold text-slate-700 border-r border-slate-100 ${
                                                     idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
@@ -1526,7 +1526,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[10px] font-black text-slate-400 opacity-60">#{student.assignedRoll}</span>
+                                                        <span className="text-[10px] font-black text-slate-400 opacity-60">রোল: {student.metadata?.rollNumber || student.assignedRoll} | আইডি: {student.metadata?.studentId || 'N/A'}</span>
                                                         {classId === '' && student.className && (
                                                             <span className="text-[10px] font-black text-[#045c84] uppercase truncate opacity-50">
                                                                 {student.className}
@@ -1540,14 +1540,12 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight">{attendanceTime}</span>
                                                             </div>
                                                         )}
-                                                        {student.stats && (
-                                                            <span className={`w-fit whitespace-nowrap text-[9px] font-black px-1.5 py-0.5 rounded-md leading-tight ${
-                                                                student.stats.percentage >= 80 ? 'bg-emerald-50 text-emerald-600' :
-                                                                student.stats.percentage >= 50 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-500'
-                                                            }`}>
-                                                                {student.stats.presentDays}/{student.stats.totalSchoolDays || student.stats.totalDays} দিন
-                                                            </span>
-                                                        )}
+                                                        <span className={`w-fit whitespace-nowrap text-[9px] font-black px-1.5 py-0.5 rounded-md leading-tight ${
+                                                            activeClassDays > 0 && (student.presentCount / activeClassDays) >= 0.8 ? 'bg-emerald-50 text-emerald-600' :
+                                                            activeClassDays > 0 && (student.presentCount / activeClassDays) >= 0.5 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-500'
+                                                        }`}>
+                                                            {student.presentCount}/{activeClassDays} দিন
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1576,13 +1574,13 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 ) : (
                                                     <button
                                                         onClick={() => updateStatus(student.id, getStatusConfig(status).next as any)}
-                                                        disabled={isReadOnlyAttendance || (!isAdmin && status === 'LEAVE_PENDING' && student.initialAttendance === 'LEAVE_PENDING')}
+                                                        disabled={isReadOnlyAttendance}
                                                         className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
                                                             isReadOnlyAttendance ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''
                                                         } ${status === 'PRESENT' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/10 ring-4 ring-emerald-500/5' :
                                                             status === 'ABSENT' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/10 ring-4 ring-rose-500/5' :
                                                                 status === 'LEAVE' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/10 ring-4 blue-500/5' :
-                                                                    status === 'LEAVE_PENDING' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/10 ring-4 ring-amber-500/5 cursor-wait' :
+                                                                    status === 'LEAVE_PENDING' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/10 ring-4 ring-amber-500/5' :
                                                                         'bg-slate-50 text-slate-400 border border-slate-200 shadow-inner hover:bg-slate-100 flex items-center justify-center'
                                                             }`}
                                                     >
