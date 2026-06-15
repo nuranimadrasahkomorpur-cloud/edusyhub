@@ -286,6 +286,12 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         }
     }, [classId, selectedDate, activeInstitute?.id]);
 
+    useEffect(() => {
+        if (classId !== undefined && activeInstitute?.id) {
+            fetchRegisterData();
+        }
+    }, [classId, monthStr, activeInstitute?.id]);
+
     const fetchStudents = async () => {
         if (!activeInstitute?.id) return;
 
