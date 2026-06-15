@@ -17,6 +17,9 @@ interface FeeCollectModalProps {
         studentPhoto?: string | null;
 
         items: any[];
+        upcomingFees?: any[];
+        historyTxns?: any[];
+        advanceBalance?: number;
         totalAmount: number;
         scannedAt?: string; // ISO timestamp when QR code was scanned
         scannedId?: string; // The actual scanned QR/barcode value
@@ -74,6 +77,19 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     useEffect(() => {
         if (!student || !activeInstitute?.id) return;
         
+        // If items are preloaded, use them
+        if (student.items && student.items.length > 0) {
+            setPendingFees(student.items);
+            const allIds = new Set<string>(student.items.map((f: any) => f.id).filter(Boolean));
+            setSelectedFeeIds(allIds);
+            const baseNames = new Set<string>(student.items.map((f: any) => f.category?.replace(/\s*\(.*?\)\s*/g, '').trim()).filter(Boolean));
+            setExpandedGroups(baseNames);
+            setUpcomingFees(student.upcomingFees || []);
+            setAdvanceBalance(student.advanceBalance || 0);
+            setLoadingData(false);
+            return;
+        }
+
         setLoadingData(true);
         fetch(`/api/admin/accounts/collect-fee?studentId=${student.studentId}&instituteId=${activeInstitute.id}`)
             .then(r => r.json())
@@ -110,6 +126,13 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     // Fetch history in the background when modal opens
     useEffect(() => {
         if (!student || !activeInstitute?.id) return;
+        
+        if (student.historyTxns && student.historyTxns.length > 0) {
+            setHistoryTxns(student.historyTxns);
+            setLoadingHistory(false);
+            return;
+        }
+
         setLoadingHistory(true);
         fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&studentId=${student.studentId}`)
             .then(r => r.json())

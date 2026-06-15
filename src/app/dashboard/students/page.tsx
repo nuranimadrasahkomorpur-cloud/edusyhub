@@ -708,6 +708,7 @@ export default function StudentManagementPage() {
     const [isSearchingStudent, setIsSearchingStudent] = useState(false);
     const [selectedTransactionForPrint, setSelectedTransactionForPrint] = useState<any>(null);
     const [feesData, setFeesData] = useState<{ [studentId: string]: { totalPaid: number, totalDue: number, advance: number } } | null>(null);
+    const [detailedFeesData, setDetailedFeesData] = useState<any>(null);
     const [loadingFees, setLoadingFees] = useState(false);
     const [tableColumns, setTableColumns] = useState<Record<string, boolean>>(() => {
         const defaults = {
@@ -832,6 +833,16 @@ export default function StudentManagementPage() {
             .finally(() => setLoadingFees(false));
     };
 
+    const fetchAllFeesDetails = () => {
+        if (!activeInstitute?.id) return;
+        fetch(`/api/admin/accounts/all-fees-details?instituteId=${activeInstitute.id}`)
+            .then(res => res.json())
+            .then(data => {
+                setDetailedFeesData(data);
+            })
+            .catch(err => console.error("Error fetching detailed fees data:", err));
+    };
+
     useEffect(() => {
         if (viewMode === 'FEES_COLLECT' && !feesData && activeInstitute?.id) {
             const syncKey = `sync_${activeInstitute.id}`;
@@ -843,29 +854,47 @@ export default function StudentManagementPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ instituteId: activeInstitute.id })
                 })
-                .then(() => fetchFeesData())
+                .then(() => {
+                    fetchFeesData();
+                    fetchAllFeesDetails();
+                })
                 .catch(err => {
                     console.error('Failed to sync dues:', err);
                     sessionStorage.removeItem(syncKey);
                     fetchFeesData();
+                    fetchAllFeesDetails();
                 });
             } else {
                 fetchFeesData();
+                fetchAllFeesDetails();
             }
         }
     }, [viewMode, activeInstitute?.id, feesData]);
 
     const handleOpenFeeCollect = async (student: any, isFromScanner = false) => {
+        const sid = student.id || student.studentId;
+        
+        let cachedItems = [];
+        let cachedHistory = [];
+        let cachedAdvance = 0;
+        
+        if (detailedFeesData) {
+            cachedItems = detailedFeesData.pendingFeesMap?.[sid] || [];
+            cachedHistory = detailedFeesData.historyMap?.[sid] || [];
+            cachedAdvance = detailedFeesData.advanceMap?.[sid] || 0;
+        }
+
         // Open modal instantly and let FeeCollectModal handle its own fetching
         setSelectedStudentForFee({
-            studentId: student.id || student.studentId,
+            studentId: sid,
             studentName: student.name || student.studentName || '',
             studentUniqueId: student.metadata?.studentId || student.studentUniqueId || student.id,
             studentPhoto: student.metadata?.studentPhoto || student.metadata?.photo || student.studentPhoto || null,
-            items: [],
+            items: cachedItems,
+            historyTxns: cachedHistory,
             totalAmount: 0,
-            advanceBalance: 0,
-            upcomingFees: []
+            advanceBalance: cachedAdvance,
+            upcomingFees: [] // We don't cache upcoming fees yet to keep payload small, let it fetch if needed
         });
         setIsFeeModalOpen(true);
         if (isFromScanner) {
