@@ -43,7 +43,8 @@ export interface FieldDefinition {
 
 export const POSSIBLE_FIELDS: FieldDefinition[] = [
     // Core (New defaults)
-    { id: 'name', label: 'শিক্ষার্থীর নাম', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'পুরো নাম', required: true },
+    { id: 'name', label: 'শিক্ষার্থীর নাম (বাংলা)', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'পুরো নাম (বাংলায়)', required: true },
+    { id: 'nameEnglish', label: 'শিক্ষার্থীর নাম (English)', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'Full Name in English' },
     { id: 'email', label: 'ইমেইল (লগইন আইডি)', type: 'text', category: 'মৌলিক তথ্য', icon: Mail, placeholder: 'পুরো ইমেইল অ্যাড্রেস দিন', required: true },
     { id: 'password', label: 'পাসওয়ার্ড', type: 'text', category: 'মৌলিক তথ্য', icon: Fingerprint, placeholder: 'লগইন পাসওয়ার্ড (ফাঁকা রাখলে স্টুডেন্ট আইডি ব্যবহার হবে)' },
     { id: 'studentPhone', label: 'শিক্ষার্থীর মোবাইল (লগইন আইডি)', type: 'text', category: 'মৌলিক তথ্য', icon: Smartphone, placeholder: 'লগইন আইডি হিসেবে ব্যবহার হবে' },
@@ -59,13 +60,19 @@ export const POSSIBLE_FIELDS: FieldDefinition[] = [
     { id: 'hobby', label: 'শখ', type: 'text', category: 'মৌলিক তথ্য', icon: HeartPulse, placeholder: 'যেমন: বই পড়া, বাগান করা' },
 
     // Identity
+    { id: 'dob', label: 'জন্ম তারিখ', type: 'date', category: 'পরিচয়', icon: Calendar, required: true },
     { id: 'birthRegNo', label: 'জন্ম নিবন্ধন নম্বর', type: 'text', category: 'পরিচয়', icon: Fingerprint, placeholder: '১৭ ডিজিটের নম্বর' },
     { id: 'nationality', label: 'জাতীয়তা', type: 'text', category: 'পরিচয়', icon: Globe, placeholder: 'যেমন: বাংলাদেশী' },
     { id: 'version', label: 'ভার্সন', type: 'select', category: 'পরিচয়', options: ['বাংলা ভার্সন', 'ইংলিশ ভার্সন'], icon: BookOpen },
     { id: 'nid', label: 'এনআইডি নম্বর (প্রযোজ্য ক্ষেত্রে)', type: 'text', category: 'পরিচয়', icon: Fingerprint, placeholder: 'জাতীয় পরিচয়পত্র নম্বর' },
+    { id: 'orphan', label: 'এতিম', type: 'select', category: 'পরিচয়', options: ['না', 'হ্যাঁ'], icon: UsersIcon },
 
     // Contact
     { id: 'emergencyContact', label: 'জরুরী যোগাযোগ', type: 'text', category: 'যোগাযোগ', icon: Smartphone, placeholder: '০১৩********' },
+    { id: 'village', label: 'গ্রাম/মহল্লা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রামের নাম' },
+    { id: 'postOffice', label: 'ডাকঘর', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'ডাকঘরের নাম' },
+    { id: 'thana', label: 'থানা/উপজেলা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'থানার নাম' },
+    { id: 'district', label: 'জেলা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'জেলার নাম' },
     { id: 'presentAddress', label: 'বর্তমান ঠিকানা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রাম, ডাকঘর, থানা, জেলা' },
     { id: 'permanentAddress', label: 'স্থায়ী ঠিকানা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রাম, ডাকঘর, থানা, জেলা' },
 
@@ -77,6 +84,10 @@ export const POSSIBLE_FIELDS: FieldDefinition[] = [
     { id: 'guardianOccupation', label: 'অভিভাবকের পেশা', type: 'text', category: 'অভিভাবক তথ্য', icon: Briefcase, placeholder: 'যেমন: শিক্ষক, ব্যবসায়ী' },
     { id: 'yearlyIncome', label: 'বার্ষিক আয়', type: 'number', category: 'অভিভাবক তথ্য', icon: DollarSign, placeholder: 'টাকায় পরিমাণ' },
     { id: 'guardianNid', label: 'অভিভাবকের এনআইডি', type: 'text', category: 'অভিভাবক তথ্য', icon: Fingerprint, placeholder: 'এনআইডি নম্বর' },
+    { id: 'guardian2', label: 'অভিভাবক ২', type: 'text', category: 'অভিভাবক তথ্য', icon: UsersIcon, placeholder: 'দ্বিতীয় অভিভাবকের নাম' },
+    { id: 'guardian2Phone', label: 'মোবাইল (অভিভাবক ২)', type: 'text', category: 'অভিভাবক তথ্য', icon: Smartphone, placeholder: 'মোবাইল নম্বর' },
+    { id: 'guardian3', label: 'অভিভাবক ৩', type: 'text', category: 'অভিভাবক তথ্য', icon: UsersIcon, placeholder: 'তৃতীয় অভিভাবকের নাম' },
+    { id: 'guardian3Phone', label: 'মোবাইল (অভিভাবক ৩)', type: 'text', category: 'অভিভাবক তথ্য', icon: Smartphone, placeholder: 'মোবাইল নম্বর' },
 
     // Academic
     { id: 'classId', label: 'শ্রেণী', type: 'class-lookup', category: 'একাডেমিক', icon: BookOpen },
@@ -87,6 +98,9 @@ export const POSSIBLE_FIELDS: FieldDefinition[] = [
     { id: 'admissionDate', label: 'ভর্তির তারিখ', type: 'date', category: 'একাডেমিক', icon: Calendar },
     { id: 'shift', label: 'শিফট', type: 'select', category: 'একাডেমিক', options: ['প্রভাতি', 'দিবা'], icon: History },
     { id: 'previousGpa', label: 'পূর্ববর্তী জিপিএ', type: 'number', category: 'একাডেমিক', icon: Award, placeholder: '৫.০০ এর মধ্যে' },
+    { id: 'admissionType', label: 'ভর্তির ধরন', type: 'select', category: 'একাডেমিক', options: ['নতুন ভর্তি', 'পুরাতন ভর্তি'], icon: UsersIcon },
+    { id: 'result', label: 'রেজাল্ট', type: 'text', category: 'একাডেমিক', icon: Award, placeholder: 'যেমন: মুমতাজ/এ+' },
+    { id: 'previousClass', label: 'পূর্ববর্তী ক্লাস', type: 'text', category: 'একাডেমিক', icon: BookOpen, placeholder: 'যেমন: হিফজ/অষ্টম' },
 
     // Documents
     { id: 'studentPhoto', label: 'শিক্ষার্থীর ছবি', type: 'attachment', category: 'নথিপত্র', icon: FileUp },

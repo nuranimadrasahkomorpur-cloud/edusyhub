@@ -322,20 +322,19 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
         setLoading(true);
         try {
-            // Fetch students, attendance, and stats in parallel
+            // Fetch students and attendance in parallel (skip heavy stats for fast initial load)
             const fetchClassId = classId || 'all';
-            const [studentsRes, attendanceRes, statsRes] = await Promise.all([
-                fetch(`/api/admin/users?role=STUDENT&classId=${fetchClassId}&instituteId=${activeInstitute?.id}`),
-                fetch(`/api/attendance/list?instituteId=${activeInstitute?.id}&date=${selectedDate}&classId=${fetchClassId}`),
-                fetch(`/api/attendance/stats?instituteId=${activeInstitute?.id}&classId=${fetchClassId}`)
+            const [studentsRes, attendanceRes] = await Promise.all([
+                fetch(`/api/admin/users?role=STUDENT&classId=${fetchClassId}&instituteId=${activeInstitute?.id}&lightweight=true`),
+                fetch(`/api/attendance/list?instituteId=${activeInstitute?.id}&date=${selectedDate}&classId=${fetchClassId}`)
             ]);
 
             if (studentsRes.ok) {
                 const studentsData = await studentsRes.json();
                 const attendanceData = attendanceRes.ok ? await attendanceRes.json() : [];
-                const statsData = statsRes.ok ? await statsRes.json() : [];
+                const statsData: any[] = []; // Skipped for performance
 
-                const statsMap = new Map(statsData.map((s: any) => [s.studentId, s]));
+                const statsMap = new Map();
 
                 const normalizeId = (id: any) => {
                     if (!id) return null;
@@ -1448,13 +1447,23 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="relative shrink-0">
                                                 <div
-                                                    className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center overflow-hidden border border-slate-100 italic font-black text-slate-400 text-[10px] shadow-inner cursor-pointer"
+                                                    className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-inner cursor-pointer relative"
+                                                    style={{ 
+                                                        backgroundColor: `hsl(${(student.name.charCodeAt(0) * 15) % 360}, 60%, 90%)`, 
+                                                        color: `hsl(${(student.name.charCodeAt(0) * 15) % 360}, 70%, 40%)` 
+                                                    }}
                                                     onClick={() => setSelectedStudentForModal(student)}
                                                 >
-                                                    {optimizedPhoto ? (
-                                                        <img src={optimizedPhoto} alt={student.name} loading="lazy" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <Users size={20} />
+                                                    <span className="text-xl font-black opacity-80">{student.name.charAt(0)}</span>
+                                                    {optimizedPhoto && (
+                                                        <img 
+                                                            src={optimizedPhoto} 
+                                                            alt={student.name} 
+                                                            loading="lazy" 
+                                                            className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300" 
+                                                            onLoad={(e) => { e.currentTarget.style.opacity = '1'; }}
+                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                        />
                                                     )}
                                                 </div>
                                             </div>

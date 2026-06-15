@@ -473,7 +473,10 @@ export async function GET(req: Request) {
             if (f.categoryId) {
                 return activeCategories.some((c: any) => c.id === f.categoryId);
             } else {
-                const hasArchived = categories.some((c: any) => c.name === f.category && c.config?.isArchived === true);
+                const baseCatName = f.category ? f.category.replace(/\s*\(.*?\)\s*/g, '').trim() : '';
+                const hasArchived = categories.some((c: any) => 
+                    (c.name === f.category || c.name === baseCatName) && c.config?.isArchived === true
+                );
                 return !hasArchived;
             }
         });
@@ -528,6 +531,7 @@ export async function GET(req: Request) {
 
                 for (const category of categories) {
                     const config = category.config || {};
+                    if (config.isArchived === true) continue;
                     if (config.frequencyType !== 'fixed' || !config.startDate) continue;
                     
                     const selectedClasses = config.selectedClasses || [];

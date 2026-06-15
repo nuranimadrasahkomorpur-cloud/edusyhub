@@ -171,7 +171,7 @@ export async function POST(req: Request) {
                         finalAmount = customAmt;
                     }
 
-                    if (finalAmount > 0) {
+                    if (finalAmount > 0 && !rest.isOptional) {
                         const datesToGenerate: Date[] = [];
                         
                         if (rest.frequencyType === 'fixed' && ['monthly', 'weekly', 'yearly', 'semester'].includes(rest.interval) && rest.startDate) {

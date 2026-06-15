@@ -7,6 +7,7 @@ import { useSession } from '@/components/SessionProvider';
 import { usePathname } from 'next/navigation';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { AnimatePresence, motion } from 'framer-motion';
+import { COUNTRIES, parsePhoneNumber, getCountryByDialCode } from '@/utils/countries';
 
 import {
     Users,
@@ -74,8 +75,20 @@ import SubjectGradingModal from '@/components/SubjectGradingModal';
 import FeeCollectModal from '@/components/FeeCollectModal';
 import PrintReceiptModal from '@/components/PrintReceiptModal';
 import StudentPrintPreviewModal from '@/components/StudentPrintPreviewModal';
+import PrintAdmissionModal from '@/components/PrintAdmissionModal';
 import { useUI } from '@/components/UIProvider';
 import { getCleanId } from '@/utils/digit-utils';
+
+const getThumbnailUrl = (url: string | undefined | null) => {
+    if (!url) return '';
+    if (url.includes('res.cloudinary.com')) {
+        const parts = url.split('/upload/');
+        if (parts.length === 2) {
+            return `${parts[0]}/upload/w_150,h_150,c_fill,q_auto,f_auto/${parts[1]}`;
+        }
+    }
+    return url;
+};
 
 const EditableCell = ({ value, type, onSave, onClose, options }: { value: any, type: string, onSave: (val: any) => void, onClose?: () => void, options?: { id: string, name: string }[] }) => {
     const [tempValue, setTempValue] = useState(value || '');
@@ -277,12 +290,19 @@ export default function StudentManagementPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [admissionType, setAdmissionType] = useState<'new' | 'old'>('new');
+    const [oldStudentSearchQuery, setOldStudentSearchQuery] = useState('');
     const [isAddTeacherModalOpen, setIsAddTeacherModalOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [openedViaScanner, setOpenedViaScanner] = useState(false);
     const [showScanButton, setShowScanButton] = useState(true);
     const scanLastScrollY = useRef(0);
+    const activeFetchSession = useRef<number>(0);
+
+
+
+
 
     useEffect(() => {
         const handleScroll = () => {
@@ -330,6 +350,10 @@ export default function StudentManagementPage() {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const canDrag = useRef(false);
     const [classSearch, setClassSearch] = useState('');
+    const [activeFormTab, setActiveFormTab] = useState<'student' | 'guardian' | 'academic' | 'fees' | 'documents'>('student');
+    const [residentialStatus, setResidentialStatus] = useState<'all' | 'abasik' | 'onabasik'>('onabasik');
+    const [applicableCategories, setApplicableCategories] = useState<any[]>([]);
+    const [admissionFees, setAdmissionFees] = useState<{ [categoryId: string]: { selected: boolean, baseAmount: number, waiver: number, paid: number, applyWaiverForFuture?: boolean } }>({});
     const [formData, setFormData] = useState<any>({
         name: '',
         email: '',
@@ -406,6 +430,15 @@ export default function StudentManagementPage() {
         const walkY = (y - startY.current) * 1.5;
         tableContainerRef.current.scrollLeft = scrollLeft.current - walkX;
         tableContainerRef.current.scrollTop = scrollTop.current - walkY;
+    };
+
+    const handleTableScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.target as HTMLDivElement;
+        if (target.scrollHeight - target.scrollTop - target.clientHeight < 100) {
+            if (hasMore && !isLoadingMore && !loading) {
+                fetchStudents(currentPage + 1);
+            }
+        }
     };
 
     const handleDirectImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -528,6 +561,80 @@ export default function StudentManagementPage() {
         }
     }, [formData.metadata?.classId, formData.metadata?.groupId, isAddModalOpen, activeInstitute?.id]);
 
+    // Fetch applicable admission fees when class/group/residentialStatus changes
+    useEffect(() => {
+        if (!isAddModalOpen || !activeInstitute?.id || !formData.metadata?.classId) {
+            setApplicableCategories([]);
+            return;
+        }
+
+        const fetchCategories = async () => {
+            try {
+                const res = await fetch(`/api/admin/accounts/categories?instituteId=${activeInstitute.id}&provider=students`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const filtered = data.filter((cat: any) => {
+                        if (cat.type !== 'INCOME') return false;
+                        if (cat.isArchived) return false;
+                        
+                        const config = cat.config || {};
+                        
+                        // Check Residential Status Match
+                        if (config.residentialStatus && config.residentialStatus !== 'all') {
+                            if (config.residentialStatus !== residentialStatus) return false;
+                        }
+
+                        // Check class match
+                        if (config.studentAmountType === 'per-class' || config.studentAmountType === 'per-group') {
+                            const cAmts = config.studentClassAmounts || {};
+                            if (!cAmts[formData.metadata.classId]) return false; // Doesn't apply to this class
+                        }
+
+                        return true;
+                    });
+                    
+                    setApplicableCategories(filtered);
+                    
+                    // Pre-fill admissionFees state with default amounts
+                    const newFeesConfig: any = {};
+                    filtered.forEach((cat: any) => {
+                        const config = cat.config || {};
+                        let baseAmount = cat.amount || 0;
+                        if (config.studentAmountType === 'per-class' && config.studentClassAmounts) {
+                            baseAmount = config.studentClassAmounts[formData.metadata.classId] || baseAmount;
+                        } else if (config.studentAmountType === 'per-group' && config.studentGroupAmounts && formData.metadata.groupId) {
+                            baseAmount = config.studentGroupAmounts[`${formData.metadata.classId}-${formData.metadata.groupId}`] || config.studentClassAmounts?.[formData.metadata.classId] || baseAmount;
+                        }
+                        
+                        newFeesConfig[cat.id] = {
+                            selected: false,
+                            baseAmount: baseAmount,
+                            waiver: 0,
+                            paid: 0
+                        };
+                    });
+                    
+                    // Keep previously entered values if they exist
+                    setAdmissionFees(prev => {
+                        const merged = { ...newFeesConfig };
+                        Object.keys(prev).forEach(key => {
+                            if (merged[key]) {
+                                merged[key].selected = prev[key].selected;
+                                merged[key].waiver = prev[key].waiver;
+                                merged[key].paid = prev[key].paid;
+                            }
+                        });
+                        return merged;
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch categories", error);
+            }
+        };
+
+        fetchCategories();
+    }, [formData.metadata?.classId, formData.metadata?.groupId, residentialStatus, isAddModalOpen, activeInstitute?.id]);
+
     const [formConfig, setFormConfig] = useState<FieldDefinition[]>([]);
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
@@ -539,7 +646,6 @@ export default function StudentManagementPage() {
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [activeTab, setActiveTab] = useState<'students' | 'applications' | 'books' | 'teachers'>('students');
-    const [activeFormTab, setActiveFormTab] = useState<'student' | 'guardian' | 'academic' | 'fees' | 'documents'>('student');
 
     const [teachers, setTeachers] = useState<any[]>([]);
     const [permissionModalData, setPermissionModalData] = useState<any>(null);
@@ -575,6 +681,13 @@ export default function StudentManagementPage() {
     const [credentialsData, setCredentialsData] = useState<any>(null);
     const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
     const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+    // Print Admission Modal
+    const [isPrintAdmissionModalOpen, setIsPrintAdmissionModalOpen] = useState(false);
+    const [studentToPrint, setStudentToPrint] = useState<any>(null);
+
     const [viewMode, setViewMode] = useState<'DEFAULT' | 'FEES_COLLECT' | 'ADMISSION'>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('students_viewMode') as any) || 'DEFAULT';
@@ -587,7 +700,8 @@ export default function StudentManagementPage() {
         }
         return 'DEFAULT';
     });
-    const [visibleCount, setVisibleCount] = useState(50);
+
+
     const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
     const [selectedStudentForFee, setSelectedStudentForFee] = useState<any>(null);
     const [showScanner, setShowScanner] = useState(false);
@@ -655,6 +769,8 @@ export default function StudentManagementPage() {
     const [showPrintModal, setShowPrintModal] = useState(false);
     const [printPreviewPayload, setPrintPreviewPayload] = useState<any | null>(null);
 
+
+
     // Load custom columns from DB
     useEffect(() => {
         if (!activeInstitute?.id) return;
@@ -707,33 +823,10 @@ export default function StudentManagementPage() {
     const fetchFeesData = () => {
         if (!activeInstitute?.id) return;
         setLoadingFees(true);
-        fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&_cb=${Date.now()}`, { cache: 'no-store' })
+        fetch(`/api/admin/accounts/dues-summary?instituteId=${activeInstitute.id}`)
             .then(res => res.json())
             .then(data => {
-                const txns = data.transactions || [];
-                const feesMap: { [studentId: string]: { totalPaid: number, totalDue: number, advance: number } } = {};
-                
-                txns.forEach((t: any) => {
-                    if (!t.studentId) return;
-                    const sId = t.studentId;
-                    if (!feesMap[sId]) {
-                        feesMap[sId] = { totalPaid: 0, totalDue: 0, advance: 0 };
-                    }
-                    
-                    if (t.type === 'INCOME') {
-                        if (t.status === 'COMPLETED') {
-                            if (t.category && t.category.startsWith('__ADVANCE__')) {
-                                feesMap[sId].advance += t.amount;
-                            } else if (!t.isExcludedFromSummary) {
-                                feesMap[sId].totalPaid += t.amount;
-                            }
-                        } else if (t.status === 'PENDING' && !t.isExcludedFromSummary && !t.isArchived) {
-                            feesMap[sId].totalDue += t.amount;
-                        }
-                    }
-                });
-                
-                setFeesData(feesMap);
+                setFeesData(data);
             })
             .catch(err => console.error("Error fetching fees data:", err))
             .finally(() => setLoadingFees(false));
@@ -744,6 +837,7 @@ export default function StudentManagementPage() {
             const syncKey = `sync_${activeInstitute.id}`;
             if (!sessionStorage.getItem(syncKey)) {
                 sessionStorage.setItem(syncKey, 'true');
+                setLoadingFees(true);
                 fetch('/api/admin/accounts/sync-dues', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -759,49 +853,24 @@ export default function StudentManagementPage() {
                 fetchFeesData();
             }
         }
-    }, [viewMode, activeInstitute?.id]);
+    }, [viewMode, activeInstitute?.id, feesData]);
 
     const handleOpenFeeCollect = async (student: any, isFromScanner = false) => {
-        setIsSearchingStudent(true);
-        try {
-            const feeRes = await fetch(`/api/admin/accounts/collect-fee?studentId=${student.id || student.studentId}&instituteId=${activeInstitute?.id || ''}`);
-            const feeData = await feeRes.json();
-            const items = feeData?.pendingFees || feeData?.items || [];
-            
-            setSelectedStudentForFee({
-                studentId: student.id || student.studentId,
-                studentName: student.name || student.studentName || '',
-                studentUniqueId: student.metadata?.studentId || student.studentUniqueId || student.id,
-                studentPhoto: student.metadata?.studentPhoto || student.metadata?.photo || student.studentPhoto || null,
-                items: items,
-                totalAmount: items.reduce((sum: number, f: any) => sum + Math.max(0, f?.amount || 0), 0),
-                advanceBalance: feeData?.advanceBalance || 0,
-                upcomingFees: feeData?.upcomingFees || []
-            });
-            setIsFeeModalOpen(true);
-            if (isFromScanner) {
-                setOpenedViaScanner(true);
-                setShowScanner(false);
-            }
-        } catch (error) {
-            console.error("Failed to load fees", error);
-            setSelectedStudentForFee({
-                studentId: student.id || student.studentId,
-                studentName: student.name || student.studentName || '',
-                studentUniqueId: student.metadata?.studentId || student.studentUniqueId || student.id,
-                studentPhoto: student.metadata?.studentPhoto || student.metadata?.photo || student.studentPhoto || null,
-                items: [],
-                totalAmount: 0,
-                advanceBalance: 0,
-                upcomingFees: []
-            });
-            setIsFeeModalOpen(true);
-            if (isFromScanner) {
-                setOpenedViaScanner(true);
-                setShowScanner(false);
-            }
-        } finally {
-            setIsSearchingStudent(false);
+        // Open modal instantly and let FeeCollectModal handle its own fetching
+        setSelectedStudentForFee({
+            studentId: student.id || student.studentId,
+            studentName: student.name || student.studentName || '',
+            studentUniqueId: student.metadata?.studentId || student.studentUniqueId || student.id,
+            studentPhoto: student.metadata?.studentPhoto || student.metadata?.photo || student.studentPhoto || null,
+            items: [],
+            totalAmount: 0,
+            advanceBalance: 0,
+            upcomingFees: []
+        });
+        setIsFeeModalOpen(true);
+        if (isFromScanner) {
+            setOpenedViaScanner(true);
+            setShowScanner(false);
         }
     };
 
@@ -813,7 +882,14 @@ export default function StudentManagementPage() {
             // Try local list first
             const local = students.find(s => String(s.metadata?.studentId || s.id) === cleanedValue);
             if (local) {
-                await handleOpenFeeCollect(local, true);
+                if (viewMode === 'FEES_COLLECT') {
+                    await handleOpenFeeCollect(local, true);
+                } else {
+                    setSelectedStudent(local);
+                    setIsProfileModalOpen(true);
+                    setOpenedViaScanner(true);
+                    setShowScanner(false);
+                }
                 return;
             }
 
@@ -827,7 +903,14 @@ export default function StudentManagementPage() {
                 const data = await res.json();
                 const s = Array.isArray(data) ? data[0] : data;
                 if (s) {
-                    await handleOpenFeeCollect(s, true);
+                    if (viewMode === 'FEES_COLLECT') {
+                        await handleOpenFeeCollect(s, true);
+                    } else {
+                        setSelectedStudent(s);
+                        setIsProfileModalOpen(true);
+                        setOpenedViaScanner(true);
+                        setShowScanner(false);
+                    }
                     return;
                 }
             }
@@ -850,8 +933,27 @@ export default function StudentManagementPage() {
                 return;
             }
             if (detail.studentId) {
-                // Delegate to scanner handler
-                handleScanResult(String(detail.studentId));
+                const local = students.find(s => String(s.metadata?.studentId || s.id) === String(detail.studentId));
+                if (local) {
+                    await handleOpenFeeCollect(local, false);
+                } else {
+                    // If not found locally, fetch from server
+                    try {
+                        const res = await fetch(`/api/admin/users?instituteId=${activeInstitute?.id}&search=${encodeURIComponent(String(detail.studentId))}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const s = Array.isArray(data) ? data[0] : data;
+                            if (s) {
+                                await handleOpenFeeCollect(s, false);
+                            } else {
+                                await alert(`শিক্ষার্থী নম্বর: ${detail.studentId} পাওয়া যায়নি`);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error searching student:', error);
+                        await alert('ছাত্র খুঁজতে একটি ত্রুটি হয়েছে।');
+                    }
+                }
             }
         };
         window.addEventListener('openFeeCollection', handler as EventListener);
@@ -1037,23 +1139,12 @@ export default function StudentManagementPage() {
     const fetchPendingCount = async () => {
         if (!activeInstitute?.id) return;
         try {
-            const res = await fetch(`/api/admin/users?role=STUDENT&instituteId=${activeInstitute.id}&admissionStatus=PENDING`);
+            const res = await fetch(`/api/admin/users?role=STUDENT&instituteId=${activeInstitute.id}&admissionStatus=PENDING&countOnly=true`);
             const data = await res.json();
-            const list = Array.isArray(data) ? data : [];
-
-            if (activeRole === 'TEACHER') {
-                const profile = currentUser?.teacherProfiles?.find((p: any) => p.instituteId === activeInstitute?.id);
-                const classWise = profile?.permissions?.classWise || {};
-                const allowedClassIds = Object.keys(classWise);
-
-                const filtered = list.filter(s => {
-                    const studentClassId = s.metadata?.classId;
-                    return allowedClassIds.includes(studentClassId);
-                });
-                setPendingCount(filtered.length);
-            } else {
-                setPendingCount(list.length);
-            }
+            
+            // Note: If teacher needs class-specific filtering, it should be done in the backend.
+            // For now, countOnly returns the filtered total directly based on the user's role and class restrictions in the API!
+            setPendingCount(data.total || 0);
         } catch (error) {
             console.error('Fetch pending count error:', error);
         }
@@ -1071,7 +1162,13 @@ export default function StudentManagementPage() {
 
             // If empty, set default fields
             if (config.length === 0) {
-                const defaultIds = ['studentPhoto', 'studentId', 'rollNumber', 'name', 'email', 'fathersName', 'mothersName', 'guardianPhone', 'password', 'guardianPassword'];
+                const defaultIds = [
+                    'name', 'dob', 'studentPhoto', 'gender', 'bloodGroup', 'religion', 'orphan', 'birthRegNo', 'nationality', 'emergencyContact', 'village', 'thana', 'postOffice', 'district', 'presentAddress', 'permanentAddress',
+                    'classId', 'groupId', 'studentId', 'rollNumber', 'admissionType', 'admissionDate', 'previousSchool', 'previousClass', 'previousGpa', 'result',
+                    'guardianName', 'guardianPhone', 'guardianRelation', 'guardianOccupation', 'fathersName', 'mothersName', 'guardian2', 'guardian2Phone', 'guardian3', 'guardian3Phone',
+                    'birthCertificate',
+                    'studentPhone', 'password'
+                ];
                 const defaults = POSSIBLE_FIELDS.filter(f => defaultIds.includes(f.id));
                 // Sort by defaultIds order
                 const sortedDefaults = defaultIds.map(id => defaults.find(f => f.id === id)).filter(Boolean) as FieldDefinition[];
@@ -1173,32 +1270,57 @@ export default function StudentManagementPage() {
     const fetchStudents = async (pageToFetch = 1) => {
         if (!activeInstitute?.id) return;
 
-        if (pageToFetch === 1) {
-            setLoading(true);
+        const isNewSession = pageToFetch === 1;
+        const currentSessionId = isNewSession ? Date.now() : activeFetchSession.current;
+        
+        if (isNewSession) {
+            activeFetchSession.current = currentSessionId;
+            // Prevent clearing the list to keep items visible while fetching
+            if (students.length === 0) {
+                setLoading(true);
+            }
             setHasMore(true);
         } else {
             setIsLoadingMore(true);
         }
         
+        if (activeFetchSession.current !== currentSessionId) return;
+        
         try {
             const instituteFilter = activeInstitute?.id ? `&instituteId=${activeInstitute.id}` : '';
             const statusFilterQuery = activeTab === 'applications' ? '&admissionStatus=PENDING' : `&status=${statusFilter}`;
+            const classFilterQuery = selectedClassId !== 'all' ? `&classId=${selectedClassId}` : '';
+            const groupFilterQuery = selectedGroupId !== 'all' ? `&groupId=${selectedGroupId}` : '';
 
-            // Fetch students without class/group filters so we can filter locally instantly
-            const res = await fetch(`/api/admin/users?role=STUDENT&search=${debouncedSearch}${instituteFilter}${statusFilterQuery}&page=${pageToFetch}&limit=1000`);
+            const limit = 50; // Increased limit for better usability
+
+            const res = await fetch(`/api/admin/users?role=STUDENT&search=${debouncedSearch}${instituteFilter}${statusFilterQuery}${classFilterQuery}${groupFilterQuery}&page=${pageToFetch}&limit=${limit}&lightweight=true`);
             const text = await res.text();
+            
+            if (activeFetchSession.current !== currentSessionId) return;
+
             try {
                 const data = JSON.parse(text);
                 const list = Array.isArray(data) ? data : [];
                 
                 if (pageToFetch === 1) {
-                    setStudents(list);
+                    startTransition(() => {
+                        setStudents(list);
+                    });
                 } else {
-                    setStudents(prev => [...prev, ...list]);
+                    startTransition(() => {
+                        setStudents(prev => {
+                            const newItems = list.filter(item => !prev.some(p => p.id === item.id));
+                            return [...prev, ...newItems];
+                        });
+                    });
                 }
                 
-                setHasMore(list.length === 20);
-                setCurrentPage(pageToFetch);
+                const moreAvailable = list.length === limit;
+                startTransition(() => {
+                    setHasMore(moreAvailable);
+                    setCurrentPage(pageToFetch);
+                });
                 
                 // Sync selectedStudent state with the updated record from the database
                 if (selectedStudent) {
@@ -1214,11 +1336,13 @@ export default function StudentManagementPage() {
         } catch (error) {
             console.error('Fetch students error:', error);
         } finally {
-            if (pageToFetch === 1) {
-                setLoading(false);
-            } else {
-                setIsLoadingMore(false);
-            }
+            startTransition(() => {
+                if (pageToFetch === 1) {
+                    setLoading(false);
+                } else {
+                    setIsLoadingMore(false);
+                }
+            });
         }
     };
 
@@ -1230,17 +1354,15 @@ export default function StudentManagementPage() {
         }
     }, [activeInstitute?.id]);
 
-    // Handle debounced search separately
+    // Handle search directly without wait time
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(search);
-        }, 500);
-        return () => clearTimeout(timer);
+        setDebouncedSearch(search);
     }, [search]);
 
     // Fetch data immediately when filters or tab change
     useEffect(() => {
-        setVisibleCount(50);
+        if (isLoading) return;
+
         if (!activeInstitute?.id) {
             setLoading(false);
             return;
@@ -1251,7 +1373,7 @@ export default function StudentManagementPage() {
         } else if (activeTab === 'students' || activeTab === 'applications') {
             fetchStudents(1);
         }
-    }, [debouncedSearch, activeInstitute?.id, activeTab, statusFilter]);
+    }, [debouncedSearch, activeInstitute?.id, activeTab, statusFilter, selectedClassId, selectedGroupId, isLoading]);
 
     // Strict Owner/SuperAdmin check
     const isOwner = activeRole === 'SUPER_ADMIN' || (activeInstitute?.adminIds || []).includes(currentUser?.id) || activeInstitute?.isOwner === true;
@@ -1628,6 +1750,41 @@ export default function StudentManagementPage() {
             });
 
             if (res.ok) {
+                let responseData: any = null;
+                try {
+                    responseData = await res.json();
+                } catch(e) {}
+                
+                // Process admission fees if it's a new student
+                if (!editingStudent && responseData?.id) {
+                    const selectedFees = Object.keys(admissionFees)
+                        .filter(catId => admissionFees[catId].selected)
+                        .map(catId => ({
+                            categoryId: catId,
+                            baseAmount: admissionFees[catId].baseAmount,
+                            waiver: admissionFees[catId].waiver,
+                            paid: admissionFees[catId].paid,
+                            applyWaiverForFuture: admissionFees[catId].applyWaiverForFuture || false,
+                            classId: payload.metadata.classId
+                        }));
+                        
+                    if (selectedFees.length > 0) {
+                        try {
+                            await fetch('/api/admin/students/process-admission-fees', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    studentId: responseData.id,
+                                    instituteId: activeInstitute.id,
+                                    fees: selectedFees
+                                })
+                            });
+                        } catch (err) {
+                            console.error('Failed to process admission fees:', err);
+                        }
+                    }
+                }
+
                 const isReviewing = editingStudent?.metadata?.admissionStatus === 'PENDING';
                 setToast({
                     message: isReviewing ? 'আবেদনটি মঞ্জুর ও ডাটা আপডেট করা হয়েছে!' : (editingStudent ? 'শিক্ষার্থীর তথ্য আপডেট করা হয়েছে!' : 'শিক্ষার্থী সফলভাবে যুক্ত করা হয়েছে!'),
@@ -1974,7 +2131,7 @@ export default function StudentManagementPage() {
     const fetchAllStudentsInClass = async () => {
         if (!activeInstitute?.id || selectedClassId === 'all') return;
         try {
-            const res = await fetch(`/api/admin/users?role=STUDENT&classId=${selectedClassId}&instituteId=${activeInstitute.id}`);
+            const res = await fetch(`/api/admin/users?role=STUDENT&classId=${selectedClassId}&instituteId=${activeInstitute.id}&lightweight=true`);
             const data = await res.json();
             setAllStudentsInClass(Array.isArray(data) ? data : []);
         } catch (error) {
@@ -2432,9 +2589,7 @@ export default function StudentManagementPage() {
                         <div className="py-20 text-center flex flex-col items-center justify-center text-slate-400">
                             <Users className="mb-4 opacity-20" size={64} />
                             <span className="text-lg font-medium">
-                                {activeTab === 'students' && selectedClassId === 'all' && !debouncedSearch 
-                                    ? 'শিক্ষার্থী দেখতে একটি ক্লাস নির্বাচন করুন অথবা সার্চ করুন।' 
-                                    : 'কোন শিক্ষার্থী পাওয়া যায়নি।'}
+                                কোন শিক্ষার্থী পাওয়া যায়নি।
                             </span>
                         </div>
                     ) : (
@@ -2446,6 +2601,7 @@ export default function StudentManagementPage() {
                                 onMouseLeave={handleMouseLeave}
                                 onMouseUp={handleMouseUp}
                                 onMouseMove={handleMouseMove}
+                                onScroll={handleTableScroll}
                                 data-lenis-prevent="true"
                                 className="overflow-auto overscroll-none w-full max-h-[calc(100vh-280px)] custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300 relative cursor-grab"
                             >
@@ -2502,6 +2658,7 @@ export default function StudentManagementPage() {
                                                 if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
                                                 return 0;
                                             })
+
                                             .map((s, index) => {
                                                 const colors = ['bg-orange-500', 'bg-yellow-400', 'bg-teal-500', 'bg-emerald-500', 'bg-blue-500', 'bg-indigo-500', 'bg-purple-500', 'bg-pink-500'];
                                                 const colorIndex = s.name ? s.name.length % colors.length : 0;
@@ -2570,10 +2727,9 @@ export default function StudentManagementPage() {
                                                                 >
                                                                     <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
                                                                     {(s.metadata?.studentPhoto || s.metadata?.photo) && (
-                                                                        <img 
-                                                                            src={s.metadata.studentPhoto || s.metadata.photo} 
+                                                                        <img loading="lazy" 
+                                                                            src={getThumbnailUrl(s.metadata.studentPhoto || s.metadata.photo)} 
                                                                             alt={s.name} 
-                                                                            loading="lazy"
                                                                             className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
                                                                             onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
                                                                         />
@@ -2604,10 +2760,9 @@ export default function StudentManagementPage() {
                                                                     >
                                                                         <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
                                                                         {(s.metadata?.studentPhoto || s.metadata?.photo) && (
-                                                                            <img 
-                                                                                src={s.metadata.studentPhoto || s.metadata.photo} 
+                                                                            <img loading="lazy" 
+                                                                                src={getThumbnailUrl(s.metadata.studentPhoto || s.metadata.photo)} 
                                                                                 alt={s.name} 
-                                                                                loading="lazy"
                                                                                 className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
                                                                                 onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
                                                                             />
@@ -2832,7 +2987,7 @@ export default function StudentManagementPage() {
                                 </table>
                             </div>
                         ) : (
-                        <div className="overflow-y-auto overscroll-none max-h-[calc(100vh-280px)] custom-scrollbar" data-lenis-prevent="true">
+                        <div onScroll={handleTableScroll} className="overflow-y-auto overscroll-none max-h-[calc(100vh-280px)] custom-scrollbar" data-lenis-prevent="true">
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
                             {students
                                 .filter(s => {
@@ -2849,6 +3004,18 @@ export default function StudentManagementPage() {
                                     }
                                     return true;
                                 })
+                                .slice().sort((a, b) => {
+                                    let aVal: any, bVal: any;
+                                    if (sortField === 'name') { aVal = a.name || ''; bVal = b.name || ''; }
+                                    else if (sortField === 'rollNumber') { aVal = Number(a.metadata?.rollNumber) || 0; bVal = Number(b.metadata?.rollNumber) || 0; }
+                                    else if (sortField === 'studentId') { aVal = a.metadata?.studentId || ''; bVal = b.metadata?.studentId || ''; }
+                                    else if (sortField === 'classId') { aVal = classes.find(c => c.id === a.metadata?.classId)?.name || ''; bVal = classes.find(c => c.id === b.metadata?.classId)?.name || ''; }
+                                    else { aVal = a.metadata?.[sortField] || ''; bVal = b.metadata?.[sortField] || ''; }
+                                    if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+                                    if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+                                    return 0;
+                                })
+
                                 .map((s, index) => {
                                     const isFeesMode = viewMode === 'FEES_COLLECT';
                                     
@@ -2887,10 +3054,9 @@ export default function StudentManagementPage() {
                                                             
                                                             {/* Lazy Loaded Image */}
                                                             {(s.metadata?.studentPhoto || s.metadata?.photo) && (
-                                                                <img 
-                                                                    src={s.metadata.studentPhoto || s.metadata.photo} 
+                                                                <img loading="lazy" 
+                                                                    src={getThumbnailUrl(s.metadata.studentPhoto || s.metadata.photo)} 
                                                                     alt={s.name} 
-                                                                    loading="lazy"
                                                                     className="w-full h-full object-cover relative z-10 opacity-0 transition-opacity duration-500" 
                                                                     onLoad={(e) => (e.target as HTMLImageElement).classList.remove('opacity-0')}
                                                                 />
@@ -3220,7 +3386,7 @@ export default function StudentManagementPage() {
                 ) : (
                     <div className="space-y-3">
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 pb-32">
-                            {students.slice(0, visibleCount).map((s, index) => (
+                            {students.map((s, index) => (
                                 <div
                                     key={s.id}
                                     onClick={() => {
@@ -3255,7 +3421,7 @@ export default function StudentManagementPage() {
                                                 <div className={`w-12 h-12 rounded-full ${bgColor} border-2 border-white shadow-md overflow-hidden flex items-center justify-center text-white font-bold text-lg group-hover:scale-110 transition-transform duration-300`}>
                                                     {(s.metadata?.studentPhoto || s.metadata?.photo) ? (
                                                         <img
-                                                            src={s.metadata.studentPhoto || s.metadata.photo}
+                                                            src={getThumbnailUrl(s.metadata.studentPhoto || s.metadata.photo)}
                                                             alt={s.name}
                                                             className="w-full h-full object-cover"
                                                             onError={(e) => {
@@ -3328,13 +3494,7 @@ export default function StudentManagementPage() {
                                 </div>
                             ))}
                         </div>
-                        {students.length > visibleCount && (
-                            <div className="flex justify-center mt-8 pb-10">
-                                <button onClick={() => setVisibleCount(v => v + 50)} className="px-6 py-2.5 bg-blue-50 text-[#045c84] hover:bg-[#045c84] hover:text-white rounded-xl font-bold transition-all flex items-center gap-2">
-                                    আরও লোড করুন <ChevronDown size={18} />
-                                </button>
-                            </div>
-                        )}
+
                     </div>
                 )
                 }
@@ -3350,11 +3510,9 @@ export default function StudentManagementPage() {
                 }}
                 title={editingStudent ? "শিক্ষার্থীর তথ্য আপডেট করুন" : "নতুন শিক্ষার্থী যুক্ত করুন"}
                 maxWidth="max-w-3xl"
-            >
-                <form onSubmit={handleFormSubmit} className="p-5 md:p-8 space-y-6">
-                    {/* Quick Action Toolbar */}
-                    {activeFormTab === 'student' && !editingStudent && (
-                        <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
+                headerActions={
+                    !editingStudent && (
+                        <div className="flex items-center gap-2 mr-2">
                             {activeInstitute?.id && (
                                 <button
                                     type="button"
@@ -3383,11 +3541,10 @@ export default function StudentManagementPage() {
                                             document.body.removeChild(textArea);
                                         }
                                     }}
-                                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-extrabold bg-blue-50 text-[#034a6b] hover:bg-blue-100 transition-all"
-                                    title="ভর্তি ফরমের লিঙ্ক কপি করুন"
+                                    className="p-2 rounded-lg text-slate-400 hover:text-[#034a6b] hover:bg-blue-50 transition-all"
+                                    title="অনলাইন ভর্তি লিঙ্ক কপি করুন"
                                 >
-                                    <ClipboardList size={18} />
-                                    <span>অনলাইন ভর্তি</span>
+                                    <Link size={20} />
                                 </button>
                             )}
                             <button
@@ -3399,24 +3556,103 @@ export default function StudentManagementPage() {
                                     }
                                     setIsExcelMode(!isExcelMode);
                                 }}
-                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-extrabold transition-all ${isExcelMode
-                                    ? 'bg-slate-200 text-slate-800'
-                                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                    }`}
-                                title={isExcelMode ? "ফর্ম মোড" : "Excel থেকে ডাটা ইম্পোর্ট করুন"}
+                                className={`p-2 rounded-lg transition-all ${isExcelMode ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                                title="ডাটাবেজ থেকে ইম্পোর্ট"
                             >
-                                <FileSpreadsheet size={18} />
-                                <span>ডাটাবেজ ভর্তি</span>
+                                <FileSpreadsheet size={20} />
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsLibraryOpen(true)}
-                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-extrabold bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all"
-                                title="ফিল্ড লাইব্রেরি থেকে ফিল্ড যোগ/মুছুন"
+                                className="p-2 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-amber-50 transition-all"
+                                title="তথ্য ফিল্ড লাইব্রেরি"
                             >
-                                <Library size={18} />
-                                <span>তথ্য ফিল্ড</span>
+                                <Library size={20} />
                             </button>
+                        </div>
+                    )
+                }
+            >
+                <form onSubmit={handleFormSubmit} className="p-5 md:p-8 space-y-6">
+                    {/* Institute Header & Form Number */}
+                    <div className="text-center pb-6 border-b border-slate-100">
+                        <h2 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-wider">{activeInstitute?.name || 'Institute Name'}</h2>
+                        <p className="text-xs text-slate-500 font-bold mb-3">{activeInstitute?.address || 'Address'}</p>
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-100 rounded-full border border-slate-200">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">ফরম নম্বর:</span>
+                            <span className="text-sm font-bold text-slate-900 font-mono">FORM-{new Date().getFullYear()}-{Math.floor(1000 + Math.random() * 9000)}</span>
+                        </div>
+                    </div>
+
+                    {/* Admission Type Toggle */}
+                    {!editingStudent && !isExcelMode && (
+                        <div className="flex flex-col gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                            <div className="flex items-center gap-6">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="admissionType" value="new" checked={admissionType === 'new'} onChange={() => setAdmissionType('new')} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
+                                    <span className="text-sm font-bold text-slate-800">নতুন শিক্ষার্থী (New)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="admissionType" value="old" checked={admissionType === 'old'} onChange={() => setAdmissionType('old')} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
+                                    <span className="text-sm font-bold text-slate-800">পুরাতন শিক্ষার্থী (Old)</span>
+                                </label>
+                            </div>
+
+                            {admissionType === 'old' && (
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="পূর্বের শিক্ষার্থীর নাম, আইডি বা রোল দিয়ে খুঁজুন..." 
+                                        value={oldStudentSearchQuery}
+                                        onChange={(e) => setOldStudentSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] text-sm font-medium outline-none transition-all"
+                                    />
+                                    {oldStudentSearchQuery.length > 1 && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto z-50">
+                                            {students.filter(s => 
+                                                s.name.toLowerCase().includes(oldStudentSearchQuery.toLowerCase()) || 
+                                                (s.metadata?.studentId && s.metadata.studentId.toLowerCase().includes(oldStudentSearchQuery.toLowerCase())) ||
+                                                (s.metadata?.rollNumber && s.metadata.rollNumber.toString().includes(oldStudentSearchQuery))
+                                            ).slice(0, 5).map(s => (
+                                                <button
+                                                    key={s.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setFormData({
+                                                            ...formData,
+                                                            name: s.name,
+                                                            email: s.email,
+                                                            phone: s.phone,
+                                                            metadata: {
+                                                                ...formData.metadata,
+                                                                ...s.metadata,
+                                                                admissionType: 'পুরাতন ভর্তি'
+                                                            }
+                                                        });
+                                                        setOldStudentSearchQuery('');
+                                                        setToast({ message: 'শিক্ষার্থীর পূর্বের তথ্য যুক্ত করা হয়েছে!', type: 'success' });
+                                                    }}
+                                                    className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0 flex items-center justify-between group"
+                                                >
+                                                    <div>
+                                                        <div className="text-sm font-bold text-slate-800">{s.name}</div>
+                                                        <div className="text-xs text-slate-500">ID: {s.metadata?.studentId || '-'} | Roll: {s.metadata?.rollNumber || '-'}</div>
+                                                    </div>
+                                                    <span className="text-xs font-bold text-[#045c84] opacity-0 group-hover:opacity-100 transition-opacity">Select</span>
+                                                </button>
+                                            ))}
+                                            {students.filter(s => 
+                                                s.name.toLowerCase().includes(oldStudentSearchQuery.toLowerCase()) || 
+                                                (s.metadata?.studentId && s.metadata.studentId.toLowerCase().includes(oldStudentSearchQuery.toLowerCase())) ||
+                                                (s.metadata?.rollNumber && s.metadata.rollNumber.toString().includes(oldStudentSearchQuery))
+                                            ).length === 0 && (
+                                                <div className="px-4 py-3 text-sm text-slate-500 font-medium text-center">কোনো শিক্ষার্থী পাওয়া যায়নি</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                     {editingStudent?.metadata?.admissionStatus === 'PENDING' && (
@@ -3886,17 +4122,11 @@ export default function StudentManagementPage() {
                                             (isEmailField && (hasGuardian || hasStudentPhone)) ||
                                             (isStudentPhoneField && (hasGuardian || hasEmail));
 
-
+                                        const isPhoneField = field.id.toLowerCase().includes('phone') || field.id.toLowerCase().includes('mobile');
+                                        const parsedPhone = isPhoneField ? parsePhoneNumber(fieldValue as string | undefined) : null;
+                                        const currentCountry = parsedPhone ? getCountryByDialCode(parsedPhone.dialCode) : null;
                                         return (
-                                            <div key={field.id} className="space-y-2 group/field">
-                                                {!formConfig.some(cf => cf.id === field.id) && !LOGIN_FIELD_IDS.includes(field.id) && field.id !== 'name' && field.id !== 'phone' && (
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-black rounded uppercase tracking-wider border border-amber-200 italic">
-                                                            Config Missing
-                                                        </span>
-                                                        <span className="text-[10px] text-slate-600 font-bold">This field is not in current form config but is used for account</span>
-                                                    </div>
-                                                )}
+                                            <div key={field.id} className={`space-y-2 group/field ${isPhoneField ? 'md:col-span-2' : ''}`}>
 
                                                 <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex justify-between">
                                                     <span>{field.label} {(isRequired || (isLoginField && !isOptionalLogin)) && <span className="text-red-600 font-black">*</span>}</span>
@@ -3944,16 +4174,17 @@ export default function StudentManagementPage() {
                                                         </div>
                                                     </div>
                                                 ) : field.type === 'attachment' ? (
-                                                        <div className="relative group/attachment">
-                                                            <div className={`relative w-[120px] h-[180px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 ${fieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
-                                                                <input
-                                                                    type="file"
-                                                                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                                                                    onChange={(e) => handleFileUpload(e, field!.id)}
-                                                                    required={isRequired && !fieldValue && !isOptionalLogin}
-                                                                />
+                                                        <div className="relative group/attachment flex justify-center w-full">
+                                                            <div className="flex flex-col items-center w-full max-w-[200px]">
+                                                                <div className={`relative w-[160px] h-[160px] md:w-[200px] md:h-[200px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 flex-shrink-0 ${fieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
+                                                                    <input
+                                                                        type="file"
+                                                                        className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                                                                        onChange={(e) => handleFileUpload(e, field!.id)}
+                                                                        required={isRequired && !fieldValue && !isOptionalLogin}
+                                                                    />
 
-                                                                {fieldValue ? (
+                                                                    {fieldValue ? (
                                                                     <div className="absolute inset-0 w-full h-full">
                                                                         <img
                                                                             src={fieldValue}
@@ -3986,40 +4217,41 @@ export default function StudentManagementPage() {
                                                                 )}
                                                             </div>
                                                             {field.id === 'studentPhoto' && (
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        setIsFaceEnrollmentModalOpen(true);
-                                                                    }}
-                                                                    className={`mt-3 flex items-center justify-between p-2 border rounded-[16px] w-[120px] transition-all group ${
-                                                                        formData.metadata?.faceDescriptors 
-                                                                            ? 'bg-green-50 border-green-200 hover:bg-green-100' 
-                                                                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                                                                    }`}
-                                                                >
-                                                                    <div className="flex flex-col items-start gap-0.5">
-                                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Face Data</span>
-                                                                        {formData.metadata?.faceDescriptors ? (
-                                                                            <span className="flex items-center gap-1 text-[10px] font-black text-green-600">
-                                                                                <CheckCircle2 size={12} />
-                                                                                Added
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="flex items-center gap-1 text-[10px] font-black text-slate-400">
-                                                                                <XCircle size={12} />
-                                                                                Pending
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
-                                                                        formData.metadata?.faceDescriptors ? 'bg-green-200 text-green-700' : 'bg-white shadow-sm border border-slate-200 text-[#045c84] group-hover:bg-[#045c84] group-hover:border-[#045c84] group-hover:text-white'
-                                                                    }`}>
-                                                                        <Camera size={12} />
-                                                                    </div>
-                                                                </button>
+                                                                <div className="flex justify-center w-full mt-2">
+                                                                    <button 
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            setIsFaceEnrollmentModalOpen(true);
+                                                                        }}
+                                                                        className={`flex items-center justify-between py-1.5 px-3 border rounded-[12px] w-full max-w-[120px] transition-all group ${
+                                                                            formData.metadata?.faceDescriptors 
+                                                                                ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                                                                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                                                                        }`}
+                                                                    >
+                                                                        <div className="flex flex-col items-start">
+                                                                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap">Face Data</span>
+                                                                            {formData.metadata?.faceDescriptors ? (
+                                                                                <span className="flex items-center gap-0.5 text-[9px] font-black text-green-600">
+                                                                                    <CheckCircle2 size={10} /> Added
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="flex items-center gap-0.5 text-[9px] font-black text-slate-400">
+                                                                                    <XCircle size={10} /> Pending
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                                                                            formData.metadata?.faceDescriptors ? 'bg-green-200 text-green-700' : 'bg-white shadow-sm border border-slate-200 text-[#045c84] group-hover:bg-[#045c84] group-hover:border-[#045c84] group-hover:text-white'
+                                                                        }`}>
+                                                                            <Camera size={10} />
+                                                                        </div>
+                                                                    </button>
+                                                                </div>
                                                             )}
                                                         </div>
+                                                    </div>
                                                 ) : field.type === 'class-lookup' ? (
                                                     <div className="relative">
                                                         <select
@@ -4068,6 +4300,160 @@ export default function StudentManagementPage() {
                                                             <ChevronDown size={18} />
                                                         </div>
                                                     </div>
+                                                ) : isPhoneField ? (
+                                                    <div className="flex gap-2 w-full items-stretch">
+                                                        <div className="relative shrink-0 w-[110px]">
+                                                            <select
+                                                                className="w-full h-full py-2 pl-3 pr-8 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-bold text-slate-900 appearance-none text-xs sm:text-sm"
+                                                                value={parsedPhone!.dialCode}
+                                                                onChange={(e) => {
+                                                                    const newDialCode = e.target.value;
+                                                                    const finalVal = newDialCode + parsedPhone!.localNumber;
+                                                                    if (isTopLevel) setFormData({ ...formData, [field.id]: finalVal });
+                                                                    else setFormData({ ...formData, metadata: { ...formData.metadata, [field.id]: finalVal } });
+                                                                }}
+                                                            >
+                                                                {COUNTRIES.map(c => (
+                                                                    <option key={c.code} value={c.dialCode}>{c.flag} {c.dialCode}</option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                                <ChevronDown size={14} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-1" dir="ltr">
+                                                            {Array.from({ length: currentCountry!.length }).map((_, i) => (
+                                                                <input
+                                                                    key={i}
+                                                                    type="text"
+                                                                    inputMode="numeric"
+                                                                    maxLength={1}
+                                                                    className={`flex-1 min-w-0 w-0 aspect-square max-w-[48px] md:max-w-[56px] text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === currentCountry!.length - 1 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-lg md:text-xl px-0 shadow-sm`}
+                                                                    value={(parsedPhone!.localNumber)[i] || ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value.replace(/\D/g, '');
+                                                                        if (!val && e.target.value !== '') return;
+
+                                                                        let newVal = (parsedPhone!.localNumber).split('');
+                                                                        newVal[i] = val;
+                                                                        const finalVal = parsedPhone!.dialCode + newVal.join('').slice(0, currentCountry!.length);
+
+                                                                        if (isTopLevel) setFormData({ ...formData, [field.id]: finalVal });
+                                                                        else setFormData({ ...formData, metadata: { ...formData.metadata, [field.id]: finalVal } });
+
+                                                                        if (val.length === 1 && i < currentCountry!.length - 1) {
+                                                                            const nextInput = e.target.parentElement?.children[i + 1] as HTMLInputElement;
+                                                                            if (nextInput) nextInput.focus();
+                                                                        }
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Backspace' && !(parsedPhone!.localNumber)[i] && i > 0) {
+                                                                            const prevInput = e.currentTarget.parentElement?.children[i - 1] as HTMLInputElement;
+                                                                            if (prevInput) prevInput.focus();
+                                                                            let newVal = (parsedPhone!.localNumber).split('');
+                                                                            newVal[i - 1] = '';
+                                                                            const finalVal = parsedPhone!.dialCode + newVal.join('').slice(0, currentCountry!.length);
+                                                                            if (isTopLevel) setFormData({ ...formData, [field.id]: finalVal });
+                                                                            else setFormData({ ...formData, metadata: { ...formData.metadata, [field.id]: finalVal } });
+                                                                        } else if (e.key === 'ArrowLeft' && i > 0) {
+                                                                            const prevInput = e.currentTarget.parentElement?.children[i - 1] as HTMLInputElement;
+                                                                            if (prevInput) prevInput.focus();
+                                                                        } else if (e.key === 'ArrowRight' && i < currentCountry!.length - 1) {
+                                                                            const nextInput = e.currentTarget.parentElement?.children[i + 1] as HTMLInputElement;
+                                                                            if (nextInput) nextInput.focus();
+                                                                        }
+                                                                    }}
+                                                                    onPaste={(e) => {
+                                                                        e.preventDefault();
+                                                                        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, currentCountry!.length);
+                                                                        if (pasted) {
+                                                                            let newVal = (parsedPhone!.localNumber).split('');
+                                                                            for(let j=0; j<pasted.length; j++) {
+                                                                                if(i+j < currentCountry!.length) newVal[i+j] = pasted[j];
+                                                                            }
+                                                                            const finalVal = parsedPhone!.dialCode + newVal.join('').slice(0, currentCountry!.length);
+                                                                            if (isTopLevel) setFormData({ ...formData, [field.id]: finalVal });
+                                                                            else setFormData({ ...formData, metadata: { ...formData.metadata, [field.id]: finalVal } });
+                                                                        }
+                                                                    }}
+                                                                    ref={(el) => {
+                                                                        // Ref just for maintaining focus if needed
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ) : field.id === 'birthRegNo' ? (
+                                                    <div className="flex w-full" dir="ltr">
+                                                        {Array.from({ length: 17 }).map((_, i) => (
+                                                            <input
+                                                                key={i}
+                                                                type="text"
+                                                                inputMode="numeric"
+                                                                maxLength={1}
+                                                                className={`flex-1 min-w-0 w-0 h-10 md:h-12 text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === 16 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-xs sm:text-sm px-0 shadow-sm`}
+                                                                value={(fieldValue || '')[i] || ''}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value.replace(/\D/g, '');
+                                                                    if (!val && e.target.value !== '') return;
+
+                                                                    let newVal = (fieldValue || '').split('');
+                                                                    newVal[i] = val;
+                                                                    const finalVal = newVal.join('').slice(0, 17);
+
+                                                                    if (isTopLevel) {
+                                                                        setFormData({ ...formData, [field.id]: finalVal });
+                                                                    } else {
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            metadata: { ...formData.metadata, [field.id]: finalVal }
+                                                                        });
+                                                                    }
+
+                                                                    if (val && i < 16) {
+                                                                        const nextInput = e.target.parentElement?.children[i + 1] as HTMLInputElement;
+                                                                        if (nextInput) nextInput.focus();
+                                                                    }
+                                                                }}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Backspace' && !(fieldValue || '')[i] && i > 0) {
+                                                                        const prevInput = e.currentTarget.parentElement?.children[i - 1] as HTMLInputElement;
+                                                                        if (prevInput) {
+                                                                            prevInput.focus();
+                                                                            let newVal = (fieldValue || '').split('');
+                                                                            newVal[i - 1] = '';
+                                                                            const finalVal = newVal.join('');
+                                                                            if (isTopLevel) setFormData({ ...formData, [field.id]: finalVal });
+                                                                            else setFormData({ ...formData, metadata: { ...formData.metadata, [field.id]: finalVal } });
+                                                                        }
+                                                                    } else if (e.key === 'ArrowLeft' && i > 0) {
+                                                                        const prevInput = e.currentTarget.parentElement?.children[i - 1] as HTMLInputElement;
+                                                                        if (prevInput) prevInput.focus();
+                                                                    } else if (e.key === 'ArrowRight' && i < 16) {
+                                                                        const nextInput = e.currentTarget.parentElement?.children[i + 1] as HTMLInputElement;
+                                                                        if (nextInput) nextInput.focus();
+                                                                    }
+                                                                }}
+                                                                onPaste={(e) => {
+                                                                    e.preventDefault();
+                                                                    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 17);
+                                                                    if (pasted) {
+                                                                        let newVal = (fieldValue || '').split('');
+                                                                        for(let j=0; j<pasted.length; j++) {
+                                                                            if(i+j < 17) newVal[i+j] = pasted[j];
+                                                                        }
+                                                                        const finalVal = newVal.join('').slice(0, 17);
+                                                                        if (isTopLevel) setFormData({ ...formData, [field.id]: finalVal });
+                                                                        else setFormData({ ...formData, metadata: { ...formData.metadata, [field.id]: finalVal } });
+                                                                        
+                                                                        const nextIndex = Math.min(16, i + pasted.length);
+                                                                        const targetInput = e.currentTarget.parentElement?.children[nextIndex] as HTMLInputElement;
+                                                                        if (targetInput) targetInput.focus();
+                                                                    }
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 ) : (
                                                     <div className="relative group/field">
                                                         <input
@@ -4105,235 +4491,395 @@ export default function StudentManagementPage() {
 
                                     return (
                                         <div className="space-y-8">
-                                            {/* Form Tabs */}
-                                            <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-2xl mb-8 sticky top-0 z-40 shrink-0 overflow-x-auto custom-scrollbar">
-                                                {[
-                                                    { id: 'student', label: 'শিক্ষার্থীর তথ্য', icon: User },
-                                                    { id: 'academic', label: 'একাডেমিক তথ্য', icon: BookOpen },
-                                                    { id: 'guardian', label: 'অভিভাবকের তথ্য', icon: Users },
-                                                    { id: 'documents', label: 'নথিপত্র', icon: FileUp },
-                                                    { id: 'fees', label: 'ফি ও লগইন', icon: Key },
-                                                ].map(tab => (
-                                                    <button
-                                                        key={tab.id}
-                                                        type="button"
-                                                        onClick={() => setActiveFormTab(tab.id as any)}
-                                                        className={`flex-1 min-w-[120px] py-2.5 px-4 text-xs font-bold rounded-xl transition-all flex justify-center items-center gap-2 ${activeFormTab === tab.id ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50/50'}`}
-                                                    >
-                                                        <tab.icon size={16} />
-                                                        <span className="whitespace-nowrap">{tab.label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            {activeFormTab === 'student' && (
-                                                <div className="space-y-8">
-                                                    {renderField('name')}
-                                                    {renderField('studentPhoto')}
-                                                    {effectiveFields.filter(f => f.type !== 'attachment' && f.id !== 'studentPhoto' && !['classId', 'groupId', 'studentId', 'rollNumber', 'session', 'admissionDate', 'previousSchool', 'previousResult', 'guardianName', 'guardianPhone', 'guardianRelation', 'guardianOccupation', 'yearlyIncome', 'guardianNid', 'fathersName', 'fathersPhone', 'mothersName', 'mothersPhone'].includes(f.id)).map(f => renderField(f.id))}
+                                            {/* Scrollable Single Form Layout */}
+                                            <div className="space-y-6">
+                                                {/* Section 1: Basic Info */}
+                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
+                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">ভর্তি ফর্ম</div>
+                                                    <div className="p-6 bg-slate-50 space-y-4">
+                                                        <div className="space-y-4">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <div className={effectiveFields.some(f => f.id === 'nameEnglish') ? "col-span-1" : "md:col-span-2"}>
+                                                                    {renderField('name')}
+                                                                </div>
+                                                                {effectiveFields.some(f => f.id === 'nameEnglish') && (
+                                                                    <div className="col-span-1">
+                                                                        {renderField('nameEnglish')}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                {renderField('dob')}
+                                                                {renderField('gender')}
+                                                                {renderField('religion')}
+                                                                {renderField('bloodGroup')}
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 grid-flow-row-dense">
+                                                            {renderField('nationality')}
+                                                            {effectiveFields.filter(f => ['মৌলিক তথ্য', 'পরিচয়'].includes(f.category || '') && !['nameEnglish', 'dob', 'gender', 'religion', 'bloodGroup', 'nationality', 'birthRegNo'].includes(f.id)).map(f => (
+                                                                <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
+                                                            ))}
+                                                            <div className="md:col-span-2">
+                                                                {renderField('birthRegNo')}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            )}
 
-                                            {activeFormTab === 'academic' && (
-                                                <div className="space-y-8">
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* Section 2: Academic Info */}
+                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
+                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">একাডেমিক তথ্য</div>
+                                                    <div className="p-6 bg-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {renderField('admissionType')}
+                                                        {renderField('admissionDate')}
                                                         {renderField('classId', true)}
                                                         {renderField('groupId')}
                                                         {renderField('studentId')}
                                                         {renderField('rollNumber')}
-                                                    </div>
-                                                    {effectiveFields.filter(f => ['session', 'admissionDate', 'previousSchool', 'previousResult'].includes(f.id)).map(f => renderField(f.id))}
-                                                </div>
-                                            )}
-
-                                            {activeFormTab === 'guardian' && (
-                                                <div className="space-y-8">
-                                                    <div className="grid grid-cols-1 gap-4">
-                                                        {effectiveFields.filter(f => ['guardianName', 'guardianPhone', 'guardianRelation', 'guardianOccupation', 'yearlyIncome', 'guardianNid', 'fathersName', 'fathersPhone', 'mothersName', 'mothersPhone'].includes(f.id)).map((field) => (
-                                                            <React.Fragment key={field.id}>
-                                                                {field.id === 'guardianName' && (
-                                                                    <div className="md:col-span-2 flex gap-2 mb-2">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                if (formData.metadata.fathersName || formData.metadata.fathersPhone) {
-                                                                                    setFormData({
-                                                                                        ...formData,
-                                                                                        metadata: { ...formData.metadata, guardianName: formData.metadata.fathersName || formData.metadata.guardianName, guardianPhone: formData.metadata.fathersPhone || formData.metadata.guardianPhone, guardianRelation: 'বাবা' }
-                                                                                    });
-                                                                                } else setToast({ message: 'পিতার তথ্য আগে পূরণ করুন।', type: 'error' });
-                                                                            }}
-                                                                            className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
-                                                                        >
-                                                                            অভিভাবক হিসেবে পিতা
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                if (formData.metadata.mothersName || formData.metadata.mothersPhone) {
-                                                                                    setFormData({
-                                                                                        ...formData,
-                                                                                        metadata: { ...formData.metadata, guardianName: formData.metadata.mothersName || formData.metadata.guardianName, guardianPhone: formData.metadata.mothersPhone || formData.metadata.guardianPhone, guardianRelation: 'মা' }
-                                                                                    });
-                                                                                } else setToast({ message: 'মাতার তথ্য আগে পূরণ করুন।', type: 'error' });
-                                                                            }}
-                                                                            className="px-3 py-1 bg-pink-50 text-pink-600 rounded-lg text-xs font-bold hover:bg-pink-100 transition-colors"
-                                                                        >
-                                                                            অভিভাবক হিসেবে মাতা
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                                {renderField(field.id)}
-                                                            </React.Fragment>
+                                                        {renderField('previousSchool')}
+                                                        {renderField('previousClass')}
+                                                        {renderField('previousGpa')}
+                                                        {renderField('result')}
+                                                        {effectiveFields.filter(f => f.category === 'একাডেমিক' && !['admissionType', 'admissionDate', 'classId', 'groupId', 'studentId', 'rollNumber', 'previousSchool', 'previousClass', 'previousGpa', 'result'].includes(f.id)).map(f => (
+                                                            <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
                                                         ))}
                                                     </div>
                                                 </div>
-                                            )}
 
-                                            {activeFormTab === 'documents' && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    {effectiveFields.filter(f => f.type === 'attachment' && f.id !== 'studentPhoto').map(f => renderField(f.id))}
+                                                {/* Section 3: Guardian Info */}
+                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
+                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">পিতা / মাতা / বর্তমান অভিভাবক</div>
+                                                    <div className="p-6 bg-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="md:col-span-2 flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (formData.metadata.fathersName || formData.metadata.fathersPhone) {
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            metadata: { ...formData.metadata, guardianName: formData.metadata.fathersName || formData.metadata.guardianName, guardianPhone: formData.metadata.fathersPhone || formData.metadata.guardianPhone, guardianRelation: 'বাবা' }
+                                                                        });
+                                                                    } else setToast({ message: 'পিতার তথ্য আগে পূরণ করুন।', type: 'error' });
+                                                                }}
+                                                                className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                                                            >
+                                                                অভিভাবক হিসেবে পিতা
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (formData.metadata.mothersName || formData.metadata.mothersPhone) {
+                                                                        setFormData({
+                                                                            ...formData,
+                                                                            metadata: { ...formData.metadata, guardianName: formData.metadata.mothersName || formData.metadata.guardianName, guardianPhone: formData.metadata.mothersPhone || formData.metadata.guardianPhone, guardianRelation: 'মা' }
+                                                                        });
+                                                                    } else setToast({ message: 'মাতার তথ্য আগে পূরণ করুন।', type: 'error' });
+                                                                }}
+                                                                className="px-3 py-1 bg-pink-50 text-pink-600 rounded-lg text-xs font-bold hover:bg-pink-100 transition-colors"
+                                                            >
+                                                                অভিভাবক হিসেবে মাতা
+                                                            </button>
+                                                        </div>
+                                                        {renderField('fathersName')}
+                                                        {renderField('mothersName')}
+                                                        {renderField('guardianName')}
+                                                        {renderField('guardianRelation')}
+                                                        {renderField('guardianPhone')}
+                                                        {renderField('guardianOccupation')}
+                                                        {renderField('guardian2')}
+                                                        {renderField('guardian2Phone')}
+                                                        {renderField('guardian3')}
+                                                        {renderField('guardian3Phone')}
+                                                        {effectiveFields.filter(f => f.category === 'অভিভাবক তথ্য' && !['fathersName', 'mothersName', 'guardianName', 'guardianRelation', 'guardianPhone', 'guardianOccupation', 'guardian2', 'guardian2Phone', 'guardian3', 'guardian3Phone'].includes(f.id)).map(f => (
+                                                            <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            )}
 
-                                            {activeFormTab === 'fees' && (
-                                                <div className="space-y-8">
-                                                    {/* Fee Tier Selector */}
-                                                    <div className="space-y-3">
-                                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                                            <span className="w-5 h-5 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px]">৳</span>
-                                                            ফি স্তর নির্ধারণ করুন
-                                                        </label>
-                                                        <div className="grid grid-cols-3 gap-2">
-                                                            {[
-                                                                { value: 'full', label: 'পূর্ণ ফি', sublabel: '100%', color: 'bg-blue-500 border-blue-500 text-white', idle: 'border-slate-200 text-blue-600 hover:border-blue-300 bg-slate-50' },
-                                                                { value: 'half', label: 'অর্ধ ফি', sublabel: '50%', color: 'bg-amber-500 border-amber-500 text-white', idle: 'border-slate-200 text-amber-600 hover:border-amber-300 bg-slate-50' },
-                                                                { value: 'free', label: 'বিনামূল্যে', sublabel: '০%', color: 'bg-emerald-500 border-emerald-500 text-white', idle: 'border-slate-200 text-emerald-600 hover:border-emerald-300 bg-slate-50' },
-                                                            ].map(tier => {
-                                                                const current = formData.metadata?.feeTier || 'full';
-                                                                const isActive = current === tier.value;
-                                                                return (
-                                                                    <button
-                                                                        key={tier.value}
-                                                                        type="button"
-                                                                        onClick={() => setFormData({ ...formData, metadata: { ...formData.metadata, feeTier: tier.value } })}
-                                                                        className={`flex flex-col items-center justify-center py-3 px-2 rounded-2xl border-2 font-black transition-all ${isActive ? tier.color + ' shadow-md scale-[1.02]' : tier.idle}`}
-                                                                    >
-                                                                        <span className="text-sm">{tier.label}</span>
-                                                                        <span className={`text-[10px] font-bold ${isActive ? 'opacity-80' : 'opacity-60'}`}>{tier.sublabel}</span>
-                                                                    </button>
-                                                                );
-                                                            })}
+                                                {/* Section 4: Address Info */}
+                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
+                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">যোগাযোগের ঠিকানা</div>
+                                                    <div className="p-6 bg-slate-50">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                            {renderField('emergencyContact')}
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                                            {renderField('village')}
+                                                            {renderField('postOffice')}
+                                                            {renderField('thana')}
+                                                            {renderField('district')}
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-4">
+                                                            {renderField('presentAddress')}
+                                                            {renderField('permanentAddress')}
+                                                            {effectiveFields.filter(f => f.category === 'যোগাযোগ' && !['emergencyContact', 'village', 'postOffice', 'thana', 'district', 'presentAddress', 'permanentAddress'].includes(f.id)).map(f => (
+                                                                <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
+                                                            ))}
                                                         </div>
                                                     </div>
-                                                    {/* Login Credentials Section */}
-                                                    <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-6">
-                                                        <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-8 h-8 rounded-xl bg-[#045c84] flex items-center justify-center text-white">
-                                                                    <Key size={18} />
+                                                </div>
+
+                                                {/* Section 5: Admission Fees */}
+                                                {!editingStudent && (
+                                                    <div className="border border-blue-200 rounded-xl overflow-hidden shadow-sm">
+                                                        <div className="bg-[#045c84] text-white py-2 px-4 font-bold text-center">ভর্তি ফি ও আবাসিক অবস্থা</div>
+                                                        <div className="p-6 bg-slate-50 space-y-6">
+                                                            <div className="space-y-3">
+                                                                <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                                    আবাসিক অবস্থা
+                                                                </label>
+                                                                <div className="flex gap-2">
+                                                                    {[
+                                                                        { id: 'all', label: 'সবার জন্য' },
+                                                                        { id: 'abasik', label: 'আবাসিক' },
+                                                                        { id: 'onabasik', label: 'অনাবাসিক' },
+                                                                    ].map(opt => (
+                                                                        <button
+                                                                            key={opt.id}
+                                                                            type="button"
+                                                                            onClick={() => setResidentialStatus(opt.id as any)}
+                                                                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border-2 ${
+                                                                                residentialStatus === opt.id ? 'border-[#045c84] bg-[#045c84] text-white shadow-md' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                                                                            }`}
+                                                                        >
+                                                                            {opt.label}
+                                                                        </button>
+                                                                    ))}
                                                                 </div>
-                                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">লগইন তথ্য (Login Credentials)</h4>
                                                             </div>
-                                                            <label className="flex items-center gap-2 cursor-pointer group">
-                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-[#045c84] transition-colors">এড়িয়ে যান (Skip)</span>
-                                                                <div className="relative">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="sr-only"
-                                                                        checked={!!formData.skipAccountSetup}
-                                                                        onChange={(e) => setFormData({ ...formData, skipAccountSetup: e.target.checked })}
-                                                                    />
-                                                                    <div className={`w-10 h-5 rounded-full transition-colors ${formData.skipAccountSetup ? 'bg-amber-500' : 'bg-slate-200'}`} />
-                                                                    <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform ${formData.skipAccountSetup ? 'translate-x-5' : ''}`} />
+
+                                                            {applicableCategories.length > 0 && (
+                                                                    <div className="space-y-3">
+                                                                        <label className="text-xs font-black text-slate-500 uppercase tracking-widest">প্রযোজ্য ফি সমূহ</label>
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                            {applicableCategories.map(cat => {
+                                                                            const fee = admissionFees[cat.id] || { selected: false, baseAmount: cat.amount || 0, waiver: 0, paid: 0 };
+                                                                            const due = Math.max(0, fee.baseAmount - fee.waiver);
+                                                                            return (
+                                                                                <div key={cat.id} className={`p-4 rounded-xl border-2 transition-all ${fee.selected ? 'border-[#045c84] bg-white' : 'border-slate-200 bg-slate-50'}`}>
+                                                                                    <div className="flex items-center justify-between w-full">
+                                                                                        <label className="flex items-center gap-4 cursor-pointer flex-1">
+                                                                                            <input 
+                                                                                                type="checkbox" 
+                                                                                                className="w-5 h-5 rounded text-[#045c84] focus:ring-[#045c84]" 
+                                                                                                checked={fee.selected}
+                                                                                                onChange={(e) => setAdmissionFees({...admissionFees, [cat.id]: { ...fee, selected: e.target.checked }})}
+                                                                                            />
+                                                                                            <div className="flex-1">
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <div className="font-bold text-slate-800 text-base">{cat.name}</div>
+                                                                                                    {cat.config?.isOptional ? (
+                                                                                                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-wider rounded-md">ঐচ্ছিক</span>
+                                                                                                    ) : (
+                                                                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-black uppercase tracking-wider rounded-md">বাধ্যতামূলক</span>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                                
+                                                                                                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                                                                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200/60">
+                                                                                                        <span className="text-slate-400 font-medium">নির্ধারিত ফি:</span> 
+                                                                                                        <span className="text-[#045c84] text-sm">৳ {fee.baseAmount}</span>
+                                                                                                    </div>
+                                                                                                    
+                                                                                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200/60">
+                                                                                                        <span className="text-slate-400 font-medium">ধরণ:</span> 
+                                                                                                        <span>
+                                                                                                            {cat.config?.frequencyType === 'one-time' ? 'এককালীন' : 
+                                                                                                             cat.config?.interval === 'monthly' ? 'মাসিক' :
+                                                                                                             cat.config?.interval === 'yearly' ? 'বাৎসরিক' :
+                                                                                                             cat.config?.interval === 'weekly' ? 'সাপ্তাহিক' :
+                                                                                                             cat.config?.interval === 'semester' ? 'ষান্মাসিক' : 'নির্দিষ্ট'}
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </label>
+                                                                                    </div>
+                                                                                    {fee.selected && (
+                                                                                        <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-3">
+                                                                                            <div className="flex gap-2 w-full">
+                                                                                                <div className="space-y-1 relative flex-1">
+                                                                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block truncate">ছাড় (Waiver)</label>
+                                                                                                    <div className="relative">
+                                                                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">৳</span>
+                                                                                                        <input 
+                                                                                                            type="number" 
+                                                                                                            className="w-full pl-6 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84]/10 transition-all outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                                            value={fee.waiver === 0 ? '' : fee.waiver}
+                                                                                                            onChange={e => setAdmissionFees({...admissionFees, [cat.id]: { ...fee, waiver: parseInt(e.target.value) || 0 }})}
+                                                                                                            placeholder="0"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="space-y-1 relative flex-1">
+                                                                                                    <label className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider">
+                                                                                                        <span className="text-slate-500 truncate mr-1">জমা (Paid)</span>
+                                                                                                        <span className="text-emerald-600 font-bold bg-emerald-50 px-1 py-0.5 rounded text-[8px] whitespace-nowrap">Due: ৳{due}</span>
+                                                                                                    </label>
+                                                                                                    <div className="relative">
+                                                                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">৳</span>
+                                                                                                        <input 
+                                                                                                            type="number" 
+                                                                                                            className="w-full pl-6 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-900 focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84]/10 transition-all outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                                            value={fee.paid === 0 ? '' : fee.paid}
+                                                                                                            onChange={e => setAdmissionFees({...admissionFees, [cat.id]: { ...fee, paid: parseInt(e.target.value) || 0 }})}
+                                                                                                            placeholder="0"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            
+                                                                                            {fee.waiver > 0 && cat.config?.frequencyType === 'fixed' && ['monthly', 'weekly', 'yearly', 'semester'].includes(cat.config?.interval) && (
+                                                                                                <div className="flex items-start gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50">
+                                                                                                    <input
+                                                                                                        type="checkbox"
+                                                                                                        id={`future-waiver-${cat.id}`}
+                                                                                                        checked={fee.applyWaiverForFuture || false}
+                                                                                                        onChange={(e) => setAdmissionFees({...admissionFees, [cat.id]: { ...fee, applyWaiverForFuture: e.target.checked }})}
+                                                                                                        className="w-3.5 h-3.5 rounded text-[#045c84] focus:ring-[#045c84] mt-0.5"
+                                                                                                    />
+                                                                                                    <label htmlFor={`future-waiver-${cat.id}`} className="text-[10px] font-bold text-[#045c84] cursor-pointer leading-tight">
+                                                                                                        পরবর্তী কিস্তিতেও এই ছাড় প্রযোজ্য করুন (Apply waiver for future)
+                                                                                                    </label>
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
                                                                 </div>
+                                                            )}
+                                                            {applicableCategories.length === 0 && formData.metadata?.classId && (
+                                                                <div className="text-sm font-bold text-slate-400 italic">এই শ্রেণীর জন্য কোনো ফি ক্যাটাগরি পাওয়া যায়নি।</div>
+                                                            )}
+                                                            {!formData.metadata?.classId && (
+                                                                <div className="text-sm font-bold text-slate-400 italic">ফি দেখতে শ্রেণী নির্বাচন করুন।</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Section 6: Other Dynamic Fields & Login */}
+                                                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                                    <div className="bg-slate-200 text-slate-700 py-2 px-4 font-bold text-center">অন্যান্য তথ্য ও লগইন</div>
+                                                    <div className="p-6 bg-slate-50 space-y-8">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {effectiveFields.filter(f => !['মৌলিক তথ্য', 'পরিচয়', 'একাডেমিক', 'অভিভাবক তথ্য', 'যোগাযোগ'].includes(f.category || '')).map(f => (
+                                                                <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
+                                                            ))}
+                                                        </div>
+
+                                                        {/* Fee Tier Selector */}
+                                                        <div className="space-y-3 pt-4 border-t border-slate-200/60">
+                                                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                                <span className="w-5 h-5 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px]">৳</span>
+                                                                ফি স্তর নির্ধারণ করুন
                                                             </label>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                {[
+                                                                    { value: 'full', label: 'পূর্ণ ফি', sublabel: '100%', color: 'bg-blue-500 border-blue-500 text-white', idle: 'border-slate-200 text-blue-600 hover:border-blue-300 bg-slate-50' },
+                                                                    { value: 'half', label: 'অর্ধ ফি', sublabel: '50%', color: 'bg-amber-500 border-amber-500 text-white', idle: 'border-slate-200 text-amber-600 hover:border-amber-300 bg-slate-50' },
+                                                                    { value: 'free', label: 'বিনামূল্যে', sublabel: '০%', color: 'bg-emerald-500 border-emerald-500 text-white', idle: 'border-slate-200 text-emerald-600 hover:border-emerald-300 bg-slate-50' },
+                                                                ].map(tier => {
+                                                                    const current = formData.metadata?.feeTier || 'full';
+                                                                    const isActive = current === tier.value;
+                                                                    return (
+                                                                        <button
+                                                                            key={tier.value}
+                                                                            type="button"
+                                                                            onClick={() => setFormData({ ...formData, metadata: { ...formData.metadata, feeTier: tier.value } })}
+                                                                            className={`flex flex-col items-center justify-center py-3 px-2 rounded-2xl border-2 font-black transition-all ${isActive ? tier.color + ' shadow-md scale-[1.02]' : tier.idle}`}
+                                                                        >
+                                                                            <span className="text-sm">{tier.label}</span>
+                                                                            <span className={`text-[10px] font-bold ${isActive ? 'opacity-80' : 'opacity-60'}`}>{tier.sublabel}</span>
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         </div>
 
-                                                        {formData.skipAccountSetup ? (
-                                                            <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3 items-center">
-                                                                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                                                                    <Info size={20} />
+                                                        {/* Login Credentials Section */}
+                                                        <div className="bg-white p-6 rounded-[24px] border border-slate-100 space-y-6">
+                                                            <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-8 h-8 rounded-xl bg-[#045c84] flex items-center justify-center text-white">
+                                                                        <Key size={18} />
+                                                                    </div>
+                                                                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">লগইন তথ্য</h4>
                                                                 </div>
-                                                                <div className="space-y-0.5">
-                                                                    <p className="text-xs font-black text-amber-900">লগইন অ্যাকাউন্ট তৈরি হবে না</p>
-                                                                    <p className="text-[10px] font-bold text-amber-700/70">শুধুমাত্র শিক্ষার্থীর বেসিক প্রোফাইল ডাটাবেজে সংরক্ষিত হবে। পরে একাডেমিক সেকশন থেকে লগইন তথ্য যুক্ত করা যাবে।</p>
-                                                                </div>
+                                                                <label className="flex items-center gap-2 cursor-pointer group">
+                                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-[#045c84] transition-colors">এড়িয়ে যান (Skip)</span>
+                                                                    <div className="relative">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="sr-only"
+                                                                            checked={!!formData.skipAccountSetup}
+                                                                            onChange={(e) => setFormData({ ...formData, skipAccountSetup: e.target.checked })}
+                                                                        />
+                                                                        <div className={`w-10 h-5 rounded-full transition-colors ${formData.skipAccountSetup ? 'bg-amber-500' : 'bg-slate-200'}`} />
+                                                                        <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform ${formData.skipAccountSetup ? 'translate-x-5' : ''}`} />
+                                                                    </div>
+                                                                </label>
                                                             </div>
-                                                        ) : (
-                                                            <>
-                                                                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-4">
-                                                                    <button 
-                                                                        type="button" 
-                                                                        onClick={() => setLoginType('student')} 
-                                                                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${loginType === 'student' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                                                    >
-                                                                        <User size={16} />
-                                                                        শিক্ষার্থীর লগইন
-                                                                    </button>
-                                                                    <button 
-                                                                        type="button" 
-                                                                        onClick={() => setLoginType('guardian')} 
-                                                                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${loginType === 'guardian' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                                                    >
-                                                                        <User size={16} />
-                                                                        অভিভাবকের লগইন
-                                                                    </button>
-                                                                </div>
 
-                                                                {loginType === 'student' ? (
-                                                                    <div className="grid grid-cols-1 gap-4 animate-fade-in">
-                                                                        {renderField('studentPhone', true)}
-                                                                        {renderField('password')}
+                                                            {formData.skipAccountSetup ? (
+                                                                <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3 items-center">
+                                                                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                                                                        <Info size={20} />
                                                                     </div>
-                                                                ) : (
-                                                                    <div className="grid grid-cols-1 gap-4 animate-fade-in">
-                                                                        {renderField('guardianPhone', true)}
-                                                                        {renderField('guardianPassword')}
+                                                                    <div className="space-y-0.5">
+                                                                        <p className="text-xs font-black text-amber-900">লগইন অ্যাকাউন্ট তৈরি হবে না</p>
+                                                                        <p className="text-[10px] font-bold text-amber-700/70">শুধুমাত্র শিক্ষার্থীর বেসিক প্রোফাইল ডাটাবেজে সংরক্ষিত হবে।</p>
                                                                     </div>
-                                                                )}
-                                                            </>
-                                                        )}
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex gap-2 p-1 bg-slate-50 rounded-xl mb-4">
+                                                                        <button 
+                                                                            type="button" 
+                                                                            onClick={() => setLoginType('student')} 
+                                                                            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${loginType === 'student' ? 'bg-white text-[#045c84] shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                        >
+                                                                            <User size={16} />
+                                                                            শিক্ষার্থীর লগইন
+                                                                        </button>
+                                                                        <button 
+                                                                            type="button" 
+                                                                            onClick={() => setLoginType('guardian')} 
+                                                                            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all flex justify-center items-center gap-2 ${loginType === 'guardian' ? 'bg-white text-[#045c84] shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                        >
+                                                                            <User size={16} />
+                                                                            অভিভাবকের লগইন
+                                                                        </button>
+                                                                    </div>
+
+                                                                    {loginType === 'student' ? (
+                                                                        <div className="grid grid-cols-1 gap-4 animate-fade-in">
+                                                                            {renderField('studentPhone', true)}
+                                                                            {renderField('password')}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="grid grid-cols-1 gap-4 animate-fade-in">
+                                                                            {renderField('guardianPhone', true)}
+                                                                            {renderField('guardianPassword')}
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
                                     );
                                 })()}
                             </div>
 
-                            <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
-                                {(() => {
-                                    const tabs: ('student' | 'academic' | 'guardian' | 'documents' | 'fees')[] = ['student', 'academic', 'guardian', 'documents', 'fees'];
-                                    const currentIndex = tabs.indexOf(activeFormTab as any);
-                                    const handleNext = () => setActiveFormTab(tabs[currentIndex + 1]);
-                                    const handleBack = () => setActiveFormTab(tabs[currentIndex - 1]);
-                                    return (
-                                        <>
-                                            {currentIndex > 0 ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={handleBack}
-                                                    className="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all active:scale-95 flex items-center gap-2"
-                                                >
-                                                    <ChevronLeft size={20} />
-                                                    <span>পূর্ববর্তী (Back)</span>
-                                                </button>
-                                            ) : <div />}
-                                            {currentIndex < tabs.length - 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={handleNext}
-                                                    className="px-8 py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-2 ml-auto mr-4"
-                                                >
-                                                    <span>পরবর্তী (Next)</span>
-                                                    <ChevronRight size={20} />
-                                                </button>
-                                            )}
-                                        </>
-                                    );
-                                })()}
-
+                            <div className="pt-6 border-t border-slate-100 flex justify-end items-center">
                                 <button
                                     type="submit"
                                     disabled={actionLoading}
@@ -4666,6 +5212,20 @@ export default function StudentManagementPage() {
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
+                                                setStudentToPrint(s);
+                                                setIsPrintAdmissionModalOpen(true);
+                                                setIsActionMenuOpen(null);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-[13px] font-bold hover:bg-slate-50 flex items-center gap-3 transition-colors text-indigo-600"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                                                <Printer size={16} />
+                                            </div>
+                                            <span>ফর্ম প্রিন্ট (Print Form)</span>
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 window.location.href = `sms:${s.phone || s.metadata?.studentPhone || s.metadata?.guardianPhone}`;
                                                 setIsActionMenuOpen(null);
                                             }}
@@ -4906,7 +5466,7 @@ export default function StudentManagementPage() {
                         <div className="flex items-center gap-4">
                             {bookData.coverImage ? (
                                 <div className="relative w-20 h-24 rounded-xl overflow-hidden border border-slate-200 group/cover">
-                                    <img src={bookData.coverImage} className="w-full h-full object-cover" />
+                                    <img loading="lazy" src={bookData.coverImage} className="w-full h-full object-cover" />
                                     <button
                                         type="button"
                                         onClick={() => setBookData({ ...bookData, coverImage: '' })}
@@ -5147,7 +5707,7 @@ export default function StudentManagementPage() {
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 overflow-hidden">
                                     {(student.metadata?.studentPhoto || student.metadata?.photo) ? (
-                                        <img src={student.metadata.studentPhoto || student.metadata.photo} alt={student.name} className="w-full h-full object-cover" />
+                                        <img loading="lazy" src={getThumbnailUrl(student.metadata.studentPhoto || student.metadata.photo)} alt={student.name} className="w-full h-full object-cover" />
                                     ) : student.name?.[0]}
                                 </div>
                                 <div className="flex-1">
@@ -5523,6 +6083,16 @@ export default function StudentManagementPage() {
                     onCaptureOffline={handleOfflineFaceCapture}
                 />
             )}
+
+            {/* Print Admission Form Modal */}
+            <PrintAdmissionModal
+                isOpen={isPrintAdmissionModalOpen}
+                onClose={() => setIsPrintAdmissionModalOpen(false)}
+                student={studentToPrint}
+                institute={activeInstitute}
+                classes={classes}
+                groups={groups}
+            />
         </div>
     );
 }

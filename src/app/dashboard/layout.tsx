@@ -64,6 +64,7 @@ const InstitutePage = dynamic(() => import('./institute/page'), { ssr: false, lo
 const AdminInstitutesPage = dynamic(() => import('./admin/institutes/page'), { ssr: false, loading: PageLoader });
 const TeachersPage = dynamic(() => import('./teachers/page'), { ssr: false, loading: PageLoader });
 const GuardiansPage = dynamic(() => import('./guardians/page'), { ssr: false, loading: PageLoader });
+const DonorsPage = dynamic(() => import('./donors/page'), { ssr: false, loading: PageLoader });
 const AdminUsersPage = dynamic(() => import('./admin/users/page'), { ssr: false, loading: PageLoader });
 const BrandingSettingsPage = dynamic(() => import('./admin/settings/branding/page'), { ssr: false, loading: PageLoader });
 const NotificationSettingsPage = dynamic(() => import('./admin/settings/notifications/page'), { ssr: false, loading: PageLoader });
@@ -92,6 +93,7 @@ const KEEPALIVE_PATHS = [
     '/dashboard/admin/institutes',
     '/dashboard/teachers',
     '/dashboard/guardians',
+    '/dashboard/donors',
     '/dashboard/admin/users',
     '/dashboard/admin/settings/branding',
     '/dashboard/admin/settings/notifications',
@@ -140,6 +142,8 @@ const getKeepAliveComponent = (path: string) => {
             return <TeachersPage />;
         case '/dashboard/guardians':
             return <GuardiansPage />;
+        case '/dashboard/donors':
+            return <DonorsPage />;
         case '/dashboard/admin/users':
             return <AdminUsersPage />;
         case '/dashboard/admin/settings/branding':
@@ -268,6 +272,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'প্রতিষ্ঠান', icon: Building2, href: activeRole === 'SUPER_ADMIN' ? '/dashboard/admin/institutes' : '/dashboard/institute', roles: ['ADMIN', 'SUPER_ADMIN', 'TEACHER'], section: 'ব্যবস্থাপনা' },
         { name: 'শিক্ষক', icon: GraduationCap, href: '/dashboard/teachers', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'অভিভাবক', icon: HeartPulse, href: '/dashboard/guardians', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
+        { name: 'দাতা', icon: HeartPulse, href: '/dashboard/donors', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'ইউজার ডাটাবেস', icon: Users, href: '/dashboard/admin/users', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'অ্যাপ ব্র্যান্ডিং', icon: Settings, href: '/dashboard/admin/settings/branding', roles: ['SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'নোটিফিকেশন সেট', icon: Bell, href: '/dashboard/admin/settings/notifications', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },

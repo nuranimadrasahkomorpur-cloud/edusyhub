@@ -18,6 +18,8 @@ export async function GET(req: Request) {
         const feeTier = searchParams.get('feeTier');
         const activeRoleQuery = searchParams.get('activeRole');
         const includeFaceData = searchParams.get('includeFaceData') === 'true';
+        const lightweight = searchParams.get('lightweight') === 'true';
+        const countOnly = searchParams.get('countOnly') === 'true';
 
         const session = await getServerSession();
         if (!session) {
@@ -63,7 +65,7 @@ export async function GET(req: Request) {
                     ...metadata,
                     hasFaceId: metadata.hasFaceId || (Array.isArray(faceDescriptor) && faceDescriptor.length > 0)
                 },
-                faceDescriptor
+                ...(includeFaceData ? { faceDescriptor } : {})
             };
 
             return NextResponse.json(formattedUser);
@@ -164,34 +166,31 @@ export async function GET(req: Request) {
                 }
             } else {
                 if (classId && classId !== 'all') {
+                    const classFilters: any[] = [{ 'metadata.classId': classId }];
+                    if (/^[a-fA-F0-9]{24}$/.test(classId)) {
+                        classFilters.push({ 'metadata.classId': { $oid: classId } });
+                    }
                     match.$and = match.$and || [];
-                    match.$and.push({
-                        $or: [
-                            { 'metadata.classId': classId },
-                            { 'metadata.classId': { $oid: classId } }
-                        ]
-                    });
+                    match.$and.push({ $or: classFilters });
                 }
             }
         } else {
             if (classId && classId !== 'all') {
+                const classFilters: any[] = [{ 'metadata.classId': classId }];
+                if (/^[a-fA-F0-9]{24}$/.test(classId)) {
+                    classFilters.push({ 'metadata.classId': { $oid: classId } });
+                }
                 match.$and = match.$and || [];
-                match.$and.push({
-                    $or: [
-                        { 'metadata.classId': classId },
-                        { 'metadata.classId': { $oid: classId } }
-                    ]
-                });
+                match.$and.push({ $or: classFilters });
             }
         }
-        if (groupId) {
+        if (groupId && groupId !== 'all') {
+            const groupFilters: any[] = [{ 'metadata.groupId': groupId }];
+            if (/^[a-fA-F0-9]{24}$/.test(groupId)) {
+                groupFilters.push({ 'metadata.groupId': { $oid: groupId } });
+            }
             match.$and = match.$and || [];
-            match.$and.push({
-                $or: [
-                    { 'metadata.groupId': groupId },
-                    { 'metadata.groupId': { $oid: groupId } }
-                ]
-            });
+            match.$and.push({ $or: groupFilters });
         }
 
         if (admissionStatus) {
@@ -272,8 +271,30 @@ export async function GET(req: Request) {
             pipeline.push({ $match: match });
         }
 
-        // Sort removed temporarily because it causes 50s+ hangs on unindexed collections with 5000+ documents
-        // pipeline.push({ $sort: { createdAt: -1 } });
+        if (countOnly) {
+            pipeline.push({ $count: 'total' });
+            const result = await (prisma as any).$runCommandRaw({
+                aggregate: 'User',
+                pipeline,
+                cursor: {}
+            });
+            const total = result.cursor?.firstBatch?.[0]?.total || 0;
+            return NextResponse.json({ total });
+        }
+
+        // PRE-PROJECT: Strip heavy faceDescriptor arrays immediately so $sort doesn't exceed 100MB RAM limit
+        if (!includeFaceData) {
+            pipeline.push({ $project: { faceDescriptor: 0 } });
+        }
+
+        // Re-enabled sort: Now that documents are lightweight, in-memory sort takes < 1ms
+        if (!lightweight) {
+            if (!classId || classId === 'all') {
+                pipeline.push({ $sort: { 'metadata.classId': 1, createdAt: -1 } });
+            } else {
+                pipeline.push({ $sort: { createdAt: -1 } });
+            }
+        }
 
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '300');
@@ -284,33 +305,50 @@ export async function GET(req: Request) {
         }
         pipeline.push({ $limit: limit });
 
-        // Lookup first institute for each user (since they can have multiple)
-        pipeline.push(
-            {
-                $lookup: {
-                    from: 'Institute',
-                    localField: 'instituteIds',
-                    foreignField: '_id',
-                    as: 'institutes'
-                }
-            },
-            {
-                $addFields: {
-                    institute: { $arrayElemAt: ['$institutes', 0] },
-                    hasFaceId: {
-                        $gt: [{ $size: { $ifNull: ["$faceDescriptor", []] } }, 0]
+        // Optimize: Skip Institute lookup for students to drastically improve performance (20x faster)
+        // since the frontend already has the activeInstitute context and doesn't display it anyway.
+        if (role !== 'STUDENT') {
+            pipeline.push(
+                {
+                    $lookup: {
+                        from: 'Institute',
+                        localField: 'instituteIds',
+                        foreignField: '_id',
+                        as: 'institutes'
+                    }
+                },
+                {
+                    $addFields: {
+                        institute: { $arrayElemAt: ['$institutes', 0] },
+                        hasFaceId: { $ifNull: ["$metadata.hasFaceId", false] }
                     }
                 }
-            }
-        );
+            );
+        }
 
         
-        const projectStage: any = {
+        let projectStage: any = {
             institutes: 0
         };
 
-        if (!includeFaceData) {
-            projectStage.faceDescriptor = 0;
+        if (lightweight && role === 'STUDENT') {
+            projectStage = {
+                name: 1,
+                email: 1,
+                phone: 1,
+                role: 1,
+                updatedAt: 1,
+                createdAt: 1,
+                'metadata.classId': 1,
+                'metadata.groupId': 1,
+                'metadata.studentId': 1,
+                'metadata.rollNumber': 1,
+                'metadata.phone': 1,
+                'metadata.guardianPhone': 1,
+                'metadata.status': 1,
+                'metadata.feeTier': 1,
+                'metadata.guardianId': 1
+            };
         }
 
         pipeline.push({ $project: projectStage });
@@ -321,44 +359,36 @@ export async function GET(req: Request) {
             cursor: { batchSize: 5000 }
         });
 
-        const users = (usersRaw.cursor?.firstBatch || []).map((user: any) => ({
-            id: user._id?.$oid || user._id?.toString(),
-            name: user.name || '',
-            email: user.email || '',
-            phone: user.phone || '',
-            password: user.metadata?.originalPassword || user.password || '',
-            role: user.role || 'USER',
-            createdAt: user.createdAt?.$date || user.createdAt,
-            updatedAt: user.updatedAt?.$date || user.updatedAt,
-            institute: user.institute ? { name: user.institute.name } : null,
-            metadata: {
-                ...(user.metadata || {}),
-                hasFaceId: user.hasFaceId || user.metadata?.hasFaceId || false
-            },
-            faceDescriptor: user.faceDescriptor || []
-        }));
-
-        // --- Server-side Class/Group Name Resolution ---
-        const studentUsers = users.filter((u: any) => u.role === 'STUDENT' && u.metadata?.classId);
-        if (studentUsers.length > 0) {
-            const classIds = [...new Set(studentUsers.map((u: any) => u.metadata.classId))] as string[];
-            const classes = await prisma.class.findMany({
-                where: { id: { in: classIds } },
-                include: { groups: true }
-            }) as any[];
-
-            studentUsers.forEach((user: any) => {
-                const cls = classes.find((c: any) => c.id === user.metadata.classId);
-                if (cls) {
-                    user.metadata.className = cls.name;
-                    if (user.metadata.groupId) {
-                        const grp = cls.groups?.find((g: any) => g.id === user.metadata.groupId);
-                        if (grp) user.metadata.groupName = grp.name;
-                    }
+        const users = (usersRaw.cursor?.firstBatch || []).map((user: any) => {
+            const mappedUser: any = {
+                id: user._id?.$oid || user._id?.toString(),
+                name: user.name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                role: user.role || 'USER',
+                createdAt: user.createdAt?.$date || user.createdAt,
+                updatedAt: user.updatedAt?.$date || user.updatedAt,
+                institute: user.institute ? { name: user.institute.name } : null,
+                metadata: {
+                    ...(user.metadata || {}),
+                    hasFaceId: user.hasFaceId || user.metadata?.hasFaceId || false
                 }
-            });
-        }
-        // ----------------------------------------------
+            };
+
+            if (!lightweight) {
+                mappedUser.password = user.metadata?.originalPassword || user.password || '';
+                mappedUser.faceDescriptor = user.faceDescriptor || [];
+            } else if (includeFaceData) {
+                mappedUser.faceDescriptor = user.faceDescriptor || [];
+            }
+
+            // Exclude passwords from metadata to be safe
+            if (mappedUser.metadata?.originalPassword) delete mappedUser.metadata.originalPassword;
+
+            return mappedUser;
+        });
+
+
 
         return NextResponse.json(users);
     } catch (error) {

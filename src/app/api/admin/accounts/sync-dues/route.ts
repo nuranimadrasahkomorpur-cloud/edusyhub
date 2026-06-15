@@ -100,30 +100,42 @@ export async function POST(req: Request) {
 
                 if (datesToGenerate.length === 0) continue;
 
-                // 2. Fetch students for this category
+                // 2. Fetch target users for this category
+                const provider = config.provider || 'students';
+                let targetUsers: any[] = [];
                 const selectedClasses = config.selectedClasses || [];
                 
-                let students: any[] = [];
-                if (selectedClasses.length > 0) {
-                    students = await (prisma as any).user.findMany({
+                if (provider === 'students') {
+                    if (selectedClasses.length > 0) {
+                        targetUsers = await (prisma as any).user.findMany({
+                            where: { 
+                                role: 'STUDENT', 
+                                instituteIds: { has: instituteId }
+                            },
+                            select: { id: true, name: true, metadata: true }
+                        });
+                        
+                        // Filter students by selected classes
+                        targetUsers = targetUsers.filter((s: any) => {
+                            const sClassId = s.metadata?.classId;
+                            return sClassId && selectedClasses.includes(sClassId);
+                        });
+                    }
+                } else if (provider === 'donors') {
+                    targetUsers = await (prisma as any).user.findMany({
                         where: { 
-                            role: 'STUDENT', 
+                            role: 'DONOR', 
                             instituteIds: { has: instituteId }
                         },
                         select: { id: true, name: true, metadata: true }
                     });
-                    
-                    // Filter students by selected classes
-                    students = students.filter((s: any) => {
-                        const sClassId = s.metadata?.classId;
-                        return sClassId && selectedClasses.includes(sClassId);
-                    });
-                    for (const s of students) {
-                        studentNameMap[s.id] = s.name || 'অজানা';
-                    }
                 }
 
-                if (students.length === 0) continue;
+                if (targetUsers.length === 0) continue;
+
+                for (const u of targetUsers) {
+                    studentNameMap[u.id] = u.name || 'অজানা';
+                }
 
                 // Cache class names
                 const classes = await (prisma as any).class.findMany({
@@ -195,57 +207,48 @@ export async function POST(req: Request) {
                 const transactionsToUpdate: { id: string, amount: number }[] = [];
                 const pendingToDelete: string[] = [];
 
-                for (const student of students) {
-                    const sClassId = student.metadata?.classId;
-                    if (!sClassId) continue;
-                    
-                    if (config.deselectedStudents && config.deselectedStudents[sClassId]) {
-                        const deselectedList = config.deselectedStudents[sClassId];
-                        if (deselectedList.includes('__ALL_DESELECTED__') || deselectedList.includes(student.id)) continue;
-                    }
-
-                    const sMetadata = student.metadata || {};
+                for (const user of targetUsers) {
+                    const uMetadata = user.metadata || {};
                     const normalizedAmount = category.amount || 0;
-                    let baseAmount = normalizedAmount;
+                    let finalAmount = normalizedAmount;
 
-                    if (student.metadata?.studentId === '102' || student.metadata?.studentId === '103' || student.metadata?.studentId === '104') {
-                        require('fs').appendFileSync('f:\\\\Edusy User flow\\\\Edusy app\\\\debug102.txt', JSON.stringify({
-                            student: student.name,
-                            studentId: student.metadata.studentId,
-                            classId: sClassId,
-                            normalizedAmount,
-                            baseAmount,
-                            tier: sMetadata.feeTier || 'full',
-                            waiver: config.studentWaivers?.[sClassId]?.[student.id] || 0,
-                            deselected: config.deselectedStudents?.[sClassId]?.includes(student.id) || false,
-                            studentAmountType: config.studentAmountType,
-                            classAmounts: config.studentClassAmounts
-                        }, null, 2) + '\\n');
-                    }
-
-                    if (config.studentAmountType === 'flat') {
-                        baseAmount = normalizedAmount;
-                    } else if (config.studentAmountType === 'per-class') {
-                        baseAmount = (config.studentClassAmounts && sClassId) ? (config.studentClassAmounts[sClassId] || normalizedAmount) : normalizedAmount;
-                    } else if (config.studentAmountType === 'per-group') {
-                        const sGroupId = sMetadata.groupId;
-                        if (sGroupId && config.studentGroupAmounts && config.studentGroupAmounts[`${sClassId}-${sGroupId}`]) {
-                            baseAmount = config.studentGroupAmounts[`${sClassId}-${sGroupId}`];
-                        } else {
-                            baseAmount = (config.studentClassAmounts && sClassId) ? (config.studentClassAmounts[sClassId] || normalizedAmount) : normalizedAmount;
+                    if (provider === 'students') {
+                        const sClassId = uMetadata.classId;
+                        if (!sClassId) continue;
+                        
+                        if (config.deselectedStudents && config.deselectedStudents[sClassId]) {
+                            const deselectedList = config.deselectedStudents[sClassId];
+                            if (deselectedList.includes('__ALL_DESELECTED__') || deselectedList.includes(user.id)) continue;
                         }
-                    }
 
-                    const tier = sMetadata.feeTier || 'full';
-                    const multiplier = tier === 'half' ? 0.5 : (tier === 'free' ? 0 : 1.0);
-                    let finalAmount = baseAmount * multiplier;
+                        let baseAmount = normalizedAmount;
 
-                    const waiver = config.studentWaivers?.[sClassId]?.[student.id] || 0;
-                    finalAmount -= waiver;
+                        if (config.studentAmountType === 'flat') {
+                            baseAmount = normalizedAmount;
+                        } else if (config.studentAmountType === 'per-class') {
+                            baseAmount = (config.studentClassAmounts && sClassId) ? (config.studentClassAmounts[sClassId] || normalizedAmount) : normalizedAmount;
+                        } else if (config.studentAmountType === 'per-group') {
+                            const sGroupId = uMetadata.groupId;
+                            if (sGroupId && config.studentGroupAmounts && config.studentGroupAmounts[`${sClassId}-${sGroupId}`]) {
+                                baseAmount = config.studentGroupAmounts[`${sClassId}-${sGroupId}`];
+                            } else {
+                                baseAmount = (config.studentClassAmounts && sClassId) ? (config.studentClassAmounts[sClassId] || normalizedAmount) : normalizedAmount;
+                            }
+                        }
 
-                    const customAmt = config.customStudentAmounts?.[sClassId]?.[student.id];
-                    if (customAmt !== undefined && customAmt !== null) {
-                        finalAmount = customAmt;
+                        const tier = uMetadata.feeTier || 'full';
+                        const multiplier = tier === 'half' ? 0.5 : (tier === 'free' ? 0 : 1.0);
+                        finalAmount = baseAmount * multiplier;
+
+                        const waiver = config.studentWaivers?.[sClassId]?.[user.id] || 0;
+                        finalAmount -= waiver;
+
+                        const customAmt = config.customStudentAmounts?.[sClassId]?.[user.id];
+                        if (customAmt !== undefined && customAmt !== null) {
+                            finalAmount = customAmt;
+                        }
+                    } else if (provider === 'donors') {
+                        finalAmount = normalizedAmount;
                     }
 
                     if (finalAmount <= 0) continue;
@@ -259,7 +262,7 @@ export async function POST(req: Request) {
                         }
                         if (config.interval === 'yearly') dateKey = `${targetDate.getFullYear()}`;
 
-                        const uniqueKey = `${student.id}_${dateKey}`;
+                        const uniqueKey = `${user.id}_${dateKey}`;
                         const txnsForDate = keysToTransactions[uniqueKey] || [];
                         
                         let totalPaid = 0;
@@ -273,6 +276,33 @@ export async function POST(req: Request) {
                         let expectedDue = finalAmount - totalPaid;
                         if (expectedDue < 0) expectedDue = 0;
 
+                        if (config.isOptional) {
+                            const optFees = uMetadata.optionalFees?.[category.id];
+                            if (!optFees) {
+                                expectedDue = 0;
+                            } else {
+                                const tTime = targetDate.getTime();
+                                let isCovered = false;
+                                for (const period of (optFees.history || [])) {
+                                    const sTime = new Date(period.start).getTime();
+                                    const eTime = period.end ? new Date(period.end).getTime() : Infinity;
+                                    
+                                    const tYear = targetDate.getFullYear();
+                                    const tMonth = targetDate.getMonth();
+                                    const sDate = new Date(period.start);
+                                    const isSameMonthStart = sDate.getFullYear() === tYear && sDate.getMonth() === tMonth;
+                                    
+                                    if (isSameMonthStart || (tTime >= sTime && tTime <= eTime)) {
+                                        isCovered = true;
+                                        break;
+                                    }
+                                }
+                                if (!isCovered) {
+                                    expectedDue = 0;
+                                }
+                            }
+                        }
+
                         if (expectedDue > 0) {
                             if (pendingTxn) {
                                 // If due exists but amount doesn't match remaining required
@@ -284,7 +314,7 @@ export async function POST(req: Request) {
                                 let amountToPay = expectedDue;
                                 let advanceUsed = 0;
                                 
-                                const sAdvance = studentAdvances[student.id];
+                                const sAdvance = studentAdvances[user.id];
                                 if (sAdvance && sAdvance.current > 0) {
                                     advanceUsed = Math.min(amountToPay, sAdvance.current);
                                     sAdvance.current -= advanceUsed;
@@ -300,10 +330,10 @@ export async function POST(req: Request) {
                                         type: 'INCOME',
                                         category: category.name,
                                         categoryId: category.id,
-                                        studentId: student.id,
-                                        studentName: student.name,
-                                        classId: sClassId,
-                                        className: classMap.get(sClassId) || null,
+                                        studentId: user.id,
+                                        studentName: user.name,
+                                        classId: provider === 'students' ? (uMetadata.classId || null) : null,
+                                        className: provider === 'students' && uMetadata.classId ? classMap.get(uMetadata.classId) || null : null,
                                         status: 'COMPLETED',
                                         note: 'অগ্রিম ব্যালেন্স থেকে স্বয়ংক্রিয় পরিশোধ',
                                         receiptNo,
@@ -321,10 +351,10 @@ export async function POST(req: Request) {
                                         type: 'INCOME',
                                         category: category.name,
                                         categoryId: category.id,
-                                        studentId: student.id,
-                                        studentName: student.name,
-                                        classId: sClassId,
-                                        className: classMap.get(sClassId) || null,
+                                        studentId: user.id,
+                                        studentName: user.name,
+                                        classId: provider === 'students' ? (uMetadata.classId || null) : null,
+                                        className: provider === 'students' && uMetadata.classId ? classMap.get(uMetadata.classId) || null : null,
                                         status: 'COMPLETED',
                                         note: 'অগ্রিম ব্যালেন্স থেকে আংশিক স্বয়ংক্রিয় পরিশোধ',
                                         receiptNo,
@@ -338,10 +368,10 @@ export async function POST(req: Request) {
                                         type: 'INCOME',
                                         category: category.name,
                                         categoryId: category.id,
-                                        studentId: student.id,
-                                        studentName: student.name,
-                                        classId: sClassId,
-                                        className: classMap.get(sClassId) || null,
+                                        studentId: user.id,
+                                        studentName: user.name,
+                                        classId: provider === 'students' ? (uMetadata.classId || null) : null,
+                                        className: provider === 'students' && uMetadata.classId ? classMap.get(uMetadata.classId) || null : null,
                                         status: 'PENDING',
                                         note: 'বকেয়া (আংশিক স্বয়ংক্রিয় পরিশোধের পরে)',
                                         instituteId,
@@ -354,10 +384,10 @@ export async function POST(req: Request) {
                                         type: 'INCOME',
                                         category: category.name,
                                         categoryId: category.id,
-                                        studentId: student.id,
-                                        studentName: student.name,
-                                        classId: sClassId,
-                                        className: classMap.get(sClassId) || null,
+                                        studentId: user.id,
+                                        studentName: user.name,
+                                        classId: provider === 'students' ? (uMetadata.classId || null) : null,
+                                        className: provider === 'students' && uMetadata.classId ? classMap.get(uMetadata.classId) || null : null,
                                         status: 'PENDING',
                                         instituteId,
                                         date: targetDate

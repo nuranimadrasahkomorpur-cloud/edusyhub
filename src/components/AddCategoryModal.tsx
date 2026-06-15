@@ -49,7 +49,8 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
         customStudentAmounts: initialData?.config?.customStudentAmounts || {},
         studentWaivers: initialData?.config?.studentWaivers || {},
         thresholdDays: initialData?.config?.thresholdDays || 0,
-        isExcludedFromSummary: initialData?.config?.isExcludedFromSummary || false
+        isExcludedFromSummary: initialData?.config?.isExcludedFromSummary || false,
+        isOptional: initialData?.config?.isOptional || false
     });
 
     const [targetCycles, setTargetCycles] = useState(1);
@@ -417,7 +418,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                             {formData.type === 'income' ? 'প্রদানকারী (Provider)' : 'গ্রহণকারী (Recipient)'}
                         </label>
                         <div className="flex flex-wrap gap-3 px-2">
-                            {['anyone', 'students', 'teachers', 'custom'].map((p) => (
+                            {['anyone', 'students', 'teachers', 'donors', 'custom'].map((p) => (
                                 <button 
                                     key={p}
                                     onClick={() => setFormData({...formData, provider: p})}
@@ -425,10 +426,75 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                         formData.provider === p ? 'border-[#045c84] bg-[#045c84] text-white shadow-xl shadow-[#045c84]/20 scale-105' : 'border-transparent bg-slate-50 text-slate-400 hover:bg-slate-100'
                                     }`}
                                 >
-                                    {p === 'anyone' ? 'উন্মুক্ত (Anyone)' : p === 'students' ? 'শিক্ষার্থী' : p === 'teachers' ? 'শিক্ষক' : 'অন্যান্য'}
+                                    {p === 'anyone' ? 'উন্মুক্ত (Anyone)' : p === 'students' ? 'শিক্ষার্থী' : p === 'teachers' ? 'শিক্ষক' : p === 'donors' ? 'দাতা' : 'অন্যান্য'}
                                 </button>
                             ))}
                         </div>
+
+                        {/* Optional Fee Toggle - Available for all providers */}
+                        <div className="space-y-2 pt-6 pb-2 px-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] block">ঐচ্ছিক খাত (Optional Sector)</label>
+                                    <p className="text-[9px] font-bold text-slate-400 italic">প্রোফাইলে এটি নির্বাচন সাপেক্ষে কার্যকর হবে। স্বয়ংক্রিয়ভাবে বকেয়া হবে না।</p>
+                                </div>
+                                <button 
+                                    onClick={() => setFormData({...formData, isOptional: !formData.isOptional})}
+                                    className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${formData.isOptional ? 'bg-[#045c84]' : 'bg-slate-200'}`}
+                                >
+                                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.isOptional ? 'translate-x-6' : ''}`} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {formData.provider === 'students' && (
+                            <div className="space-y-2 pt-2 pb-4 px-2">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2 block">আবাসিক অবস্থা (Residential Status)</label>
+                                <div className="flex flex-wrap gap-2 px-2">
+                                    {[
+                                        { id: 'all', label: 'সবার জন্য (All)' },
+                                        { id: 'abasik', label: 'আবাসিক (Residential)' },
+                                        { id: 'onabasik', label: 'অনাবাসিক (Non-residential)' },
+                                    ].map((opt) => (
+                                        <button 
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); setFormData({...formData, residentialStatus: opt.id as any}); }}
+                                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border-2 ${
+                                                (formData.residentialStatus || 'all') === opt.id ? 'border-[#045c84] bg-[#045c84] text-white shadow-md' : 'border-slate-100 bg-white text-slate-500 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {formData.provider === 'donors' && (
+                            <div className="bg-[#045c84]/5 p-8 rounded-[40px] border border-[#045c84]/10 text-center space-y-4 animate-in zoom-in-95 duration-300">
+                                <div className="w-16 h-16 bg-white text-[#045c84] rounded-3xl flex items-center justify-center mx-auto mb-2 shadow-sm border border-[#045c84]/10">
+                                    <Users size={28} />
+                                </div>
+                                <h3 className="text-lg font-black text-[#045c84]">দাতাগণ (Donors)</h3>
+                                <p className="text-xs font-bold text-slate-600 max-w-sm mx-auto leading-relaxed">
+                                    এই খাতের ফি দাতাদের প্রোফাইল থেকে নির্ধারণ করা হবে। নিচে ডিফল্ট পরিমাণ দিয়ে রাখতে পারেন।
+                                </p>
+                                <div className="pt-6 max-w-xs mx-auto text-left">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] mb-3 block pl-2">নির্ধারিত পরিমাণ</label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
+                                        <input 
+                                            type="number"
+                                            value={formData.amount || ''}
+                                            onChange={(e) => setFormData({...formData, amount: parseInt(e.target.value) || 0})}
+                                            className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3 focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none text-black font-black placeholder:font-normal placeholder:text-slate-300 shadow-sm"
+                                            placeholder="পরিমাণ দিন"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {formData.provider === 'anyone' && (
                             <div className="bg-[#045c84]/5 p-8 rounded-[40px] border border-[#045c84]/10 text-center space-y-4 animate-in zoom-in-95 duration-300">
@@ -489,8 +555,8 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                             onChange={(e) => setFormData({...formData, amount: normalizeBengaliDigits(e.target.value)})}
                                         />
                                     </div>
-                                )}
-
+                                )}                                
+                                
                                 {/* Threshold Days Setting */}
                                 <div className="space-y-2 pt-6 border-t border-slate-200/50">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2">
@@ -513,9 +579,6 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                             <span className="text-[10px] font-black text-slate-400 shrink-0">তারিখ</span>
                                         </div>
                                     </div>
-                                    <p className="text-[9px] font-bold text-slate-400 px-2 pt-1 leading-relaxed italic">
-                                        * শিক্ষার্থী যদি এই দিনের (যেমন ১০ তারিখ) পরে ভর্তি হয়, তবে বর্তমান মাসের ফি স্বয়ংক্রিয়ভাবে হাফ (৫০%) হিসেবে গণ্য হবে।
-                                    </p>
                                 </div>
 
                                 {formData.studentAmountType === 'per-class' && (

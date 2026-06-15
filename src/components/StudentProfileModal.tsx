@@ -98,6 +98,23 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
     const tabButtonsRef = useRef<{ [key: string]: HTMLButtonElement | null }>({});
     const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
+    const [profileImage, setProfileImage] = useState<string | null>(student?.metadata?.studentPhoto || student?.metadata?.photo || null);
+
+    useEffect(() => {
+        setProfileImage(student?.metadata?.studentPhoto || student?.metadata?.photo || null);
+        if (isOpen && student?.id && !student?.metadata?.studentPhoto && !student?.metadata?.photo) {
+            fetch(`/api/admin/users?id=${student.id}&includeFaceData=false`)
+                .then(res => res.json())
+                .then(data => {
+                    const fullStudent = Array.isArray(data) ? data[0] : data;
+                    if (fullStudent?.metadata?.studentPhoto || fullStudent?.metadata?.photo) {
+                        setProfileImage(fullStudent.metadata.studentPhoto || fullStudent.metadata.photo);
+                    }
+                })
+                .catch(err => console.error('Failed to fetch profile image:', err));
+        }
+    }, [isOpen, student?.id, student?.metadata?.studentPhoto, student?.metadata?.photo]);
+
     // --- FEE & TRANSACTION LOGIC ---
     const dueTransactions = transactions.filter(t => 
         (t.status?.toString().toUpperCase() === 'PENDING') && 
@@ -679,8 +696,8 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                     <div className="flex flex-col items-center py-8 font-bengali">
                         <div className="relative mb-4">
                             <div className="w-24 h-24 rounded-full bg-[#CCF2F4] border-4 border-white shadow-sm flex items-center justify-center text-[#045c84] font-bold text-3xl overflow-hidden relative group">
-                                {student.metadata?.studentPhoto || student.metadata?.photo ? (
-                                    <img src={student.metadata.studentPhoto || student.metadata.photo} alt={student.name} className="w-full h-full object-cover" />
+                                {profileImage ? (
+                                    <img src={profileImage} alt={student.name} className="w-full h-full object-cover" />
                                 ) : (
                                     student.name?.[0] || 'S'
                                 )}
@@ -1027,6 +1044,73 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                                 {transactions.filter(t => t.status !== 'PENDING' && t.status !== 'FAILED').map((t, idx) => (
                                                     <TransactionItem key={idx} label={t.category} date={new Date(t.date).toLocaleDateString('bn-BD')} status={t.status} amount={`৳${t.amount}`} isPaid={t.status === 'COMPLETED'} />
                                                 ))}
+                                            </div>
+                                        )}
+
+                                        {/* Optional Fees Section */}
+                                        {categories.filter(c => c.config?.isOptional && (c.config?.selectedClasses?.includes(student.metadata?.classId) || c.config?.provider === 'anyone')).length > 0 && (
+                                            <div className="mt-8 border-t border-slate-50 pt-6">
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <Sparkles size={16} className="text-amber-500" />
+                                                    <h5 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">ঐচ্ছিক ফি (Optional Fees)</h5>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    {categories
+                                                        .filter(c => c.config?.isOptional && (c.config?.selectedClasses?.includes(student.metadata?.classId) || c.config?.provider === 'anyone'))
+                                                        .map(c => {
+                                                            const optFees = student.metadata?.optionalFees || {};
+                                                            const isOptedIn = optFees[c.id]?.active;
+
+                                                            return (
+                                                                <div key={c.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
+                                                                    <div>
+                                                                        <p className="font-bold text-sm text-slate-800">{c.name}</p>
+                                                                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">পরিমাণ: ৳{c.amount} ({c.config?.interval || 'মাসিক'})</p>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            const newActive = !isOptedIn;
+                                                                            const newOptFees = { ...optFees };
+                                                                            if (!newOptFees[c.id]) newOptFees[c.id] = { active: false, history: [] };
+                                                                            
+                                                                            if (newActive) {
+                                                                                newOptFees[c.id].active = true;
+                                                                                newOptFees[c.id].history.push({ start: new Date().toISOString(), end: null });
+                                                                            } else {
+                                                                                newOptFees[c.id].active = false;
+                                                                                const lastHistory = newOptFees[c.id].history[newOptFees[c.id].history.length - 1];
+                                                                                if (lastHistory && !lastHistory.end) {
+                                                                                    lastHistory.end = new Date().toISOString();
+                                                                                }
+                                                                            }
+
+                                                                            try {
+                                                                                const res = await fetch('/api/admin/users', {
+                                                                                    method: 'PATCH',
+                                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                                    body: JSON.stringify({
+                                                                                        id: student.id,
+                                                                                        metadata: {
+                                                                                            ...(student.metadata || {}),
+                                                                                            optionalFees: newOptFees
+                                                                                        }
+                                                                                    })
+                                                                                });
+                                                                                if (res.ok) {
+                                                                                    onUpdate?.();
+                                                                                }
+                                                                            } catch (e) {
+                                                                                console.error(e);
+                                                                            }
+                                                                        }}
+                                                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isOptedIn ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                                                                    >
+                                                                        {isOptedIn ? 'বন্ধ করুন' : 'চালু করুন'}
+                                                                    </button>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                </div>
                                             </div>
                                         )}
                                     </>

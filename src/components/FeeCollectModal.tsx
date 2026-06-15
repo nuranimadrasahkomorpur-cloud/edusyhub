@@ -43,7 +43,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     const [upcomingFees, setUpcomingFees] = useState<any[]>([]);
     const [historyTxns, setHistoryTxns] = useState<any[]>([]);
     const [advanceBalance, setAdvanceBalance] = useState(0);
-    const [loadingData, setLoadingData] = useState(false);
+    const [loadingData, setLoadingData] = useState(!student?.items || student.items.length === 0);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
     // Form state
@@ -74,6 +74,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     useEffect(() => {
         if (!student || !activeInstitute?.id) return;
         
+        setLoadingData(true);
         fetch(`/api/admin/accounts/collect-fee?studentId=${student.studentId}&instituteId=${activeInstitute.id}`)
             .then(r => r.json())
                 .then(data => {
@@ -110,7 +111,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
     useEffect(() => {
         if (!student || !activeInstitute?.id) return;
         setLoadingHistory(true);
-        fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}`)
+        fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&studentId=${student.studentId}`)
             .then(r => r.json())
             .then(data => {
                 const txns = (data.transactions || []).filter(
@@ -129,9 +130,6 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                         if (receiptMap.has(t.receiptNo)) {
                             const existing = receiptMap.get(t.receiptNo);
                             existing.amount += t.amount;
-                            if (!existing.category.includes(t.category)) {
-                                existing.category += `, ${t.category}`;
-                            }
                             existing.subTransactions.push(t);
                         } else {
                             const copy = { ...t, subTransactions: [t] };
@@ -141,7 +139,26 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                     } else {
                         groupedTxns.push({ ...t, subTransactions: [t] });
                     }
+                }
 
+                for (const g of groupedTxns) {
+                    if (g.subTransactions && g.subTransactions.length > 1) {
+                        const baseCount: Record<string, number> = {};
+                        g.subTransactions.forEach((st: any) => {
+                            const base = st.category ? st.category.replace(/\s*\(.*?\)\s*/g, '').trim() : 'অন্যান্য ফি';
+                            baseCount[base] = (baseCount[base] || 0) + 1;
+                        });
+                        const parts = Object.entries(baseCount).map(([base, count]) => {
+                            if (count > 1) {
+                                const suffix = (base.includes('মাস') || base.includes('বেতন')) ? 'মাস' : 'টি';
+                                return `${base} (${count} ${suffix})`;
+                            }
+                            // If count is 1, see if we can use the original category name to preserve the month info
+                            const singleTxn = g.subTransactions.find((st: any) => (st.category ? st.category.replace(/\s*\(.*?\)\s*/g, '').trim() : 'অন্যান্য ফি') === base);
+                            return singleTxn?.category || base;
+                        });
+                        g.category = parts.join(', ');
+                    }
                 }
 
                 // Sort newest first
@@ -841,7 +858,12 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                         </div>
 
                         <div className="flex-1 overflow-y-auto flex flex-col" data-lenis-prevent>
-                            {historyTxns.length === 0 ? (
+                            {loadingHistory ? (
+                                <div className="flex-1 min-h-[400px] p-12 flex flex-col items-center justify-center text-center space-y-3">
+                                    <div className="w-8 h-8 border-4 border-slate-100 border-t-[#045c84] rounded-full animate-spin" />
+                                    <p className="text-xs font-bold text-slate-500">পেমেন্ট ইতিহাস লোড হচ্ছে...</p>
+                                </div>
+                            ) : historyTxns.length === 0 ? (
                                 <div className="flex-1 min-h-[400px] p-12 flex flex-col items-center justify-center text-center">
                                     <History size={40} className="mx-auto mb-3 text-slate-200" />
                                     <p className="text-xs font-black text-slate-400">কোন পেমেন্ট ইতিহাস পাওয়া যায়নি</p>

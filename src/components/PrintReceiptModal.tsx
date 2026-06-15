@@ -54,6 +54,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
     const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
     const [overallDue, setOverallDue] = useState<number | null>(null);
     const [categoryDues, setCategoryDues] = useState<Record<string, number>>({});
+    const [imageError, setImageError] = useState(false);
 
     const handlePrint = () => {
         setIsPrinting(true);
@@ -318,8 +319,13 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                         </div>
                         
                         <div className="shrink-0">
-                            {transaction.studentPhoto ? (
-                                <img src={transaction.studentPhoto} alt={transaction.studentName} className="w-20 h-24 rounded-xl object-cover border-2 border-slate-200 shadow-sm" />
+                            {transaction.studentPhoto && !imageError ? (
+                                <img 
+                                    src={transaction.studentPhoto} 
+                                    alt={transaction.studentName} 
+                                    className="w-20 h-24 rounded-xl object-cover border-2 border-slate-200 shadow-sm" 
+                                    onError={() => setImageError(true)}
+                                />
                             ) : (
                                 <div className="w-20 h-24 rounded-xl bg-slate-50 flex items-center justify-center border-2 border-slate-200 shadow-sm text-slate-300">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
