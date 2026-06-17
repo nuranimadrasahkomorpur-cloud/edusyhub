@@ -5,7 +5,7 @@ import { Building2 } from 'lucide-react';
 
 interface PrintLayoutProps {
     title: string;
-    subtitle?: string;
+    subtitle?: React.ReactNode;
     institute?: any;
     children: React.ReactNode;
     date?: string;
@@ -18,66 +18,83 @@ interface PrintLayoutProps {
     hideHeader?: boolean;
     footerCenterContent?: React.ReactNode;
     hideSignature?: boolean;
+    className?: string;
+    leftSignatureLabel?: string;
+    rightSignatureLabel?: string;
 }
 
-export default function PrintLayout({ title, subtitle, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding, hideLogo = false, hideHeader = false, footerCenterContent, hideSignature = false }: PrintLayoutProps) {
+export default function PrintLayout({ title, subtitle, institute, children, date = new Date().toLocaleDateString('bn-BD'), pageSize = 'A4', previewOnly = false, hideDate = false, hideTitle = false, pagePadding, hideLogo = false, hideHeader = false, footerCenterContent, hideSignature = false, className, leftSignatureLabel = 'শ্রেণি শিক্ষকের স্বাক্ষর', rightSignatureLabel = 'প্রধান শিক্ষকের স্বাক্ষর' }: PrintLayoutProps) {
     const isA5 = pageSize === 'A5';
-    const baseClass = `${previewOnly ? '' : 'print-area'} bg-white p-4 font-bengali text-slate-900 border-4 border-double border-slate-300 m-2 flex flex-col`;
+    const baseClass = `print-area ${previewOnly ? 'shadow-xl border border-slate-200 print:shadow-none print:border-none' : ''} bg-white p-4 font-bengali text-slate-900 border-4 border-double border-slate-300 print:border-none print:m-0 m-2 flex flex-col`;
     const sizeClass = previewOnly ? (isA5 ? 'min-h-[210mm] w-full mx-auto' : 'min-h-[10.5in] w-full') : 'w-full';
+    const [logoError, setLogoError] = React.useState(false);
+    const hasLogo = !hideLogo && !!institute?.logo && !logoError;
+
+    const leftPadNeeded = hasLogo ? 96 : 0;
+    const rightPadNeeded = (!hideDate && !!date) ? 160 : 0;
+    const balancePad = Math.max(leftPadNeeded, rightPadNeeded);
+
     return (
-        <div className={`${baseClass} ${sizeClass}`} style={{ padding: `${pagePadding ?? 16}px` }}>
-            {/* Institute Header: logo flush-left, institute text centered */}
+        <div className={`${baseClass} ${sizeClass} ${className || ''}`} style={{ padding: `${pagePadding ?? 16}px` }}>
+            {/* Institute Header: logo absolute-left, date absolute-right, name centered */}
             {!hideHeader && (
-                <div className={`mb-0 border-b-2 border-slate-800 ${hideTitle ? 'pb-4' : 'pb-8'}`} style={{ display: 'grid', gridTemplateColumns: hideLogo ? '1fr' : '96px 1fr 96px', alignItems: 'center' }}>
-                {/* left logo column */}
-                {!hideLogo && (
-                    <div className="pl-4 flex items-center justify-start">
-                        {institute?.logo ? (
-                            <img src={institute.logo} alt={institute.name} className="w-20 h-20 object-contain" />
-                        ) : (
-                            <div className="w-20 h-20 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center">
-                                <Building2 size={40} className="text-slate-400" />
-                            </div>
-                        )}
+                <div className={`relative mb-0 border-b-2 border-slate-800 ${hideTitle ? 'pb-3' : 'pb-4'} flex items-center justify-center w-full`} style={{ minHeight: '80px' }}>
+                    {/* left logo */}
+                    {hasLogo && (
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-start z-10">
+                            <img 
+                                src={institute.logo} 
+                                alt="" 
+                                className="w-20 h-20 object-contain" 
+                                onError={() => setLogoError(true)} 
+                            />
+                        </div>
+                    )}
+
+                    {/* centered title column */}
+                    <div 
+                        className="flex flex-col items-center justify-center mx-auto text-center" 
+                        style={{ 
+                            minWidth: 0,
+                            maxWidth: balancePad > 0 ? `calc(100% - ${balancePad * 2}px)` : '100%',
+                            width: '100%',
+                            zIndex: 1
+                        }}
+                    >
+                        <h1 className="text-[22px] font-black uppercase tracking-tight text-slate-900 leading-tight text-center w-full">
+                            {institute?.name || 'Education Institute'}
+                        </h1>
+                        <p className="text-[14px] font-bold text-slate-600 text-center w-full mt-1">
+                            {institute?.address || 'Address not provided'}
+                        </p>
                     </div>
-                )}
 
-                {/* centered title column (will not overlap logo) */}
-                <div className="flex flex-col items-center justify-center" style={{ minWidth: 0 }}>
-                    <h1 className="text-[24px] font-black uppercase tracking-tight text-slate-900 leading-tight text-center whitespace-nowrap">
-                        {institute?.name || 'Education Institute'}
-                    </h1>
-                    <p className="text-[16px] font-bold text-slate-600 text-center whitespace-nowrap">
-                        {institute?.address || 'Address not provided'}
-                    </p>
-                </div>
-
-                {/* right placeholder column (keeps center truly centered) */}
-                {!hideLogo && <div className="pr-4" />}
-                </div>
-            )}
-
-            {/* Document Title overlapping the break line */}
-            {!hideTitle && (
-                <div className="flex flex-col items-center justify-center mb-3" style={{ marginTop: '-18px' }}>
-                    <div className="inline-block bg-slate-900 text-white px-3 py-1 rounded-full font-black text-[14px] uppercase tracking-widest relative z-10 border-4 border-white">
-                        {title}
-                    </div>
-                    {subtitle && (
-                        <div className="inline-block bg-slate-100 text-slate-700 px-3 py-0.5 mt-[-6px] rounded-full font-bold text-[12px] relative z-0 border-2 border-white shadow-sm">
-                            {subtitle}
+                    {/* right date column */}
+                    {!hideDate && date && (
+                        <div className="absolute right-4 bottom-[2px] text-right flex flex-col justify-end items-end z-10">
+                            <p className="text-[13px] font-black text-slate-800 leading-tight whitespace-nowrap">{date}</p>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Date */}
-            {!hideDate && date && (
-                <div className="flex justify-end mb-4">
-                    <div className="text-right">
-                        <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">তারিখ</p>
-                        <p className="text-[16px] font-black text-slate-800">{date}</p>
+            {/* Document Title overlapping the break line */}
+            {!hideTitle && (
+                <div className="flex flex-col items-center justify-center mb-2" style={{ marginTop: '-14px' }}>
+                    <div className="inline-block bg-slate-900 text-white px-3 py-0.5 rounded-full font-black text-[13px] uppercase tracking-widest relative z-10 border-4 border-white">
+                        {title}
                     </div>
+                    {subtitle && (
+                        <div className="mt-1">
+                            {typeof subtitle === 'string' ? (
+                                <div className="inline-block bg-slate-100 text-slate-700 px-3 py-0.5 mt-[-4px] rounded-full font-bold text-[11px] relative z-0 border-2 border-white shadow-sm">
+                                    {subtitle}
+                                </div>
+                            ) : (
+                                subtitle
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -88,10 +105,10 @@ export default function PrintLayout({ title, subtitle, institute, children, date
 
             {/* Signature Area */}
             {!hideSignature && (
-                <div className="flex items-end justify-between mt-auto pt-12 signature-area shrink-0 relative w-full">
+                <div className="flex items-end justify-between mt-auto pt-6 signature-area shrink-0 relative w-full">
                     <div className="text-center w-40 z-10">
                         <div className="w-full border-t border-slate-400 mb-1.5 mx-auto"></div>
-                        <p className="font-bold text-slate-600 text-[13px]">আদায়কারীর স্বাক্ষর</p>
+                        <p className="font-bold text-slate-600 text-[13px]">{leftSignatureLabel}</p>
                     </div>
                     
                     {footerCenterContent && (
@@ -102,7 +119,7 @@ export default function PrintLayout({ title, subtitle, institute, children, date
                     
                     <div className="text-center w-40 z-10">
                         <div className="w-full border-t border-slate-400 mb-1.5 mx-auto"></div>
-                        <p className="font-bold text-slate-600 text-[13px]">প্রধান শিক্ষকের স্বাক্ষর</p>
+                        <p className="font-bold text-slate-600 text-[13px]">{rightSignatureLabel}</p>
                     </div>
                 </div>
             )}
@@ -111,7 +128,7 @@ export default function PrintLayout({ title, subtitle, institute, children, date
                 @media print {
                     @page {
                         size: auto;
-                        margin: 0.25in;
+                        margin: 0 !important;
                     }
                     body, html {
                         height: auto !important;
@@ -134,23 +151,33 @@ export default function PrintLayout({ title, subtitle, institute, children, date
                         width: 100% !important;
                         max-width: none !important;
                         height: auto !important;
-                        min-height: 98vh !important;
+                        min-height: 0 !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
-                        display: flex !important;
-                        flex-direction: column !important;
+                        display: block !important;
                         transform: none !important;
                         page-break-after: auto;
                         break-after: auto;
+                        page-break-inside: auto;
+                        break-inside: auto;
+                        overflow: visible !important;
                         box-sizing: border-box;
+                    }
+                    .print-area * {
+                        overflow: visible !important;
+                    }
+                    .print-area + .print-area {
+                        page-break-before: always !important;
+                        break-before: page !important;
                     }
                     .print-min-h {
                         min-height: auto !important;
                     }
                     .print-area table { width: 100% !important; border-collapse: collapse; }
                     .print-area img { max-width: 100% !important; height: auto !important; }
+                    .print-area tbody tr { page-break-inside: avoid; break-inside: avoid; }
                     .signature-area { page-break-inside: avoid; break-inside: avoid; }
                     .no-print { display: none !important; }
                     .print-reset-outer, .print-reset-inner {

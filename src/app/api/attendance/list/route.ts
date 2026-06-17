@@ -26,9 +26,11 @@ export async function GET(req: NextRequest) {
         let instituteId = searchParams.get('instituteId');
         const dateString = searchParams.get('date');
         const month = searchParams.get('month'); // e.g. "2026-05" for full-month register view
+        const startDate = searchParams.get('startDate');
+        const endDate = searchParams.get('endDate');
 
-        if ((!classId && !instituteId) || (!dateString && !month)) {
-            return NextResponse.json({ error: 'Missing classId/instituteId or date/month' }, { status: 400 });
+        if ((!classId && !instituteId) || (!dateString && !month && !(startDate && endDate))) {
+            return NextResponse.json({ error: 'Missing classId/instituteId or date/month/range' }, { status: 400 });
         }
 
         if (!instituteId && classId && classId !== 'all' && classId !== '') {
@@ -73,6 +75,9 @@ export async function GET(req: NextRequest) {
         if (month) {
             // Match all dateStrings starting with the given month prefix e.g. "2026-05"
             filter.dateString = { $regex: `^${month}-` };
+        } else if (startDate && endDate) {
+            // Date range filter
+            filter.dateString = { $gte: startDate, $lte: endDate };
         } else {
             filter.dateString = dateString;
         }

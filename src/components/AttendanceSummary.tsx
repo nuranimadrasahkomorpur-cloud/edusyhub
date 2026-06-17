@@ -16,10 +16,12 @@ import {
     UserX,
     Clock,
     LayoutGrid,
-    ChevronDown
+    ChevronDown,
+    Printer
 } from 'lucide-react';
 import { useSession } from './SessionProvider';
 import { getCleanId } from '@/utils/digit-utils';
+import AttendancePrintPreviewModal from './AttendancePrintPreviewModal';
 import {
     LineChart,
     Line,
@@ -82,6 +84,41 @@ export default function AttendanceSummary({
         return d.toISOString().split('T')[0];
     });
     const [endDate, setEndDate] = useState(() => initialEndDate || new Date().toISOString().split('T')[0]);
+    const [loadingPrint, setLoadingPrint] = useState(false);
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [printPayload, setPrintPayload] = useState<any>(null);
+
+    const handleOpenPrintPreview = async () => {
+        if (!activeInstitute) return;
+        setLoadingPrint(true);
+        try {
+            const studentsUrl = `/api/admin/users?role=STUDENT&instituteId=${activeInstitute.id}&classId=${selectedClassId || ''}&lightweight=true`;
+            const studentsRes = await fetch(studentsUrl);
+            if (!studentsRes.ok) throw new Error('Failed to fetch students');
+            const students = await studentsRes.json();
+
+            const attendanceUrl = `/api/attendance/list?instituteId=${activeInstitute.id}&classId=${selectedClassId || ''}&startDate=${startDate}&endDate=${endDate}`;
+            const attendanceRes = await fetch(attendanceUrl);
+            if (!attendanceRes.ok) throw new Error('Failed to fetch attendance records');
+            const attendanceList = await attendanceRes.json();
+
+            setPrintPayload({
+                students,
+                attendanceList,
+                classes,
+                institute: activeInstitute,
+                startDate,
+                endDate,
+                selectedClassId: selectedClassId || 'all'
+            });
+            setShowPrintModal(true);
+        } catch (error) {
+            console.error('Error fetching print data:', error);
+            alert('প্রিন্ট ডাটা লোড করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
+        } finally {
+            setLoadingPrint(false);
+        }
+    };
     const [quickDate, setQuickDate] = useState<string>(() => {
         if (initialStartDate && initialEndDate) {
             const startDay = initialStartDate.split('-')[2];
@@ -170,7 +207,7 @@ export default function AttendanceSummary({
                 const filteredClasses = Array.isArray(data) ? data.filter((c: any) => canViewReportForClass(c.id)) : [];
                 setClasses(filteredClasses);
                 
-                if (!isAdminUser && filteredClasses.length > 0 && (!selectedClassId || !filteredClasses.some(c => c.id === selectedClassId))) {
+                if (selectedClassId !== '' && filteredClasses.length > 0 && !filteredClasses.some(c => c.id === selectedClassId)) {
                     setSelectedClassId(filteredClasses[0].id);
                 }
             }
@@ -277,7 +314,7 @@ export default function AttendanceSummary({
                             onChange={(e) => setSelectedClassId(e.target.value)}
                             className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 ring-[#045c84]/20 transition-all cursor-pointer h-[42px]"
                         >
-                            {isAdminUser && <option value="">সব ক্লাস</option>}
+                            <option value="">সব ক্লাস</option>
                             {classes.map(c => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
@@ -288,12 +325,51 @@ export default function AttendanceSummary({
 
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={handleOpenPrintPreview}
+                        disabled={loadingPrint}
+                        className="bg-emerald-600 text-white px-8 py-3.5 rounded-2xl font-black text-base flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-950/10 disabled:opacity-50"
+                    >
+                        {loadingPrint ? (
+                            <Loader2 className="animate-spin" size={20} />
+                        ) : (
+                            <Printer size={20} />
+                        )}
+                        প্রিন্ট করুন
+                    </button>
+                    <button
                         onClick={fetchSummary}
                         className="bg-[#045c84] text-white px-8 py-3.5 rounded-2xl font-black text-base flex items-center gap-2 hover:bg-[#034a6b] transition-all shadow-lg shadow-blue-900/10"
                     >
                         রিফ্রেশ করুন
                     </button>
                 </div>
+            </div>
+
+            {/* Class Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-1 -mx-1 scroll-smooth">
+                <button
+                    onClick={() => setSelectedClassId('')}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 whitespace-nowrap border shrink-0 ${
+                        selectedClassId === ''
+                            ? 'bg-[#045c84] text-white border-transparent shadow-md scale-105'
+                            : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50 hover:text-slate-700'
+                    }`}
+                >
+                    সব ক্লাস
+                </button>
+                {classes.map((c) => (
+                    <button
+                        key={c.id}
+                        onClick={() => setSelectedClassId(c.id)}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 whitespace-nowrap border shrink-0 ${
+                            selectedClassId === c.id
+                                ? 'bg-[#045c84] text-white border-transparent shadow-md scale-105'
+                                : 'bg-white text-slate-500 border-slate-100 hover:bg-slate-50 hover:text-slate-700'
+                        }`}
+                    >
+                        {c.name}
+                    </button>
+                ))}
             </div>
 
             {/* Stats Cards */}
@@ -471,6 +547,14 @@ export default function AttendanceSummary({
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* Print Preview Modal */}
+            {showPrintModal && printPayload && (
+                <AttendancePrintPreviewModal
+                    payload={printPayload}
+                    onClose={() => setShowPrintModal(false)}
+                />
             )}
         </div>
     );

@@ -145,9 +145,7 @@ export async function POST(req: NextRequest) {
         try {
             const finalClassId = (student.metadata as any)?.classId;
             if (finalClassId) {
-                const targetClassIdStr = typeof finalClassId === 'string'
-                    ? finalClassId
-                    : (finalClassId.$oid || finalClassId.toString());
+                const targetClassIdStr = getCleanId(finalClassId);
 
                 if (targetClassIdStr) {
                     const classAttendances = await prisma.attendance.findMany({

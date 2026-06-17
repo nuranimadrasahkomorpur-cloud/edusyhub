@@ -43,6 +43,19 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Resolve student's actual classId if classId is missing, 'all', or empty
+        let finalClassId = classId;
+        const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
+        if (!finalClassId || finalClassId === 'all' || finalClassId === '' || !isValidObjectId(finalClassId)) {
+            const student = await prisma.user.findUnique({
+                where: { id: studentId },
+                select: { metadata: true }
+            });
+            finalClassId = (student?.metadata as any)?.classId;
+        }
+
+        const targetClassIdStr = finalClassId ? getCleanId(finalClassId) : null;
+
         let isOwner = false;
         if (instituteId) {
             const inst = await prisma.institute.findUnique({
@@ -83,26 +96,16 @@ export async function POST(req: NextRequest) {
             }
 
             if (!profile.isAdmin) {
-                let finalClassId = classId;
-                if (!finalClassId || finalClassId === 'all' || finalClassId === '') {
-                    const student = await prisma.user.findUnique({
-                        where: { id: studentId },
-                        select: { metadata: true }
-                    });
-                    finalClassId = (student?.metadata as any)?.classId;
-                }
-
-                if (!finalClassId) {
+                if (!targetClassIdStr || !isValidObjectId(targetClassIdStr)) {
                     return NextResponse.json({ error: 'Class ID not found' }, { status: 400 });
                 }
 
-                const targetClassId = getCleanId(finalClassId);
                 const assignedClassIds = (profile.assignedClassIds || []).map(id => getCleanId(id));
-                if (!assignedClassIds.includes(targetClassId)) {
+                if (!assignedClassIds.includes(targetClassIdStr)) {
                     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
                 }
 
-                const classPermissions = (profile.permissions as any)?.classWise?.[targetClassId];
+                const classPermissions = (profile.permissions as any)?.classWise?.[targetClassIdStr];
                 let hasPerm = false;
                 if (classPermissions) {
                     if (typeof classPermissions === 'object' && classPermissions.permissions && Array.isArray(classPermissions.permissions)) {
@@ -133,7 +136,9 @@ export async function POST(req: NextRequest) {
             }
         };
 
-        if (classId) updateDoc.$set.classId = { $oid: classId };
+        if (targetClassIdStr && isValidObjectId(targetClassIdStr)) {
+            updateDoc.$set.classId = { $oid: targetClassIdStr };
+        }
         if (remarks) updateDoc.$set.remarks = remarks;
 
         // Robust command execution logic
@@ -165,91 +170,79 @@ export async function POST(req: NextRequest) {
 
         // Auto-absent logic: Mark all other unmarked students in the class as ABSENT in the database
         try {
-            let finalClassId = classId;
-            if (!finalClassId || finalClassId === 'all' || finalClassId === '') {
-                const student = await prisma.user.findUnique({
-                    where: { id: studentId },
-                    select: { metadata: true }
+            if (targetClassIdStr && isValidObjectId(targetClassIdStr)) {
+                // Fetch all other students in the same institute
+                const allStudents = await prisma.user.findMany({
+                    where: {
+                        role: 'STUDENT',
+                        OR: [
+                            { instituteIds: { has: instituteId } },
+                            { instituteIds: { has: { $oid: instituteId } as any } }
+                        ]
+                    },
+                    select: { id: true, metadata: true }
                 });
-                finalClassId = (student?.metadata as any)?.classId;
-            }
 
-            if (finalClassId) {
-                const targetClassIdStr = typeof finalClassId === 'string'
-                    ? finalClassId
-                    : (finalClassId.$oid || finalClassId.toString());
+                // Filter to approved and active students in the target class
+                const classStudents = allStudents.filter((s: any) => {
+                    const sClassId = s.metadata?.classId;
+                    if (!sClassId) return false;
+                    const sClassIdStr = getCleanId(sClassId);
+                    if (sClassIdStr !== targetClassIdStr) return false;
 
-                if (targetClassIdStr) {
-                    // Fetch all other students in the same institute
-                    const allStudents = await prisma.user.findMany({
+                    if (s.metadata?.admissionStatus === 'PENDING') return false;
+                    if (s.metadata?.status === 'INACTIVE') return false;
+                    return s.id !== studentId; // exclude the student currently marked
+                });
+
+                if (classStudents.length > 0) {
+                    // Find existing attendance records for these class students on dateString
+                    const existingAttendances = await prisma.attendance.findMany({
                         where: {
-                            role: 'STUDENT',
-                            instituteIds: { has: instituteId }
+                            dateString,
+                            instituteId,
+                            studentId: { in: classStudents.map(s => s.id) }
                         },
-                        select: { id: true, metadata: true }
+                        select: { studentId: true }
                     });
+                    const markedStudentIds = new Set(existingAttendances.map(a => a.studentId));
 
-                    // Filter to approved and active students in the target class
-                    const classStudents = allStudents.filter((s: any) => {
-                        const sClassId = s.metadata?.classId;
-                        if (!sClassId) return false;
-                        const sClassIdStr = typeof sClassId === 'string' ? sClassId : (sClassId.$oid || sClassId.toString());
-                        if (sClassIdStr !== targetClassIdStr) return false;
-
-                        if (s.metadata?.admissionStatus === 'PENDING') return false;
-                        if (s.metadata?.status === 'INACTIVE') return false;
-                        return s.id !== studentId; // exclude the student currently marked
-                    });
-
-                    if (classStudents.length > 0) {
-                        // Find existing attendance records for these class students on dateString
-                        const existingAttendances = await prisma.attendance.findMany({
-                            where: {
-                                dateString,
-                                instituteId,
-                                studentId: { in: classStudents.map(s => s.id) }
-                            },
-                            select: { studentId: true }
-                        });
-                        const markedStudentIds = new Set(existingAttendances.map(a => a.studentId));
-
-                        const unmarkedStudents = classStudents.filter(s => !markedStudentIds.has(s.id));
-                        if (unmarkedStudents.length > 0) {
-                            const bulkUpdates = unmarkedStudents.map(s => {
-                                const doc: any = {
-                                    $set: {
-                                        studentId: { $oid: s.id },
-                                        instituteId: { $oid: instituteId },
-                                        dateString,
-                                        status: 'ABSENT',
-                                        method: method || 'MANUAL',
-                                        updatedAt: new Date()
-                                    }
-                                };
-                                doc.$set.classId = { $oid: targetClassIdStr };
-                                return {
-                                    q: { studentId: { $oid: s.id }, dateString },
-                                    u: doc,
-                                    upsert: true
-                                };
-                            });
-
-                            const runBulkUpdates = async (collection: string) => {
-                                return (prisma as any).$runCommandRaw({
-                                    update: collection,
-                                    updates: bulkUpdates
-                                });
-                            };
-
-                            try {
-                                await runBulkUpdates('Attendance');
-                            } catch (rawError: any) {
-                                console.error('Raw MongoDB bulk update (Attendance) failed:', rawError);
-                                try {
-                                    await runBulkUpdates('attendance');
-                                } catch (secondError: any) {
-                                    console.error('Fallback bulk update (attendance) also failed:', secondError);
+                    const unmarkedStudents = classStudents.filter(s => !markedStudentIds.has(s.id));
+                    if (unmarkedStudents.length > 0) {
+                        const bulkUpdates = unmarkedStudents.map(s => {
+                            const doc: any = {
+                                $set: {
+                                    studentId: { $oid: s.id },
+                                    instituteId: { $oid: instituteId },
+                                    dateString,
+                                    status: 'ABSENT',
+                                    method: method || 'MANUAL',
+                                    updatedAt: new Date()
                                 }
+                            };
+                            doc.$set.classId = { $oid: targetClassIdStr };
+                            return {
+                                q: { studentId: { $oid: s.id }, dateString },
+                                u: doc,
+                                upsert: true
+                            };
+                        });
+
+                        const runBulkUpdates = async (collection: string) => {
+                            return (prisma as any).$runCommandRaw({
+                                update: collection,
+                                updates: bulkUpdates
+                            });
+                        };
+
+                        try {
+                            await runBulkUpdates('Attendance');
+                        } catch (rawError: any) {
+                            console.error('Raw MongoDB bulk update (Attendance) failed:', rawError);
+                            try {
+                                await runBulkUpdates('attendance');
+                            } catch (secondError: any) {
+                                console.error('Fallback bulk update (attendance) also failed:', secondError);
                             }
                         }
                     }

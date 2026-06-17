@@ -1748,7 +1748,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
             >
                 <div className="bg-slate-50 min-h-[60vh]">
                     <AttendanceSummary 
-                        initialClassId={classId === 'all' ? '' : classId}
+                        initialClassId=""
                         initialStartDate={monthStr ? `${monthStr}-01` : undefined}
                         initialEndDate={monthStr ? `${monthStr}-${daysInMonth}` : undefined}
                     />

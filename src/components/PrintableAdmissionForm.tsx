@@ -54,6 +54,7 @@ const BarcodeSVG = React.memo(({ value, width = 120, height = 36 }: { value: str
 });
 
 export default function PrintableAdmissionForm({ student, institute, classes, groups }: Props) {
+    const [logoError, setLogoError] = React.useState(false);
     if (!student) return null;
 
     const className = classes?.find(c => c.id === student.metadata?.classId)?.name || '';
@@ -74,8 +75,13 @@ export default function PrintableAdmissionForm({ student, institute, classes, gr
                         {institute?.name || 'আল-জামিআতুল ইসলামিয়া দারুস সুফফাহ মাদ্রাসা ও লিল্লাহ বোর্ডিং'}
                     </h1>
                     <div className="flex items-center justify-center gap-4">
-                        {institute?.logo && (
-                            <img src={institute.logo} alt="Logo" className="w-12 h-12 object-contain" />
+                        {institute?.logo && !logoError && (
+                            <img 
+                                src={institute.logo} 
+                                alt="" 
+                                className="w-12 h-12 object-contain" 
+                                onError={() => setLogoError(true)}
+                            />
                         )}
                         <p className="text-sm font-bold">{institute?.address || 'কেয়া-পেছী মেলা বাজার, শেরপুর, বগুড়া।'} | {institute?.phone || '017-5890-6571'}</p>
                     </div>

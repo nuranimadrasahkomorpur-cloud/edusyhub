@@ -2605,7 +2605,7 @@ export default function AccountsPage() {
                                     };
                                 });
                             }
-                            fetchAccounts(true);
+                            fetchAccounts(activeSubTab, true);
                         }}
                         onPrintReceipt={(txn: any) => {
                             setFeeCollectStudent(null);
@@ -2693,7 +2693,7 @@ export default function AccountsPage() {
                             transactions: [newTxn, ...prev.transactions]
                         }));
                     }
-                    fetchAccounts(true);
+                    fetchAccounts(activeSubTab, true);
                 }}
             />
 
