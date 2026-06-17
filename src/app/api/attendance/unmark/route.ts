@@ -140,6 +140,61 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Revert to NONE all logic: If no active records (PRESENT, LATE, LEAVE) remain for this class,
+        // delete all remaining auto-absent records for the class and date.
+        try {
+            const finalClassId = (student.metadata as any)?.classId;
+            if (finalClassId) {
+                const targetClassIdStr = typeof finalClassId === 'string'
+                    ? finalClassId
+                    : (finalClassId.$oid || finalClassId.toString());
+
+                if (targetClassIdStr) {
+                    const classAttendances = await prisma.attendance.findMany({
+                        where: {
+                            dateString,
+                            instituteId: targetInstituteId,
+                            classId: targetClassIdStr
+                        },
+                        select: { status: true }
+                    });
+
+                    const hasActiveRecords = classAttendances.some(a => 
+                        ['PRESENT', 'LATE', 'LEAVE', 'LEAVE_PENDING'].includes(a.status)
+                    );
+
+                    if (!hasActiveRecords && classAttendances.length > 0) {
+                        const deleteClassRecords = async (collection: string) => {
+                            return (prisma as any).$runCommandRaw({
+                                delete: collection,
+                                deletes: [
+                                    {
+                                        q: {
+                                            classId: { $oid: targetClassIdStr },
+                                            dateString
+                                        },
+                                        limit: 0
+                                    }
+                                ]
+                            });
+                        };
+
+                        try {
+                            await deleteClassRecords('Attendance');
+                        } catch (e) {
+                            try {
+                                await deleteClassRecords('attendance');
+                            } catch (err2) {
+                                console.error('Failed to clean up auto-absent records:', err2);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (cleanupError) {
+            console.error('Failed to run revert-to-none-all cleanup logic:', cleanupError);
+        }
+
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error('CRITICAL: Error unmarking attendance:', error);

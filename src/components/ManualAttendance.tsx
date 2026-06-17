@@ -400,18 +400,37 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
         const now = new Date().toISOString();
 
+        const unmarkedStudents = students.filter(s => s.id !== id && s.initialAttendance === 'ABSENT' && !s.updatedAt);
+
         // Optimistic UI updates
-        setStudents(prev => prev.map(s => s.id === id ? {
-            ...s,
-            attendance: status,
-            initialAttendance: status, // Auto-saved
-            updatedAt: status !== 'ABSENT' ? now : s.updatedAt
-        } : s));
+        setStudents(prev => prev.map(s => {
+            if (s.id === id) {
+                return {
+                    ...s,
+                    attendance: status,
+                    initialAttendance: status, // Auto-saved
+                    updatedAt: status !== 'ABSENT' ? now : s.updatedAt
+                };
+            } else if (s.initialAttendance === 'ABSENT' && !s.updatedAt) {
+                // Auto-absent for all other unmarked students
+                return {
+                    ...s,
+                    attendance: 'ABSENT',
+                    initialAttendance: 'ABSENT',
+                    updatedAt: now
+                };
+            }
+            return s;
+        }));
 
         setRegisterData(prev => {
             const next = { ...prev };
-            if (!next[id]) next[id] = {};
-            next[id][selectedDate] = status || 'ABSENT';
+            next[id] = { ...prev[id], [selectedDate]: status || 'ABSENT' };
+
+            unmarkedStudents.forEach(us => {
+                next[us.id] = { ...prev[us.id], [selectedDate]: 'ABSENT' };
+            });
+
             return next;
         });
 
@@ -495,8 +514,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         setRegisterData(prev => {
             const next = { ...prev };
             toUpdate.forEach(item => {
-                if (!next[item.id]) next[item.id] = {};
-                next[item.id][selectedDate] = item.status || 'ABSENT';
+                next[item.id] = { ...prev[item.id], [selectedDate]: item.status || 'ABSENT' };
             });
             return next;
         });
@@ -564,30 +582,82 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         
         const nextStatus = statuses[nextStatusIndex];
         
+        const unmarkedStudents = students.filter(s => s.id !== studentId && !registerData[s.id]?.[dateString]);
+
         // Optimistic UI update in register view
         setRegisterData(prev => {
             const next = { ...prev };
-            if (!next[studentId]) next[studentId] = {};
+            const studentDates = { ...(prev[studentId] || {}) };
+            
             if (nextStatus === 'NONE') {
-                delete next[studentId][dateString];
+                delete studentDates[dateString];
             } else {
-                next[studentId] = {
-                    ...next[studentId],
-                    [dateString]: nextStatus
-                };
+                studentDates[dateString] = nextStatus;
             }
+            next[studentId] = studentDates;
+
+            if (nextStatus !== 'NONE') {
+                unmarkedStudents.forEach(us => {
+                    next[us.id] = { ...(prev[us.id] || {}), [dateString]: 'ABSENT' };
+                });
+            } else {
+                // Check if any other student has a non-ABSENT status for this dateString
+                const hasOtherActive = students.some(s => 
+                    s.id !== studentId && 
+                    (s.id === studentId ? nextStatus : (next[s.id]?.[dateString])) && 
+                    ['PRESENT', 'LATE', 'LEAVE', 'LEAVE_PENDING'].includes(s.id === studentId ? nextStatus : (next[s.id]?.[dateString]))
+                );
+
+                if (!hasOtherActive) {
+                    // Revert all to NONE (clear dateString)
+                    students.forEach(s => {
+                        if (next[s.id]) {
+                            const updatedDates = { ...next[s.id] };
+                            delete updatedDates[dateString];
+                            next[s.id] = updatedDates;
+                        }
+                    });
+                }
+            }
+
             return next;
         });
 
         // If it's the currently selected date, also update the main students list
         if (dateString === selectedDate) {
+            const now = new Date().toISOString();
+
+            // Check if there will be any other active student left if we unmark this one
+            const willHaveOtherActive = students.some(s => 
+                s.id !== studentId && 
+                ['PRESENT', 'LATE', 'LEAVE', 'LEAVE_PENDING'].includes(s.attendance || '')
+            );
+
             setStudents(prev => prev.map(s => {
-                if (s.id !== studentId) return s;
-                return {
-                    ...s,
-                    attendance: nextStatus === 'NONE' ? 'ABSENT' : nextStatus as any,
-                    initialAttendance: nextStatus === 'NONE' ? 'ABSENT' : nextStatus as any // auto-saved
-                };
+                if (s.id === studentId) {
+                    return {
+                        ...s,
+                        attendance: nextStatus === 'NONE' ? 'ABSENT' : nextStatus as any,
+                        initialAttendance: nextStatus === 'NONE' ? 'ABSENT' : nextStatus as any, // auto-saved
+                        updatedAt: nextStatus !== 'NONE' ? now : undefined
+                    };
+                } else if (nextStatus === 'NONE' && !willHaveOtherActive) {
+                    // Revert all others to unmarked (initial state)
+                    return {
+                        ...s,
+                        attendance: 'ABSENT',
+                        initialAttendance: 'ABSENT',
+                        updatedAt: undefined
+                    };
+                } else if (nextStatus !== 'NONE' && s.initialAttendance === 'ABSENT' && !s.updatedAt) {
+                    return {
+                        ...s,
+                        attendance: 'ABSENT',
+                        initialAttendance: 'ABSENT',
+                        updatedAt: now
+                    };
+                }
+                return s;
             }));
         }
 
@@ -736,7 +806,9 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                 const next = { ...prev };
                 savedStudents.forEach(s => {
                     if (next[s.id]) {
-                        delete next[s.id][selectedDate];
+                        const updatedDates = { ...next[s.id] };
+                        delete updatedDates[selectedDate];
+                        next[s.id] = updatedDates;
                     }
                 });
                 return next;

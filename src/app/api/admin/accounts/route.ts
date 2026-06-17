@@ -24,31 +24,187 @@ export async function GET(req: Request) {
         }
         if (role) where.role = role;
 
-        const transactions = await (prisma as any).transaction.findMany({
-            where,
-            orderBy: { updatedAt: 'desc' }
-        });
+        // Resolve target institute ID for config mapping
+        let targetInstituteId = instituteId;
+        if (!targetInstituteId && studentId) {
+            const firstTx = await (prisma as any).transaction.findFirst({
+                where: { studentId },
+                select: { instituteId: true }
+            });
+            if (firstTx) {
+                targetInstituteId = firstTx.instituteId.toString();
+            } else {
+                const user = await (prisma as any).user.findUnique({
+                    where: { id: studentId },
+                    select: { instituteIds: true, defaultInstituteId: true }
+                });
+                targetInstituteId = user?.defaultInstituteId?.toString() || user?.instituteIds?.[0]?.toString() || null;
+            }
+        }
 
         // Load categories to check existence for orphaned dues checking and exclusion flags
-        let categoryNames = new Set<string>();
-        let categoryIds = new Set<string>();
-        let categoryMap = new Map<string, any>();
+        const categoryNames = new Set<string>();
+        const categoryIds = new Set<string>();
+        const categoryMap = new Map<string, any>();
         
-        const targetInstituteId = instituteId || (transactions.length > 0 ? transactions[0].instituteId : null);
+        const excludedCategoryIds: string[] = [];
+        const excludedCategoryNames: string[] = [];
+        const archivedCategoryIds: string[] = [];
+        const archivedCategoryNames: string[] = [];
+
         if (targetInstituteId) {
             const categories = await (prisma as any).accountCategory.findMany({
                 where: { instituteId: targetInstituteId },
                 select: { id: true, name: true, config: true }
             });
             categories.forEach((c: any) => {
-                if (c.name) categoryNames.add(c.name.trim().toLowerCase());
+                const idStr = c.id.toString();
+                if (c.name) {
+                    const nameLower = c.name.trim().toLowerCase();
+                    categoryNames.add(nameLower);
+                    categoryMap.set(nameLower, c);
+                }
                 if (c.id) {
-                    const idStr = c.id.toString();
                     categoryIds.add(idStr);
                     categoryMap.set(idStr, c);
                 }
+
+                const config = c.config && typeof c.config === 'object' ? c.config : {};
+                if (config.isExcludedFromSummary === true) {
+                    excludedCategoryIds.push(idStr);
+                    if (c.name) excludedCategoryNames.push(c.name);
+                }
+                if (config.isArchived === true) {
+                    archivedCategoryIds.push(idStr);
+                    if (c.name) archivedCategoryNames.push(c.name);
+                }
             });
         }
+
+        // Compute stats using native DB aggregations for maximum speed
+        // 1. Advance balance
+        const advanceAgg = await (prisma as any).transaction.aggregate({
+            where: {
+                ...where,
+                type: 'INCOME',
+                status: 'COMPLETED',
+                category: {
+                    startsWith: '__ADVANCE__'
+                }
+            },
+            _sum: {
+                amount: true
+            }
+        });
+        const advanceBalance = advanceAgg._sum.amount || 0;
+
+        // 2. Total income (excludes advance entries and excluded categories)
+        const incomeAgg = await (prisma as any).transaction.aggregate({
+            where: {
+                ...where,
+                type: 'INCOME',
+                status: 'COMPLETED',
+                NOT: [
+                    {
+                        category: {
+                            startsWith: '__ADVANCE__'
+                        }
+                    },
+                    ...(excludedCategoryNames.length > 0 ? [{
+                        category: {
+                            in: excludedCategoryNames
+                        }
+                    }] : []),
+                    ...(excludedCategoryIds.length > 0 ? [{
+                        categoryId: {
+                            in: excludedCategoryIds
+                        }
+                    }] : [])
+                ]
+            },
+            _sum: {
+                amount: true
+            }
+        });
+        const totalIncome = incomeAgg._sum.amount || 0;
+
+        // 3. Total expense (excludes excluded categories)
+        const expenseAgg = await (prisma as any).transaction.aggregate({
+            where: {
+                ...where,
+                type: 'EXPENSE',
+                status: 'COMPLETED',
+                NOT: [
+                    ...(excludedCategoryNames.length > 0 ? [{
+                        category: {
+                            in: excludedCategoryNames
+                        }
+                    }] : []),
+                    ...(excludedCategoryIds.length > 0 ? [{
+                        categoryId: {
+                            in: excludedCategoryIds
+                        }
+                    }] : [])
+                ]
+            },
+            _sum: {
+                amount: true
+            }
+        });
+        const totalExpense = expenseAgg._sum.amount || 0;
+
+        // 4. Pending fees (excludes archived and excluded categories)
+        const pendingAgg = await (prisma as any).transaction.aggregate({
+            where: {
+                ...where,
+                type: 'INCOME',
+                status: 'PENDING',
+                NOT: [
+                    ...(excludedCategoryNames.length > 0 || archivedCategoryNames.length > 0 ? [{
+                        category: {
+                            in: [...excludedCategoryNames, ...archivedCategoryNames]
+                        }
+                    }] : []),
+                    ...(excludedCategoryIds.length > 0 || archivedCategoryIds.length > 0 ? [{
+                        categoryId: {
+                            in: [...excludedCategoryIds, ...archivedCategoryIds]
+                        }
+                    }] : [])
+                ]
+            },
+            _sum: {
+                amount: true
+            }
+        });
+        const pendingFees = pendingAgg._sum.amount || 0;
+
+        const balance = totalIncome - totalExpense;
+
+        const summary = {
+            totalIncome,
+            totalExpense,
+            pendingFees,
+            balance,
+            advanceBalance,
+            incomeChange: '+0%',
+            expenseChange: '+0%',
+            pendingChange: '+0%',
+            balanceChange: '+0%'
+        };
+
+        // Fetch limited transactions to optimize performance
+        const txWhere = { ...where };
+        const status = searchParams.get('status');
+        if (status) {
+            txWhere.status = status;
+        }
+
+        const limit = studentId ? undefined : 300;
+        const transactions = await (prisma as any).transaction.findMany({
+            where: txWhere,
+            orderBy: { updatedAt: 'desc' },
+            ...(limit ? { take: limit } : {})
+        });
 
         // Fetch student user metadata to attach profile images and institute-specific student IDs
         const studentIdsToFetch = Array.from(
@@ -79,7 +235,7 @@ export async function GET(req: Request) {
             const categoryExists = categoryNames.has(categoryNameLower) || (catIdStr && categoryIds.has(catIdStr));
 
             let displayCategory = rawTx.category;
-            const catInfo = catIdStr ? categoryMap.get(catIdStr) : null;
+            const catInfo = catIdStr ? categoryMap.get(catIdStr) : (categoryNameLower ? categoryMap.get(categoryNameLower) : null);
             const interval = catInfo?.config?.interval;
             const frequencyType = catInfo?.config?.frequencyType;
 
@@ -165,13 +321,6 @@ export async function GET(req: Request) {
             let isArchived = false;
             if (catInfo) {
                 isArchived = catInfo.config?.isArchived || false;
-            } else {
-                for (const cat of categoryMap.values()) {
-                    if (cat.name === rawTx.category && cat.config?.isArchived) {
-                        isArchived = true;
-                        break;
-                    }
-                }
             }
 
             const isExcludedFromSummary = catInfo?.config?.isExcludedFromSummary || false;
@@ -187,39 +336,6 @@ export async function GET(req: Request) {
                 isArchived
             };
         });
-
-        // Advance balance: stored separately as __ADVANCE__ category transactions
-        const advanceBalance = transactionsWithStudentInfo
-            .filter((t: any) => t.type === 'INCOME' && t.status === 'COMPLETED' && typeof t.category === 'string' && t.category.startsWith('__ADVANCE__'))
-            .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-        // Total income excludes advance entries (they are not real income, just prepayments)
-        const totalIncome = transactionsWithStudentInfo
-            .filter((t: any) => t.type === 'INCOME' && t.status === 'COMPLETED' && !t.isExcludedFromSummary && !(typeof t.category === 'string' && t.category.startsWith('__ADVANCE__')))
-            .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-        const totalExpense = transactionsWithStudentInfo
-            .filter((t: any) => t.type === 'EXPENSE' && t.status === 'COMPLETED' && !t.isExcludedFromSummary)
-            .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-        const pendingFees = transactionsWithStudentInfo
-            .filter((t: any) => t.type === 'INCOME' && t.status === 'PENDING' && !t.isExcludedFromSummary && !t.isArchived)
-            .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-        const balance = totalIncome - totalExpense;
-
-        // For now, these are fixed, but could be calculated by comparing with previous month
-        const summary = {
-            totalIncome,
-            totalExpense,
-            pendingFees,
-            balance,
-            advanceBalance,
-            incomeChange: '+0%',
-            expenseChange: '+0%',
-            pendingChange: '+0%',
-            balanceChange: '+0%'
-        };
 
         const response = NextResponse.json({
             summary,

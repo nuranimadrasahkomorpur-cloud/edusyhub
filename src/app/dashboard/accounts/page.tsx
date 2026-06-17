@@ -17,6 +17,7 @@ import {
     Plus,
     Calendar,
     Users,
+    User,
     GraduationCap,
     ChevronRight,
     ChevronDown,
@@ -46,6 +47,8 @@ import { useUI } from '@/components/UIProvider';
 import { getCleanId } from '@/utils/digit-utils';
 import QRBarcodeScanner from '@/components/QRBarcodeScanner';
 import { usePathname } from 'next/navigation';
+import StudentAvatar from '@/components/StudentAvatar';
+
 
 const getShortCategory = (category: string) => {
     if (!category) return 'অজানা';
@@ -226,72 +229,152 @@ export default function AccountsPage() {
         };
     }, [isDeletingProgress, orphanedCategoryToDelete]);
 
-    const fetchAccounts = async (silent = false) => {
+    const activeSubTabRef = useRef(activeSubTab);
+    useEffect(() => {
+        activeSubTabRef.current = activeSubTab;
+    }, [activeSubTab]);
+
+    const getStatusForTab = (tab: 'transactions' | 'pending' | 'categories') => {
+        return tab === 'pending' ? 'PENDING' : 'COMPLETED';
+    };
+
+    const fetchAccounts = async (tabToFetch: 'transactions' | 'pending' | 'categories' = activeSubTabRef.current, silent = false) => {
         if (!activeInstitute?.id) return;
         if (!silent) setLoading(true);
+        const status = getStatusForTab(tabToFetch);
         try {
-            const res = await fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&_cb=${Date.now()}`, { cache: 'no-store' });
+            const res = await fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&status=${status}&_cb=${Date.now()}`, { cache: 'no-store' });
             const data = await res.json();
             if (res.ok) {
-                setAccountData(data);
+                if (activeSubTabRef.current === tabToFetch) {
+                    setAccountData(data);
+                }
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(`cached_accounts_data_${activeInstitute.id}_${status}`, JSON.stringify(data));
+                }
             }
         } catch (err) {
             console.error("Fetch accounts error:", err);
         } finally {
-            if (!silent) setLoading(false);
+            if (activeSubTabRef.current === tabToFetch && !silent) setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchAccounts();
+    const loadCachedData = (tab: 'transactions' | 'pending' | 'categories') => {
+        if (!activeInstitute?.id) return false;
+        if (typeof window === 'undefined') return false;
         
-        // Auto-refresh data silently every 2 seconds for near-instant updates across devices
+        const status = getStatusForTab(tab);
+        const cached = window.localStorage.getItem(`cached_accounts_data_${activeInstitute.id}_${status}`);
+        if (cached) {
+            try {
+                setAccountData(JSON.parse(cached));
+                setLoading(false);
+                return true;
+            } catch (e) {
+                console.error("Error parsing cached accounts:", e);
+            }
+        }
+        setAccountData(prev => ({
+            ...prev,
+            transactions: []
+        }));
+        setLoading(true);
+        return false;
+    };
+
+    useEffect(() => {
+        if (!activeInstitute?.id) return;
+        
+        const hasCache = loadCachedData(activeSubTab);
+        fetchAccounts(activeSubTab, hasCache);
+    }, [activeSubTab, activeInstitute?.id]);
+
+    useEffect(() => {
+        if (!activeInstitute?.id) return;
+        
+        // Auto-refresh data silently every 10 seconds for near-instant updates across devices, ONLY when window is visible/focused
         const intervalId = setInterval(() => {
-            fetchAccounts(true);
-        }, 2000);
+            if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                fetchAccounts(activeSubTabRef.current, true);
+            }
+        }, 10000);
+
+        // Fetch instantly when the tab becomes focused/visible again
+        const handleVisibilityChange = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                fetchAccounts(activeSubTabRef.current, true);
+            }
+        };
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
         
         // Auto-sync missing dues in the background
-        if (activeInstitute?.id) {
-            const syncKey = `sync_${activeInstitute.id}`;
-            if (!sessionStorage.getItem(syncKey)) {
-                sessionStorage.setItem(syncKey, 'true');
+        const syncKey = `sync_${activeInstitute.id}`;
+        if (!sessionStorage.getItem(syncKey)) {
+            sessionStorage.setItem(syncKey, 'true');
 
-                fetch('/api/admin/accounts/sync-dues', {
+            fetch('/api/admin/accounts/sync-dues', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ instituteId: activeInstitute.id })
             }).then(res => res.json())
               .then(data => {
                   if (data.generatedCount && data.generatedCount > 0) {
-                      // Silently refetch to show newly generated dues
-                      fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&_cb=${Date.now()}`, { cache: 'no-store' })
+                      // Silently refetch to show newly generated dues and save to PENDING cache
+                      fetch(`/api/admin/accounts?instituteId=${activeInstitute.id}&status=PENDING&_cb=${Date.now()}`, { cache: 'no-store' })
                           .then(res => res.json())
-                          .then(accData => setAccountData(accData));
+                          .then(accData => {
+                              if (activeSubTabRef.current === 'pending') {
+                                  setAccountData(accData);
+                              }
+                              if (typeof window !== 'undefined') {
+                                  window.localStorage.setItem(`cached_accounts_data_${activeInstitute.id}_PENDING`, JSON.stringify(accData));
+                              }
+                          });
                   }
               }).catch(err => {
                   console.error('Failed to sync dues:', err);
                   sessionStorage.removeItem(syncKey); // Allow retry on failure
               });
-            }
         }
         
-        return () => clearInterval(intervalId);
+        return () => {
+            clearInterval(intervalId);
+            if (typeof document !== 'undefined') {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }
+        };
     }, [activeInstitute?.id]);
 
 
     // Fetch categories so we can detect archived categories and avoid showing dues for them
     useEffect(() => {
+        if (!activeInstitute?.id) return;
+
+        if (typeof window !== 'undefined') {
+            const cached = window.localStorage.getItem(`cached_categories_data_${activeInstitute.id}`);
+            if (cached) {
+                try {
+                    setCategories(JSON.parse(cached));
+                } catch (e) {}
+            }
+        }
+
         const fetchCategories = async () => {
-            if (!activeInstitute?.id) return;
             try {
                 const res = await fetch(`/api/admin/accounts/categories?instituteId=${activeInstitute.id}`);
                 if (res.ok) {
                     const data = await res.json();
-                    setCategories(Array.isArray(data) ? data : []);
+                    const list = Array.isArray(data) ? data : [];
+                    setCategories(list);
+                    if (typeof window !== 'undefined') {
+                        window.localStorage.setItem(`cached_categories_data_${activeInstitute.id}`, JSON.stringify(list));
+                    }
                 }
             } catch (err) {
                 console.error('Fetch categories error:', err);
-                setCategories([]);
             }
         };
         fetchCategories();
@@ -357,7 +440,7 @@ export default function AccountsPage() {
             });
             const data = await res.json();
             if (res.ok) {
-                await fetchAccounts(true);
+                await fetchAccounts(activeSubTab, true);
                 setToast({ message: 'সফলভাবে বকেয়া ফি মুছে ফেলা হয়েছে।', type: 'success' });
                 setOrphanedCategoryToDelete(null);
                 setIsDeletingProgress(false);
@@ -394,7 +477,7 @@ export default function AccountsPage() {
                         transactions: prev.transactions.filter(t => t.id !== transactionToDelete.id)
                     }));
                     // Refresh UI data (don't await sync-dues)
-                    fetchAccounts(true);
+                    fetchAccounts(activeSubTab, true);
                     setTransactionToDelete(null);
                 } else {
                 const data = await res.json();
@@ -816,13 +899,13 @@ export default function AccountsPage() {
                                     className={`${cardBaseClass} cursor-pointer`}
                                 >
                                     <div className="flex items-center gap-2">
-                                        {student.studentPhoto ? (
-                                            <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover" />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
-                                                {student.studentName[0] || 'S'}
-                                            </div>
-                                        )}
+                                        <StudentAvatar
+                                            src={student.studentPhoto}
+                                            name={student.studentName}
+                                            sizeClass="w-10 h-10 rounded-xl shadow-sm"
+                                            iconSize={18}
+                                            fallbackType="letter"
+                                        />
                                         <div>
                                             <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
                                             <p className="text-[10px] text-slate-500 mt-0.5">{student.items.length} টি ফি</p>
@@ -864,13 +947,13 @@ export default function AccountsPage() {
                                     >
                                         <td className="px-8 py-4">
                                             <div className="flex items-center gap-3">
-                                                {student.studentPhoto ? (
-                                                    <img src={student.studentPhoto} alt={student.studentName} className="w-8 h-8 rounded-full object-cover" />
-                                                ) : (
-                                                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-xs">
-                                                        {student.studentName[0] || 'S'}
-                                                    </div>
-                                                )}
+                                                <StudentAvatar
+                                                    src={student.studentPhoto}
+                                                    name={student.studentName}
+                                                    sizeClass="w-8 h-8 rounded-full"
+                                                    iconSize={14}
+                                                    fallbackType="letter"
+                                                />
                                                 <div>
                                                     <p className="font-black text-xs text-slate-800 whitespace-nowrap">{student.studentName}</p>
                                                     <p className="text-[9px] font-bold text-slate-400 tracking-tight whitespace-nowrap">ID: {student.studentUniqueId}</p>
@@ -1105,13 +1188,13 @@ export default function AccountsPage() {
                                     >
                                         <div className="flex items-center justify-between gap-4">
                                             <div className="flex items-center gap-3">
-                                                {txn.studentPhoto ? (
-                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
-                                                ) : (
-                                                    <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-base shadow-sm">
-                                                        {txn.studentName?.[0] || 'S'}
-                                                    </div>
-                                                )}
+                                                <StudentAvatar
+                                                    src={txn.studentPhoto}
+                                                    name={txn.studentName}
+                                                    sizeClass="w-12 h-12 rounded-xl shadow-sm"
+                                                    iconSize={20}
+                                                    fallbackType="letter"
+                                                />
                                                 <div className="flex flex-col gap-0.5">
                                                     <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
                                                     <p className="text-[10px] text-slate-500" title={txn.category}>{getShortCategory(txn.category)}</p>
@@ -1156,13 +1239,13 @@ export default function AccountsPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
-                                                    {txn.studentPhoto ? (
-                                                        <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
-                                                            {txn.studentName?.[0] || 'S'}
-                                                        </div>
-                                                    )}
+                                                    <StudentAvatar
+                                                        src={txn.studentPhoto}
+                                                        name={txn.studentName}
+                                                        sizeClass="w-6 h-6 rounded-full"
+                                                        iconSize={10}
+                                                        fallbackType="letter"
+                                                    />
                                                     <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
                                                 </div>
                                             </td>
@@ -1206,13 +1289,13 @@ export default function AccountsPage() {
                                 <div key={txn.id} className={cardBaseClass}>
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="flex items-start gap-3">
-                                            {txn.studentPhoto ? (
-                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
-                                            ) : (
-                                                <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-base shadow-sm">
-                                                    {txn.studentName?.[0] || 'S'}
-                                                </div>
-                                            )}
+                                            <StudentAvatar
+                                                src={txn.studentPhoto}
+                                                name={txn.studentName}
+                                                sizeClass="w-12 h-12 rounded-xl shadow-sm"
+                                                iconSize={20}
+                                                fallbackType="letter"
+                                            />
                                             <div className="flex flex-col gap-1">
                                                 <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
                                                 <p className="text-[10px] text-slate-500">{txn.category}</p>
@@ -1279,13 +1362,13 @@ export default function AccountsPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            {txn.studentPhoto ? (
-                                                <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
-                                            ) : (
-                                                <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
-                                                    {txn.studentName?.[0] || 'S'}
-                                                </div>
-                                            )}
+                                            <StudentAvatar
+                                                src={txn.studentPhoto}
+                                                name={txn.studentName}
+                                                sizeClass="w-6 h-6 rounded-full"
+                                                iconSize={10}
+                                                fallbackType="letter"
+                                            />
                                             <span className="font-black text-xs text-slate-800">{txn.studentName}</span>
                                         </div>
                                     </td>
@@ -1360,13 +1443,12 @@ export default function AccountsPage() {
                                 >
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-3">
-                                            {student.studentPhoto ? (
-                                                <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-sm">
-                                                    {student.studentName[0] || 'S'}
-                                                </div>
-                                            )}
+                                            <StudentAvatar
+                                                src={student.studentPhoto}
+                                                name={student.studentName}
+                                                sizeClass="w-10 h-10 rounded-xl"
+                                                iconSize={18}
+                                            />
                                             <div>
                                                 <p className="font-black text-sm text-slate-800 leading-tight">{student.studentName}</p>
                                             </div>
@@ -1404,13 +1486,12 @@ export default function AccountsPage() {
                                 <tr key={student.studentId} className="group cursor-pointer hover:bg-slate-50/50 transition-all duration-300">
                                     <td className="px-8 py-4">
                                         <div className="flex items-center gap-3">
-                                            {student.studentPhoto ? (
-                                                <img src={student.studentPhoto} alt={student.studentName} className="w-8 h-8 rounded-full object-cover" />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-xs">
-                                                    {student.studentName[0] || 'S'}
-                                                </div>
-                                            )}
+                                            <StudentAvatar
+                                                src={student.studentPhoto}
+                                                name={student.studentName}
+                                                sizeClass="w-8 h-8 rounded-full"
+                                                iconSize={14}
+                                            />
                                             <div>
                                                 <p className="font-black text-xs text-slate-800 whitespace-nowrap">{student.studentName}</p>
                                                 <p className="text-[9px] font-bold text-slate-400 tracking-tight whitespace-nowrap">ID: {student.studentUniqueId}</p>
@@ -1647,13 +1728,12 @@ export default function AccountsPage() {
                                     >
                                         <div className="flex items-center justify-between gap-4">
                                             <div className="flex items-center gap-3">
-                                                {txn.studentPhoto ? (
-                                                    <img src={txn.studentPhoto} alt={txn.studentName} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
-                                                ) : (
-                                                    <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-base shadow-sm">
-                                                        {txn.studentName?.[0] || 'S'}
-                                                    </div>
-                                                )}
+                                                <StudentAvatar
+                                                    src={txn.studentPhoto}
+                                                    name={txn.studentName}
+                                                    sizeClass="w-12 h-12 rounded-xl shadow-sm"
+                                                    fallbackType="letter"
+                                                />
                                                 <div className="flex flex-col gap-0.5">
                                                     <p className="font-black text-sm text-slate-800 leading-tight">{txn.studentName}</p>
                                                     <p className="text-[10px] text-slate-500" title={txn.category}>{getShortCategory(txn.category)}</p>
@@ -1701,13 +1781,12 @@ export default function AccountsPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
-                                                    {txn.studentPhoto ? (
-                                                        <img src={txn.studentPhoto} alt={txn.studentName} className="w-6 h-6 rounded-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
-                                                            {txn.studentName?.[0] || 'S'}
-                                                        </div>
-                                                    )}
+                                                    <StudentAvatar
+                                                        src={txn.studentPhoto}
+                                                        name={txn.studentName}
+                                                        sizeClass="w-6 h-6 rounded-full"
+                                                        fallbackType="letter"
+                                                    />
                                                     <span className="font-black text-xs text-slate-800 whitespace-nowrap">{txn.studentName}</span>
                                                 </div>
                                             </td>
@@ -2169,13 +2248,13 @@ export default function AccountsPage() {
                         <div className="p-8 pb-4 border-b border-slate-50">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    {selectedStudentDetails.studentPhoto ? (
-                                        <img src={selectedStudentDetails.studentPhoto} alt={selectedStudentDetails.studentName} className="w-12 h-12 rounded-2xl object-cover shadow-md" />
-                                    ) : (
-                                        <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center font-black font-bengali text-lg shadow-sm">
-                                            {selectedStudentDetails.studentName[0] || 'S'}
-                                        </div>
-                                    )}
+                                    <StudentAvatar
+                                        src={selectedStudentDetails.studentPhoto}
+                                        name={selectedStudentDetails.studentName}
+                                        sizeClass="w-12 h-12 rounded-2xl shadow-md"
+                                        iconSize={20}
+                                        fallbackType="letter"
+                                    />
                                     <div>
                                         <h2 className="text-xl font-black text-slate-800">{selectedStudentDetails.studentName}</h2>
                                         <p className="text-xs font-bold text-slate-400">ID: {selectedStudentDetails.studentUniqueId}</p>
@@ -2338,13 +2417,13 @@ export default function AccountsPage() {
                                         <tr key={item.id} className="hover:bg-slate-50/30 transition-colors">
                                             <td className="px-6 py-3.5">
                                                 <div className="flex items-center gap-2">
-                                                    {item.studentPhoto ? (
-                                                        <img src={item.studentPhoto} alt={item.studentName} className="w-6 h-6 rounded-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold font-bengali text-[10px]">
-                                                            {item.studentName?.[0] || 'S'}
-                                                        </div>
-                                                    )}
+                                                    <StudentAvatar
+                                                        src={item.studentPhoto}
+                                                        name={item.studentName}
+                                                        sizeClass="w-6 h-6 rounded-full"
+                                                        iconSize={10}
+                                                        fallbackType="letter"
+                                                    />
                                                     <span className="font-bold text-xs text-slate-700">{item.studentName}</span>
                                                 </div>
                                             </td>
@@ -2749,22 +2828,42 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
         return list;
     }, [categories, activeCategoryFilter, externalSearchQuery, categoryFilterMode, forcedType]);
 
-    const fetchCategories = async () => {
+    const fetchCategories = async (silent = false) => {
         if (!activeInstitute?.id) return;
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const res = await fetch(`/api/admin/accounts/categories?instituteId=${activeInstitute.id}`);
             const data = await res.json();
-            setCategories(Array.isArray(data) ? data : []);
+            if (res.ok) {
+                const list = Array.isArray(data) ? data : [];
+                setCategories(list);
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(`cached_categories_data_${activeInstitute.id}`, JSON.stringify(list));
+                }
+            }
         } catch (error) {
             console.error('Fetch categories error:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchCategories();
+        if (!activeInstitute?.id) return;
+        
+        let hasCache = false;
+        if (typeof window !== 'undefined') {
+            const cached = window.localStorage.getItem(`cached_categories_data_${activeInstitute.id}`);
+            if (cached) {
+                try {
+                    setCategories(JSON.parse(cached));
+                    setLoading(false);
+                    hasCache = true;
+                } catch (e) {}
+            }
+        }
+        
+        fetchCategories(hasCache);
     }, [activeInstitute?.id]);
 
     const handleAdd = () => {

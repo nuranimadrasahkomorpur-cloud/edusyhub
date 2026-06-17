@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { createPortal } from 'react-dom';
+import StudentAvatar from '@/components/StudentAvatar';
+
 
 interface FeeCollectModalProps {
     student: {
@@ -390,13 +392,12 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                 <div className="bg-gradient-to-r from-[#045c84] to-[#067ab0] px-6 py-5 text-white flex-shrink-0">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                            {student.studentPhoto ? (
-                                <img src={student.studentPhoto} alt={student.studentName} className="w-10 h-10 rounded-xl object-cover ring-2 ring-white/30" />
-                            ) : (
-                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg">
-                                    {(student.studentName || 'S')[0]}
-                                </div>
-                            )}
+                            <StudentAvatar
+                                src={student.studentPhoto}
+                                name={student.studentName}
+                                sizeClass="w-10 h-10 rounded-xl ring-2 ring-white/30"
+                                fallbackType="letter"
+                            />
                             <div>
                                 <h2 className="text-base font-black tracking-wide">{student.studentName}</h2>
                                 <p className="text-[10px] text-white/70 font-bold tracking-widest">ID: {student.studentUniqueId}</p>

@@ -163,6 +163,102 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Auto-absent logic: Mark all other unmarked students in the class as ABSENT in the database
+        try {
+            let finalClassId = classId;
+            if (!finalClassId || finalClassId === 'all' || finalClassId === '') {
+                const student = await prisma.user.findUnique({
+                    where: { id: studentId },
+                    select: { metadata: true }
+                });
+                finalClassId = (student?.metadata as any)?.classId;
+            }
+
+            if (finalClassId) {
+                const targetClassIdStr = typeof finalClassId === 'string'
+                    ? finalClassId
+                    : (finalClassId.$oid || finalClassId.toString());
+
+                if (targetClassIdStr) {
+                    // Fetch all other students in the same institute
+                    const allStudents = await prisma.user.findMany({
+                        where: {
+                            role: 'STUDENT',
+                            instituteIds: { has: instituteId }
+                        },
+                        select: { id: true, metadata: true }
+                    });
+
+                    // Filter to approved and active students in the target class
+                    const classStudents = allStudents.filter((s: any) => {
+                        const sClassId = s.metadata?.classId;
+                        if (!sClassId) return false;
+                        const sClassIdStr = typeof sClassId === 'string' ? sClassId : (sClassId.$oid || sClassId.toString());
+                        if (sClassIdStr !== targetClassIdStr) return false;
+
+                        if (s.metadata?.admissionStatus === 'PENDING') return false;
+                        if (s.metadata?.status === 'INACTIVE') return false;
+                        return s.id !== studentId; // exclude the student currently marked
+                    });
+
+                    if (classStudents.length > 0) {
+                        // Find existing attendance records for these class students on dateString
+                        const existingAttendances = await prisma.attendance.findMany({
+                            where: {
+                                dateString,
+                                instituteId,
+                                studentId: { in: classStudents.map(s => s.id) }
+                            },
+                            select: { studentId: true }
+                        });
+                        const markedStudentIds = new Set(existingAttendances.map(a => a.studentId));
+
+                        const unmarkedStudents = classStudents.filter(s => !markedStudentIds.has(s.id));
+                        if (unmarkedStudents.length > 0) {
+                            const bulkUpdates = unmarkedStudents.map(s => {
+                                const doc: any = {
+                                    $set: {
+                                        studentId: { $oid: s.id },
+                                        instituteId: { $oid: instituteId },
+                                        dateString,
+                                        status: 'ABSENT',
+                                        method: method || 'MANUAL',
+                                        updatedAt: new Date()
+                                    }
+                                };
+                                doc.$set.classId = { $oid: targetClassIdStr };
+                                return {
+                                    q: { studentId: { $oid: s.id }, dateString },
+                                    u: doc,
+                                    upsert: true
+                                };
+                            });
+
+                            const runBulkUpdates = async (collection: string) => {
+                                return (prisma as any).$runCommandRaw({
+                                    update: collection,
+                                    updates: bulkUpdates
+                                });
+                            };
+
+                            try {
+                                await runBulkUpdates('Attendance');
+                            } catch (rawError: any) {
+                                console.error('Raw MongoDB bulk update (Attendance) failed:', rawError);
+                                try {
+                                    await runBulkUpdates('attendance');
+                                } catch (secondError: any) {
+                                    console.error('Fallback bulk update (attendance) also failed:', secondError);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (autoAbsentError) {
+            console.error('Failed to run auto-absent logic:', autoAbsentError);
+        }
+
         // Trigger Guardian Notification for FRS/QR methods if status is PRESENT
         if (status === 'PRESENT' && (method === 'FRS' || method === 'QR')) {
             try {
