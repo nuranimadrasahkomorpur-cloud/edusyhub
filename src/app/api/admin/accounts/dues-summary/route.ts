@@ -23,11 +23,22 @@ export async function GET(req: Request) {
         const archivedCategoryNames = archivedCategories.map((c: any) => c.name);
         const archivedCategoryIds = archivedCategories.map((c: any) => c.id).filter(Boolean);
 
-        const matchStage = {
+        const studentIdsParam = searchParams.get('studentIds');
+        const matchStage: any = {
             instituteId: { $oid: instituteId },
             type: 'INCOME',
-            studentId: { $ne: null }
         };
+
+        if (studentIdsParam) {
+            const ids = studentIdsParam.split(',').filter(Boolean);
+            if (ids.length > 0) {
+                matchStage.studentId = { $in: ids.map(id => ({ $oid: id })) };
+            } else {
+                matchStage.studentId = { $ne: null };
+            }
+        } else {
+            matchStage.studentId = { $ne: null };
+        }
 
         const result = await (prisma as any).$runCommandRaw({
             aggregate: 'Transaction',

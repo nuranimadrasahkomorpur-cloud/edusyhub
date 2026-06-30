@@ -820,20 +820,43 @@ export default function StudentManagementPage() {
     };
 
 
-    const fetchFeesData = () => {
+    const fetchFeesData = (studentsList?: any[], forceRefresh = false) => {
         if (!activeInstitute?.id) return;
+        const currentList = studentsList || students;
+        if (currentList.length === 0) return;
+        
+        let idsToFetch = currentList.map(s => s.id);
+        if (!forceRefresh) {
+            // Only fetch for students that don't have feesData yet, unless forceRefresh is true.
+            // Using a functional approach to get the most up-to-date feesData is safer, 
+            // but we can rely on the current render's feesData for the missing check.
+            idsToFetch = idsToFetch.filter(id => !feesData?.[id]);
+        }
+        
+        if (idsToFetch.length === 0) return;
+
         setLoadingFees(true);
-        fetch(`/api/admin/accounts/dues-summary?instituteId=${activeInstitute.id}`)
+        fetch(`/api/admin/accounts/dues-summary?instituteId=${activeInstitute.id}&studentIds=${idsToFetch.join(',')}`)
             .then(res => res.json())
             .then(data => {
-                setFeesData(data);
+                setFeesData(prev => {
+                    const newFees = { ...(prev || {}) };
+                    // Set all requested IDs, even if they have no dues, to prevent infinite re-fetching
+                    idsToFetch.forEach(id => {
+                        newFees[id] = data[id] || { totalPaid: 0, totalDue: 0, advance: 0 };
+                    });
+                    return newFees;
+                });
             })
             .catch(err => console.error("Error fetching fees data:", err))
             .finally(() => setLoadingFees(false));
     };
 
     useEffect(() => {
-        if (viewMode === 'FEES_COLLECT' && !feesData && activeInstitute?.id) {
+        if (viewMode === 'FEES_COLLECT' && activeInstitute?.id && students.length > 0) {
+            const missingIds = students.filter(s => !feesData?.[s.id]).map(s => s.id);
+            if (missingIds.length === 0) return;
+
             const syncKey = `sync_${activeInstitute.id}`;
             if (!sessionStorage.getItem(syncKey)) {
                 sessionStorage.setItem(syncKey, 'true');
@@ -843,17 +866,17 @@ export default function StudentManagementPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ instituteId: activeInstitute.id })
                 })
-                .then(() => fetchFeesData())
+                .then(() => fetchFeesData(students))
                 .catch(err => {
                     console.error('Failed to sync dues:', err);
                     sessionStorage.removeItem(syncKey);
-                    fetchFeesData();
+                    fetchFeesData(students);
                 });
             } else {
-                fetchFeesData();
+                fetchFeesData(students);
             }
         }
-    }, [viewMode, activeInstitute?.id, feesData]);
+    }, [viewMode, activeInstitute?.id, students, feesData]);
 
     const handleOpenFeeCollect = async (student: any, isFromScanner = false) => {
         // Open modal instantly and let FeeCollectModal handle its own fetching
@@ -1773,6 +1796,14 @@ export default function StudentManagementPage() {
                 } else {
                     // Fetch for new student to get DB ID
                     fetchStudents();
+                    
+                    if (responseData?.id) {
+                        setStudentToPrint({
+                            ...payload,
+                            id: responseData.id
+                        });
+                        setIsPrintAdmissionModalOpen(true);
+                    }
                 }
                 setEditingStudent(null);
             } else {
@@ -5952,10 +5983,10 @@ export default function StudentManagementPage() {
                                 });
                             } catch (err) {
                                 console.error('Failed to update single student fee data', err);
-                                fetchFeesData(); // Fallback
+                                fetchFeesData(undefined, true); // Fallback
                             }
                         } else {
-                            fetchFeesData();
+                            fetchFeesData(undefined, true);
                         }
                     }}
                     onPrintReceipt={(txn: any) => {

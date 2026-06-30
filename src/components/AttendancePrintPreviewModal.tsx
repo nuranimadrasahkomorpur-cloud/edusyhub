@@ -109,6 +109,16 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
         return `${startDayBn} ${banglaMonths[startMonth]} ${startYearBn} - ${endDayBn} ${banglaMonths[endMonth]} ${endYearBn}`;
     };
 
+    // Calculate total working days (days where attendance was taken)
+    const classWorkingDays = useMemo(() => {
+        const uniqueDates = new Set(attendanceList.map((a: any) => a.dateString));
+        let count = 0;
+        dateList.forEach(d => {
+            if (uniqueDates.has(d)) count++;
+        });
+        return count;
+    }, [attendanceList, dateList]);
+
     // Calculate individual student stats
     const studentWithStats = useMemo(() => {
         return students.map((s: any) => {
@@ -130,8 +140,7 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
             const leave = records.filter((r: any) => ['LEAVE', 'LEAVE_PENDING'].includes(r.status)).length;
             
             // Total school days can be approximated by number of days in range that had at least one attendance record across the class
-            // But let's count dates where this student had any record, or fallback to total dates.
-            const totalWorking = dateList.length;
+            const totalWorking = classWorkingDays > 0 ? classWorkingDays : dateList.length;
             const rate = totalWorking > 0 ? Math.round(((present + late) / totalWorking) * 100) : 0;
 
             return {
@@ -171,6 +180,8 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
     const [isAutoFit, setIsAutoFit] = useState(true);
     const [translateX, setTranslateX] = useState(0);
     const [translateY, setTranslateY] = useState(0);
+    const [totalMarks, setTotalMarks] = useState(20);
+    const [cardColumns, setCardColumns] = useState(2);
     
     // Touch gesture tracking refs
     const touchStateRef = useRef({
@@ -396,7 +407,7 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
             });
         } else {
             // Register Grid Headers
-            const headers = ['রোল', 'নাম', ...dateList.map(d => d.split('-')[2]), 'উপস্থিত', '%'];
+            const headers = ['রোল', 'নাম', ...dateList.map(d => d.split('-')[2]), 'উপস্থিত', '%', 'প্রাপ্ত নম্বর'];
             tsv = headers.join('\t') + '\n';
             printStudents.forEach(s => {
                 const datesRow = dateList.map(d => {
@@ -408,7 +419,8 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                     s.name,
                     ...datesRow,
                     `${s.present + s.late}/${s.totalWorking}`,
-                    `${s.rate}%`
+                    `${s.rate}%`,
+                    Math.round((s.rate * totalMarks) / 100)
                 ].join('\t') + '\n';
             });
         }
@@ -677,6 +689,7 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                 })}
                                                                 <th className="py-2.5 px-2 font-black" style={{ minWidth: '4em' }}>উপস্থিত</th>
                                                                 <th className="py-2.5 px-2 font-black" style={{ minWidth: '3em' }}>%</th>
+                                                                <th className="py-2.5 px-2 font-black" style={{ minWidth: '4em' }}>প্রাপ্ত নম্বর</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
@@ -714,6 +727,9 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                         }`} style={{ fontSize: '0.85em' }}>
                                                                             {s.rate}%
                                                                         </span>
+                                                                    </td>
+                                                                    <td className="py-2 px-1 text-indigo-700 font-black">
+                                                                        {Math.round((s.rate * totalMarks) / 100)}
                                                                     </td>
                                                                 </tr>
                                                             ))}
@@ -784,7 +800,7 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                         {chunkStudents.length > 0 && (
                                                             <div 
                                                                 className="grid gap-4 mt-2"
-                                                                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}
+                                                                style={{ gridTemplateColumns: `repeat(${cardColumns}, 1fr)` }}
                                                             >
                                                                 {chunkStudents.map((s) => (
                                                                     <div 
@@ -813,7 +829,7 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                                 style={{ width: `${s.rate}%` }}
                                                                             />
                                                                         </div>
-                                                                        <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-bold">
+                                                                        <div className="grid grid-cols-5 gap-1.5 text-center text-[9px] font-bold">
                                                                             <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
                                                                                 <span className="block text-slate-400 leading-none mb-1">মোট</span>
                                                                                 <span className="text-slate-700 font-black">{s.totalWorking}</span>
@@ -829,6 +845,10 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                             <div className="bg-blue-50/50 p-1.5 rounded-lg border border-blue-100/50">
                                                                                 <span className="block text-blue-500 leading-none mb-1">ছুটি</span>
                                                                                 <span className="text-blue-700 font-black">{s.leave}</span>
+                                                                            </div>
+                                                                            <div className="bg-indigo-50/50 p-1.5 rounded-lg border border-indigo-100/50">
+                                                                                <span className="block text-indigo-500 leading-none mb-1">নম্বর</span>
+                                                                                <span className="text-indigo-700 font-black">{Math.round((s.rate * totalMarks) / 100)}</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -892,6 +912,17 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                 রেজিস্টার ভিউ
                             </button>
                         </div>
+                    </div>
+                    
+                    <div className="px-4 pb-3 border-b border-slate-100 bg-slate-50/50">
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1">মোট হাজিরা নম্বর</label>
+                        <input
+                            type="number"
+                            value={totalMarks}
+                            onChange={e => setTotalMarks(Number(e.target.value))}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-700 outline-none focus:border-[#4f46e5] transition-all shadow-sm focus:shadow-indigo-100/50"
+                            placeholder="যেমন: 20"
+                        />
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-6 custom-scrollbar">
@@ -1008,6 +1039,24 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                         className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#4f46e5]"
                                     />
                                     <p className="text-[10px] text-slate-400">সারি বেশি হলে নতুন পেজে যাবে</p>
+                                </div>
+                            )}
+
+                            {/* Card grid columns (card view only) */}
+                            {viewMode === 'card' && (
+                                <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                                        <span>কার্ড কলাম সংখ্যা</span>
+                                        <span className="text-[#4f46e5] font-black">{cardColumns}</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="6"
+                                        value={cardColumns}
+                                        onChange={e => setCardColumns(parseInt(e.target.value))}
+                                        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-[#4f46e5]"
+                                    />
                                 </div>
                             )}
                         </div>

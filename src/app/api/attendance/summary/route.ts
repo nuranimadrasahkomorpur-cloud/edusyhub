@@ -196,24 +196,12 @@ export async function GET(req: NextRequest) {
         const summary = statsResult.cursor?.firstBatch[0] || { present: 0, absent: 0, late: 0, leave: 0, totalCount: 0 };
         const workingDays = dailyResult.cursor?.firstBatch.length || 0;
         const expectedTotalRecords = workingDays * totalStudents;
-        
-        // Add missing records as absent
-        if (expectedTotalRecords > summary.totalCount) {
-            const missing = expectedTotalRecords - summary.totalCount;
-            summary.absent += missing;
-            summary.totalCount = expectedTotalRecords;
-        }
 
         const dailyTrends = (dailyResult.cursor?.firstBatch || []).map((d: any) => {
-            const existingTotal = d.present + d.absent + d.late + d.leave;
-            let missing = 0;
-            if (totalStudents > existingTotal) {
-                missing = totalStudents - existingTotal;
-            }
             return {
                 date: d._id,
                 present: d.present,
-                absent: d.absent + missing,
+                absent: d.absent,
                 late: d.late,
                 leave: d.leave
             };

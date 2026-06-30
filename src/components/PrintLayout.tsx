@@ -128,7 +128,7 @@ export default function PrintLayout({ title, subtitle, institute, children, date
                 @media print {
                     @page {
                         size: auto;
-                        margin: 0 !important;
+                        margin: 0.2in !important;
                     }
                     body, html {
                         height: auto !important;
@@ -151,12 +151,13 @@ export default function PrintLayout({ title, subtitle, institute, children, date
                         width: 100% !important;
                         max-width: none !important;
                         height: auto !important;
-                        min-height: 0 !important;
+                        min-height: 98vh !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         border: none !important;
                         box-shadow: none !important;
-                        display: block !important;
+                        display: flex !important;
+                        flex-direction: column !important;
                         transform: none !important;
                         page-break-after: auto;
                         break-after: auto;
