@@ -1349,7 +1349,6 @@ export default function StudentManagementPage() {
         setDebouncedSearch(search);
     }, [search]);
 
-    // Fetch data immediately when filters or tab change
     useEffect(() => {
         if (isLoading) return;
 
@@ -1363,7 +1362,7 @@ export default function StudentManagementPage() {
         } else if (activeTab === 'students' || activeTab === 'applications') {
             fetchStudents(1);
         }
-    }, [debouncedSearch, activeInstitute?.id, activeTab, statusFilter, selectedClassId, selectedGroupId, isLoading]);
+    }, [debouncedSearch, activeInstitute?.id, activeTab, statusFilter, selectedClassId, selectedGroupId]);
 
     // Strict Owner/SuperAdmin check
     const isOwner = activeRole === 'SUPER_ADMIN' || (activeInstitute?.adminIds || []).includes(currentUser?.id) || activeInstitute?.isOwner === true;
