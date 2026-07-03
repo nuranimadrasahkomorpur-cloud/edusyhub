@@ -78,7 +78,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
                                 if (freshInst) {
                                     setActiveInstitute(freshInst);
                                     localStorage.setItem('edusy_active_institute', JSON.stringify(freshInst));
+                                } else {
+                                    // The user is no longer part of the active institute
+                                    if (data.user.institutes && data.user.institutes.length > 0) {
+                                        const defaultInst = data.user.institutes.find((i: any) => i.id === data.user.defaultInstituteId) || data.user.institutes[0];
+                                        setActiveInstitute(defaultInst);
+                                        localStorage.setItem('edusy_active_institute', JSON.stringify(defaultInst));
+                                    } else {
+                                        setActiveInstitute(null);
+                                        localStorage.removeItem('edusy_active_institute');
+                                    }
                                 }
+                            } else if (data.user.institutes && data.user.institutes.length > 0) {
+                                const defaultInst = data.user.institutes.find((i: any) => i.id === data.user.defaultInstituteId) || data.user.institutes[0];
+                                setActiveInstitute(defaultInst);
+                                localStorage.setItem('edusy_active_institute', JSON.stringify(defaultInst));
                             }
                         }
                     }
@@ -194,6 +208,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             if (freshActive) {
                 setActiveInstitute(freshActive);
                 localStorage.setItem('edusy_active_institute', JSON.stringify(freshActive));
+            } else {
+                if (institutes.length > 0) {
+                    setActiveInstitute(institutes[0]);
+                    localStorage.setItem('edusy_active_institute', JSON.stringify(institutes[0]));
+                } else {
+                    setActiveInstitute(null);
+                    localStorage.removeItem('edusy_active_institute');
+                }
             }
         }
     }, []);

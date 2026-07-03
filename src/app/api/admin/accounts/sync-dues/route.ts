@@ -1,6 +1,37 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 
+export async function GET(req: Request) {
+    const now = new Date();
+    const categories = await (prisma as any).accountCategory.findMany({});
+    const fixedCategoryIds = categories.filter((c: any) => c.config?.frequencyType === 'fixed').map((c: any) => c.id);
+
+    if (fixedCategoryIds.length > 0) {
+        const futureFees = await (prisma as any).transaction.findMany({
+            where: {
+                status: 'PENDING',
+                categoryId: { in: fixedCategoryIds },
+            }
+        });
+
+        const toDeleteIds = [];
+        for (const fee of futureFees) {
+            const feeDate = new Date(fee.date);
+            if (feeDate.getFullYear() > now.getFullYear() || (feeDate.getFullYear() === now.getFullYear() && feeDate.getMonth() > now.getMonth())) {
+                toDeleteIds.push(fee.id);
+            }
+        }
+
+        if (toDeleteIds.length > 0) {
+            await (prisma as any).transaction.deleteMany({
+                where: { id: { in: toDeleteIds } }
+            });
+            return NextResponse.json({ message: `Cleaned up ${toDeleteIds.length} future dues.` });
+        }
+    }
+    return NextResponse.json({ message: 'No future dues to clean up.' });
+}
+
 export async function POST(req: Request) {
     try {
         const { instituteId } = await req.json();
@@ -59,13 +90,27 @@ export async function POST(req: Request) {
 
         let totalGenerated = 0;
 
+        // Clean up any future PENDING dues that were mistakenly generated in the past due to future endDates
+        const fixedCategoryIds = categories.filter((c: any) => c.config?.frequencyType === 'fixed').map((c: any) => c.id);
+        if (fixedCategoryIds.length > 0) {
+            await (prisma as any).transaction.deleteMany({
+                where: {
+                    instituteId,
+                    categoryId: { in: fixedCategoryIds },
+                    status: 'PENDING',
+                    date: { gt: new Date() }
+                }
+            });
+        }
+
         for (const category of categories) {
             const config = category.config || {};
             if (config.frequencyType === 'fixed' && ['monthly', 'weekly', 'yearly', 'semester'].includes(config.interval) && config.startDate) {
                 const start = new Date(config.startDate);
                 const current = new Date();
-                const end = config.endDate ? new Date(config.endDate) : current;
-                const actualEnd = end < start && !config.endDate ? current : end;
+                // We should only generate dues up to the CURRENT date, or the end date if it's in the past.
+                const configEnd = config.endDate ? new Date(config.endDate) : null;
+                const actualEnd = configEnd ? new Date(Math.min(current.getTime(), configEnd.getTime())) : current;
 
                 const datesToGenerate: Date[] = [];
                 

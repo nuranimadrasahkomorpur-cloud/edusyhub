@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from '@/components/SessionProvider';
+import { useUI } from '@/components/UIProvider';
 import {
     Users,
     Building2,
@@ -19,7 +20,9 @@ import {
     Save,
     Copy,
     Link2,
-    CheckCheck
+    CheckCheck,
+    LogOut,
+    Edit2
 } from 'lucide-react';
 import Toast from '@/components/Toast';
 import Modal from '@/components/Modal';
@@ -27,6 +30,7 @@ import Modal from '@/components/Modal';
 
 export default function MultiInstitutePage() {
     const { user, activeRole, activeInstitute, switchInstitute, refreshInstitutes, setAllInstitutes, login } = useSession();
+    const { confirm } = useUI();
     const [institutes, setInstitutes] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -203,6 +207,32 @@ export default function MultiInstitutePage() {
         }
     };
 
+    const handleLeaveInstitute = async (inst: any) => {
+        if (!await confirm(`আপনি কি নিশ্চিত যে আপনি "${inst.name}" থেকে লিভ নিতে চান?`)) return;
+        
+        try {
+            const res = await fetch('/api/institute/leave', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ instituteId: inst.id, userId: user?.id }),
+            });
+            if (res.ok) {
+                setToast({ message: 'আপনি সফলভাবে প্রতিষ্ঠান থেকে লিভ নিয়েছেন।', type: 'success' });
+                fetchInstitutes(); // Refresh list
+                
+                // If they left their active institute, we should probably reset active institute
+                if (activeInstitute?.id === inst.id) {
+                    window.location.reload(); // Hard reload to reset session state cleanly
+                }
+            } else {
+                setToast({ message: 'লিভ নিতে সমস্যা হয়েছে।', type: 'error' });
+            }
+        } catch (error) {
+            console.error('Leave institute error:', error);
+            setToast({ message: 'সার্ভার এরর হয়েছে।', type: 'error' });
+        }
+    };
+
     if (activeRole !== 'ADMIN' && activeRole !== 'SUPER_ADMIN' && activeRole !== 'TEACHER') {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
@@ -344,12 +374,23 @@ export default function MultiInstitutePage() {
                                             {copiedId === inst.id ? <CheckCheck size={16} /> : <Link2 size={16} />}
                                             <span>{copiedId === inst.id ? 'কপি!' : 'API'}</span>
                                         </button>
-                                        <button
-                                            onClick={() => handleOpenEdit(inst)}
-                                            className="px-4 py-3 bg-slate-50 text-slate-400 hover:text-[#045c84] hover:bg-slate-100 rounded-xl transition-all"
-                                        >
-                                            <MoreVertical size={18} />
-                                        </button>
+                                        {inst.isOwner !== false ? (
+                                            <button
+                                                onClick={() => handleOpenEdit(inst)}
+                                                title="এডিট করুন"
+                                                className="px-4 py-3 bg-slate-50 text-slate-400 hover:text-[#045c84] hover:bg-slate-100 rounded-xl transition-all"
+                                            >
+                                                <Edit2 size={18} />
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleLeaveInstitute(inst)}
+                                                title="লিভ নিন"
+                                                className="px-4 py-3 bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                            >
+                                                <LogOut size={18} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

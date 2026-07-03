@@ -77,7 +77,25 @@ import PrintReceiptModal from '@/components/PrintReceiptModal';
 import StudentPrintPreviewModal from '@/components/StudentPrintPreviewModal';
 import PrintAdmissionModal from '@/components/PrintAdmissionModal';
 import { useUI } from '@/components/UIProvider';
-import { getCleanId } from '@/utils/digit-utils';
+import { getCleanId, normalizeAuthIdentifier } from '@/utils/digit-utils';
+
+const PRESET_CLASSES = {
+    school: {
+        bn: ['প্লে', 'নার্সারি', 'প্রথম শ্রেণী', 'দ্বিতীয় শ্রেণী', 'তৃতীয় শ্রেণী', 'চতুর্থ শ্রেণী', 'পঞ্চম শ্রেণী', 'ষষ্ঠ শ্রেণী', 'সপ্তম শ্রেণী', 'অষ্টম শ্রেণী', 'নবম শ্রেণী', 'দশম শ্রেণী', 'একাদশ শ্রেণী', 'দ্বাদশ শ্রেণী'],
+        en: ['Play', 'Nursery', 'Class One', 'Class Two', 'Class Three', 'Class Four', 'Class Five', 'Class Six', 'Class Seven', 'Class Eight', 'Class Nine', 'Class Ten', 'Class Eleven', 'Class Twelve'],
+        ar: ['روصة', 'تمهيدي', 'الصف الأول', 'الصف الثاني', 'الصف الثالث', 'الصف الرابع', 'الصف الخامس', 'الصف السادس', 'الصف السابع', 'الصف الثامن', 'الصف التاسع', 'الصف العاشر', 'الحادي عشر', 'الثاني عشر']
+    },
+    alia: {
+        bn: ['প্লে', 'নার্সারি', 'ইবতেদায়ী ১ম', 'ইবতেদায়ী ২য়', 'ইবতেদায়ী ৩য়', 'ইবতেদায়ী ৪র্থ', 'ইবতেদায়ী ৫ম', 'দাখিল ৬ষ্ঠ', 'দাখিল ৭ম', 'দাখিল ৮ম', 'দাখিল ৯ম', 'দাখিল ১০ম', 'আলিম ১ম বর্ষ', 'আলিম ২য় বর্ষ', 'ফাযিল', 'কামিল', 'হিফজ', 'নূরানী', 'মক্তব'],
+        en: ['Play', 'Nursery', 'Ibtedayi One', 'Ibtedayi Two', 'Ibtedayi Three', 'Ibtedayi Four', 'Ibtedayi Five', 'Dakhil Six', 'Dakhil Seven', 'Dakhil Eight', 'Dakhil Nine', 'Dakhil Ten', 'Alim First Year', 'Alim Second Year', 'Fazil', 'Kamil', 'Hifz', 'Noorani', 'Maktab'],
+        ar: ['روصة', 'تمهيدي', 'الابتدائي الأول', 'الابتدائي الثاني', 'الابتدائي الثالث', 'الابتدائي الرابع', 'الابتدائي الخامس', 'الداخل السادس', 'الداخل السابع', 'الداخل الثامن', 'الداخل التاسع', 'الداخل العاشر', 'عالم سنة أولى', 'عالم سنة ثانية', 'فاضل', 'كامل', 'حفظ', 'نوراني', 'مكتب']
+    },
+    qawmi: {
+        bn: ['নূরানী / মক্তব', 'নাজেরা', 'হিফজ', 'আউয়াল (১ম)', 'ছানী (২য়)', 'ছালেছ (৩য়)', 'রাবে (৪র্থ)', 'খামেস (৫ম)', 'নাহবেমীর', 'হেদায়াতুন নাহু', 'কাফিয়া', 'শরহে জামী', 'শরহে বেকায়া', 'জালালাইন', 'মিশকাত', 'দাওরায়ে হাদীস', 'ইফতা'],
+        en: ['Noorani / Maktab', 'Nazira', 'Hifz', 'Awwal', 'Sani', 'Salis', 'Rabi', 'Khamis', 'Nahw-e-Mir', 'Hidayatun Nahw', 'Kafiyah', 'Sharh-e-Jami', 'Sharh-e-Wiqayah', 'Jalalain', 'Mishkat', 'Dawra-e-Hadith', 'Ifta'],
+        ar: ['نوراني / مكتب', 'ناظرة', 'حفظ', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'نحو مير', 'هداية النحو', 'كافية', 'شرح جامي', 'شرح وقاية', 'جلالين', 'مشكاة', 'دورة الحديث', 'إفتاء']
+    }
+};
 
 const getThumbnailUrl = (url: string | undefined | null) => {
     if (!url) return '';
@@ -299,6 +317,8 @@ export default function StudentManagementPage() {
     const [showScanButton, setShowScanButton] = useState(true);
     const scanLastScrollY = useRef(0);
     const activeFetchSession = useRef<number>(0);
+    const [classPresetType, setClassPresetType] = useState<'school' | 'alia' | 'qawmi' | null>(null);
+    const [classLanguage, setClassLanguage] = useState<'bn' | 'en' | 'ar'>('bn');
 
 
 
@@ -358,8 +378,22 @@ export default function StudentManagementPage() {
         name: '',
         email: '',
         password: '',
-        metadata: {}
+        metadata: { 
+            religion: 'ইসলাম', 
+            nationality: 'বাংলাদেশী',
+            admissionType: 'নতুন ভর্তি',
+            admissionDate: new Date().toISOString().split('T')[0]
+        }
     });
+
+    const [gradingSystem, setGradingSystem] = useState<'school' | 'madrasa'>('school');
+
+    // Auto-save form data draft
+    useEffect(() => {
+        if (isAddModalOpen && !editingStudent) {
+            localStorage.setItem('edusy_student_form_draft', JSON.stringify(formData));
+        }
+    }, [formData, isAddModalOpen, editingStudent]);
     
     // Direct Image Upload from Table
     const [uploadingStudentId, setUploadingStudentId] = useState<string | null>(null);
@@ -1780,7 +1814,8 @@ export default function StudentManagementPage() {
                     type: 'success'
                 });
                 setIsAddModalOpen(false);
-                setFormData({ name: '', email: '', password: '', metadata: {} });
+                setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
+                localStorage.removeItem('edusy_student_form_draft');
                 
                 if (editingStudent) {
                     // Update locally
@@ -1792,6 +1827,13 @@ export default function StudentManagementPage() {
                         metadata: payload.metadata || s.metadata,
                         faceDescriptor: payload.faceDescriptor || s.faceDescriptor
                     } : s));
+                    
+                    setStudentToPrint({
+                        ...editingStudent,
+                        ...payload,
+                        id: editingStudent.id
+                    });
+                    setIsPrintAdmissionModalOpen(true);
                 } else {
                     // Fetch for new student to get DB ID
                     fetchStudents();
@@ -1876,26 +1918,22 @@ export default function StudentManagementPage() {
         try {
             let payload: any = { instituteId: activeInstitute.id };
 
-            if (isBulkClassMode) {
-                const items = bulkClassText
-                    .split('\n')
-                    .map(line => {
-                        const slMatch = line.match(/^(\d+)[\.\)\s-]+/);
-                        const order = slMatch ? parseInt(slMatch[1]) : 0;
-                        const name = line.replace(/^\d+[\.\)\s-]+/, '').trim();
-                        return { name, order };
-                    })
-                    .filter(item => item.name.length > 0);
+            const items = bulkClassText
+                .split('\n')
+                .map(line => {
+                    const slMatch = line.match(/^(\d+)[\.\)\s-]+/);
+                    const order = slMatch ? parseInt(slMatch[1]) : 0;
+                    const name = line.replace(/^\d+[\.\)\s-]+/, '').trim();
+                    return { name, order };
+                })
+                .filter(item => item.name.length > 0);
 
-                if (items.length === 0) {
-                    setToast({ message: 'অনুগ্রহ করে ক্লাস লিস্ট দিন।', type: 'error' });
-                    setActionLoading(false);
-                    return;
-                }
-                payload.names = items;
-            } else {
-                payload.name = classData.name;
+            if (items.length === 0) {
+                setToast({ message: 'অনুগ্রহ করে ক্লাস লিস্ট দিন।', type: 'error' });
+                setActionLoading(false);
+                return;
             }
+            payload.names = items;
 
             const url = editingClass ? `/api/admin/classes/${editingClass.id}` : '/api/admin/classes';
             const method = editingClass ? 'PATCH' : 'POST';
@@ -3502,7 +3540,7 @@ export default function StudentManagementPage() {
                 onClose={() => {
                     setIsAddModalOpen(false);
                     setEditingStudent(null);
-                    setFormData({ name: '', email: '', password: '', metadata: {} });
+                    setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
                     setActiveFormTab('student');
                 }}
                 title={editingStudent ? "শিক্ষার্থীর তথ্য আপডেট করুন" : "নতুন শিক্ষার্থী যুক্ত করুন"}
@@ -3547,6 +3585,20 @@ export default function StudentManagementPage() {
                             <button
                                 type="button"
                                 onClick={() => {
+                                    if (window.confirm('আপনি কি ড্রাফটটি মুছে ফেলে নতুন করে ফর্ম পূরণ করতে চান?')) {
+                                        localStorage.removeItem('edusy_student_form_draft');
+                                        setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
+                                        setToast({ message: 'ড্রাফট ক্লিয়ার করা হয়েছে', type: 'success' });
+                                    }
+                                }}
+                                className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                                title="ড্রাফট মুছুন (Clear Draft)"
+                            >
+                                <Trash2 size={20} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
                                     if (!isExcelMode) {
                                         setExcelData([]);
                                         setColumnMappings({});
@@ -3585,25 +3637,52 @@ export default function StudentManagementPage() {
                     {!editingStudent && !isExcelMode && (
                         <div className="flex flex-col gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
                             <div className="flex items-center gap-6">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="admissionType" value="new" checked={admissionType === 'new'} onChange={() => setAdmissionType('new')} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
-                                    <span className="text-sm font-bold text-slate-800">নতুন শিক্ষার্থী (New)</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="admissionType" value="old" checked={admissionType === 'old'} onChange={() => setAdmissionType('old')} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
-                                    <span className="text-sm font-bold text-slate-800">পুরাতন শিক্ষার্থী (Old)</span>
-                                </label>
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="admissionType" value="new" checked={admissionType === 'new'} onChange={() => {
+                                            setAdmissionType('new');
+                                            setFormData({ ...formData, metadata: { ...formData.metadata, admissionType: 'নতুন ভর্তি' } });
+                                        }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
+                                        <span className="text-sm font-bold text-slate-800">নতুন শিক্ষার্থী (New)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="admissionType" value="old" checked={admissionType === 'old'} onChange={() => {
+                                            setAdmissionType('old');
+                                            setFormData({ ...formData, metadata: { ...formData.metadata, admissionType: 'পুরাতন ভর্তি' } });
+                                        }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
+                                        <span className="text-sm font-bold text-slate-800">পুরাতন শিক্ষার্থী (Old)</span>
+                                    </label>
+                                </div>
+                                
+                                <div className="h-6 w-px bg-slate-300 mx-2" />
+                                
+                                <div className="flex items-center gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="headerResidentialStatus" value="abasik" checked={formData.metadata?.residentialStatus === 'abasik' || residentialStatus === 'abasik'} onChange={() => {
+                                            setResidentialStatus('abasik');
+                                            setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: 'abasik' } });
+                                        }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
+                                        <span className="text-sm font-bold text-slate-800">আবাসিক (Res.)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="headerResidentialStatus" value="onabasik" checked={formData.metadata?.residentialStatus === 'onabasik' || residentialStatus === 'onabasik'} onChange={() => {
+                                            setResidentialStatus('onabasik');
+                                            setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: 'onabasik' } });
+                                        }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
+                                        <span className="text-sm font-bold text-slate-800">অনাবাসিক (Non-res.)</span>
+                                    </label>
+                                </div>
                             </div>
 
                             {admissionType === 'old' && (
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                                     <input 
                                         type="text" 
                                         placeholder="পূর্বের শিক্ষার্থীর নাম, আইডি বা রোল দিয়ে খুঁজুন..." 
                                         value={oldStudentSearchQuery}
                                         onChange={(e) => setOldStudentSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] text-sm font-medium outline-none transition-all"
+                                        className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all"
                                     />
                                     {oldStudentSearchQuery.length > 1 && (
                                         <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto z-50">
@@ -4099,6 +4178,9 @@ export default function StudentManagementPage() {
                                         : formConfig).filter(f => !LOGIN_FIELD_IDS.includes(f.id) && f.id !== 'name');
 
                                     const renderField = (fieldId: string, forceRequired?: boolean) => {
+                                        const isMandatory = ['name', 'classId', 'studentId', 'rollNumber', ...LOGIN_FIELD_IDS].includes(fieldId);
+                                        if (!isMandatory && !effectiveFields.some(f => f.id === fieldId)) return null;
+                                        
                                         const field = POSSIBLE_FIELDS.find(f => f.id === fieldId);
                                         if (!field) return null;
 
@@ -4122,11 +4204,43 @@ export default function StudentManagementPage() {
                                         const isPhoneField = field.id.toLowerCase().includes('phone') || field.id.toLowerCase().includes('mobile');
                                         const parsedPhone = isPhoneField ? parsePhoneNumber(fieldValue as string | undefined) : null;
                                         const currentCountry = parsedPhone ? getCountryByDialCode(parsedPhone.dialCode) : null;
+                                        
+                                        const calculateAge = (dobStr: string) => {
+                                            if (!dobStr) return '';
+                                            const dob = new Date(dobStr);
+                                            if (isNaN(dob.getTime())) return '';
+                                            const today = new Date();
+                                            let years = today.getFullYear() - dob.getFullYear();
+                                            let months = today.getMonth() - dob.getMonth();
+                                            let days = today.getDate() - dob.getDate();
+                                            if (days < 0) {
+                                                months--;
+                                                days += new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+                                            }
+                                            if (months < 0) {
+                                                years--;
+                                                months += 12;
+                                            }
+                                            if (years < 0) return 'ভুল তারিখ';
+                                            let parts = [];
+                                            if (years > 0) parts.push(`${years} বছর`);
+                                            if (months > 0) parts.push(`${months} মাস`);
+                                            if (days > 0 || (years === 0 && months === 0)) parts.push(`${days} দিন`);
+                                            return parts.join(' ');
+                                        };
+
                                         return (
                                             <div key={field.id} className={`space-y-2 group/field ${isPhoneField ? 'md:col-span-2' : ''}`}>
 
                                                 <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex justify-between">
-                                                    <span>{field.label} {(isRequired || (isLoginField && !isOptionalLogin)) && <span className="text-red-600 font-black">*</span>}</span>
+                                                    <span className="flex items-center gap-2">
+                                                        <span>{field.label} {(isRequired || (isLoginField && !isOptionalLogin)) && <span className="text-red-600 font-black">*</span>}</span>
+                                                        {field.id === 'dob' && fieldValue && (
+                                                            <span className="text-[10px] font-black text-[#045c84] bg-[#045c84]/10 px-2 py-0.5 rounded-md normal-case tracking-normal">
+                                                                বয়স: {calculateAge(fieldValue as string)}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                     {isOptionalLogin && (
                                                         <span className="text-[10px] font-medium text-slate-400 font-sans ml-auto bg-slate-100 px-1.5 py-0.5 rounded uppercase">ঐচ্ছিক</span>
                                                     )}
@@ -4328,7 +4442,7 @@ export default function StudentManagementPage() {
                                                                     className={`flex-1 min-w-0 w-0 aspect-square max-w-[48px] md:max-w-[56px] text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === currentCountry!.length - 1 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-lg md:text-xl px-0 shadow-sm`}
                                                                     value={(parsedPhone!.localNumber)[i] || ''}
                                                                     onChange={(e) => {
-                                                                        const val = e.target.value.replace(/\D/g, '');
+                                                                        const val = normalizeAuthIdentifier(e.target.value).replace(/\D/g, '');
                                                                         if (!val && e.target.value !== '') return;
 
                                                                         let newVal = (parsedPhone!.localNumber).split('');
@@ -4362,7 +4476,7 @@ export default function StudentManagementPage() {
                                                                     }}
                                                                     onPaste={(e) => {
                                                                         e.preventDefault();
-                                                                        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, currentCountry!.length);
+                                                                        const pasted = normalizeAuthIdentifier(e.clipboardData.getData('text')).replace(/\D/g, '').slice(0, currentCountry!.length);
                                                                         if (pasted) {
                                                                             let newVal = (parsedPhone!.localNumber).split('');
                                                                             for(let j=0; j<pasted.length; j++) {
@@ -4391,7 +4505,7 @@ export default function StudentManagementPage() {
                                                                 className={`flex-1 min-w-0 w-0 h-10 md:h-12 text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === 16 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-xs sm:text-sm px-0 shadow-sm`}
                                                                 value={(fieldValue || '')[i] || ''}
                                                                 onChange={(e) => {
-                                                                    const val = e.target.value.replace(/\D/g, '');
+                                                                    const val = normalizeAuthIdentifier(e.target.value).replace(/\D/g, '');
                                                                     if (!val && e.target.value !== '') return;
 
                                                                     let newVal = (fieldValue || '').split('');
@@ -4433,7 +4547,7 @@ export default function StudentManagementPage() {
                                                                 }}
                                                                 onPaste={(e) => {
                                                                     e.preventDefault();
-                                                                    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 17);
+                                                                    const pasted = normalizeAuthIdentifier(e.clipboardData.getData('text')).replace(/\D/g, '').slice(0, 17);
                                                                     if (pasted) {
                                                                         let newVal = (fieldValue || '').split('');
                                                                         for(let j=0; j<pasted.length; j++) {
@@ -4454,12 +4568,18 @@ export default function StudentManagementPage() {
                                                 ) : (
                                                     <div className="relative group/field">
                                                         <input
-                                                            type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                                                            type={field.type === 'number' ? 'text' : field.type === 'date' ? 'date' : 'text'}
+                                                            inputMode={field.type === 'number' ? 'numeric' : undefined}
                                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-bold text-slate-900 placeholder:text-slate-300"
                                                             placeholder={field.placeholder || `${field.label} দিন`}
                                                             value={fieldValue || ''}
                                                             onChange={(e) => {
-                                                                const val = e.target.value;
+                                                                let val = e.target.value;
+                                                                if (field.type === 'number') {
+                                                                    val = normalizeAuthIdentifier(val).replace(/[^0-9.]/g, '');
+                                                                } else if (field.id === 'emergencyContact' || field.id === 'studentPhone' || field.id === 'fathersPhone' || field.id === 'mothersPhone' || field.id === 'guardianPhone' || field.id === 'guardian2Phone' || field.id === 'guardian3Phone') {
+                                                                    val = normalizeAuthIdentifier(val).replace(/[^0-9+]/g, '');
+                                                                }
                                                                 if (isTopLevel) {
                                                                     setFormData({ ...formData, [field.id]: val });
                                                                 } else {
@@ -4537,8 +4657,96 @@ export default function StudentManagementPage() {
                                                         {renderField('rollNumber')}
                                                         {renderField('previousSchool')}
                                                         {renderField('previousClass')}
-                                                        {renderField('previousGpa')}
-                                                        {renderField('result')}
+                                                        
+                                                        {effectiveFields.some(f => f.id === 'previousGpa' || f.id === 'result') && (
+                                                            <div className="md:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                                                                <div className="flex items-center justify-between">
+                                                                    <label className="text-xs font-bold text-slate-700">গ্রেডিং সিস্টেম (Grading System)</label>
+                                                                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setGradingSystem('school')}
+                                                                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${gradingSystem === 'school' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                        >
+                                                                            জেনারেল/স্কুল (General)
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setGradingSystem('madrasa')}
+                                                                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${gradingSystem === 'madrasa' ? 'bg-white text-[#107044] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                        >
+                                                                            মাদরাসা (Madrasa)
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    {effectiveFields.some(f => f.id === 'previousGpa') && (
+                                                                        gradingSystem === 'school' ? (
+                                                                            renderField('previousGpa')
+                                                                        ) : (
+                                                                            <div className="space-y-1.5">
+                                                                                <label className="text-xs font-bold text-slate-700">বিভাগ/মার্কস (Division/Marks)</label>
+                                                                                <div className="relative">
+                                                                                    <select
+                                                                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-bold text-slate-900 appearance-none"
+                                                                                        value={formData.metadata?.previousGpa || ''}
+                                                                                        onChange={(e) => setFormData({ ...formData, metadata: { ...formData.metadata, previousGpa: e.target.value } })}
+                                                                                    >
+                                                                                        <option value="">নির্বাচন করুন</option>
+                                                                                        <option value="১ম বিভাগ">১ম বিভাগ</option>
+                                                                                        <option value="২য় বিভাগ">২য় বিভাগ</option>
+                                                                                        <option value="৩য় বিভাগ">৩য় বিভাগ</option>
+                                                                                        <option value="উত্তীর্ণ">উত্তীর্ণ</option>
+                                                                                    </select>
+                                                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                                                        <ChevronDown size={18} />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )
+                                                                    )}
+                                                                    
+                                                                    {effectiveFields.some(f => f.id === 'result') && (
+                                                                        <div className="space-y-1.5">
+                                                                            <label className="text-xs font-bold text-slate-700">রেজাল্ট (Result)</label>
+                                                                            <div className="relative">
+                                                                                <select
+                                                                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-bold text-slate-900 appearance-none"
+                                                                                    value={formData.metadata?.result || ''}
+                                                                                    onChange={(e) => setFormData({ ...formData, metadata: { ...formData.metadata, result: e.target.value } })}
+                                                                                >
+                                                                                    <option value="">নির্বাচন করুন</option>
+                                                                                    {gradingSystem === 'madrasa' ? (
+                                                                                        <>
+                                                                                            <option value="মুমতাজ (Mumtaz)">মুমতাজ (Mumtaz)</option>
+                                                                                            <option value="জায়্যিদ জিদ্দান (Jayyid Jiddan)">জায়্যিদ জিদ্দান (Jayyid Jiddan)</option>
+                                                                                            <option value="জায়্যিদ (Jayyid)">জায়্যিদ (Jayyid)</option>
+                                                                                            <option value="মাকবুল (Makbul)">মাকবুল (Makbul)</option>
+                                                                                            <option value="রাসিব (Rasib)">রাসিব (Rasib)</option>
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <option value="A+">A+</option>
+                                                                                            <option value="A">A</option>
+                                                                                            <option value="A-">A-</option>
+                                                                                            <option value="B">B</option>
+                                                                                            <option value="C">C</option>
+                                                                                            <option value="D">D</option>
+                                                                                            <option value="F">F</option>
+                                                                                        </>
+                                                                                    )}
+                                                                                </select>
+                                                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                                                    <ChevronDown size={18} />
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
                                                         {effectiveFields.filter(f => f.category === 'একাডেমিক' && !['admissionType', 'admissionDate', 'classId', 'groupId', 'studentId', 'rollNumber', 'previousSchool', 'previousClass', 'previousGpa', 'result'].includes(f.id)).map(f => (
                                                             <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
                                                         ))}
@@ -4636,7 +4844,10 @@ export default function StudentManagementPage() {
                                                                         <button
                                                                             key={opt.id}
                                                                             type="button"
-                                                                            onClick={() => setResidentialStatus(opt.id as any)}
+                                                                            onClick={() => {
+                                                                                setResidentialStatus(opt.id as any);
+                                                                                setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: opt.id } });
+                                                                            }}
                                                                             className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border-2 ${
                                                                                 residentialStatus === opt.id ? 'border-[#045c84] bg-[#045c84] text-white shadow-md' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                                                                             }`}
@@ -4876,7 +5087,18 @@ export default function StudentManagementPage() {
                                 })()}
                             </div>
 
-                            <div className="pt-6 border-t border-slate-100 flex justify-end items-center">
+                            <div className="pt-6 border-t border-slate-100 flex justify-end items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setStudentToPrint(formData);
+                                        setIsPrintAdmissionModalOpen(true);
+                                    }}
+                                    className="px-6 py-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-2xl shadow-sm transition-all active:scale-95 flex items-center gap-2"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                    <span>প্রিন্ট ফর্ম</span>
+                                </button>
                                 <button
                                     type="submit"
                                     disabled={actionLoading}
@@ -4968,60 +5190,121 @@ export default function StudentManagementPage() {
                     setClassData({ name: '' });
                 }}
                 title={editingClass ? "ক্লাস আপডেট করুন" : "নতুন ক্লাস তৈরি করুন"}
-                maxWidth="max-w-md"
+                maxWidth="max-w-xl"
+                noScroll={true}
             >
-                <form onSubmit={handleQuickClassCreate} className="p-5 md:p-8 space-y-6">
-                    {!editingClass && (
-                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded-xl">
-                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider ml-2">বাল্ক অ্যাড (Bulk)</span>
-                            <button
-                                type="button"
-                                onClick={() => setIsBulkClassMode(!isBulkClassMode)}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isBulkClassMode ? 'bg-[#045c84]' : 'bg-slate-300'}`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isBulkClassMode ? 'translate-x-6' : 'translate-x-1'}`} />
-                            </button>
-                        </div>
-                    )}
+                <form onSubmit={handleQuickClassCreate} className="flex flex-col h-full max-h-[90vh] sm:max-h-[85vh]">
+                    <div className="p-5 md:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                        {!editingClass && (
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">দ্রুত নির্বাচন করুন</label>
+                                
+                                <div className="flex flex-col-reverse sm:flex-row gap-2">
+                                    <div className="flex-1 flex bg-slate-100 p-1 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setClassPresetType(classPresetType === 'school' ? null : 'school')}
+                                            className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all ${classPresetType === 'school' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            জেনারেল/স্কুল
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setClassPresetType(classPresetType === 'alia' ? null : 'alia')}
+                                            className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all ${classPresetType === 'alia' ? 'bg-white text-[#107044] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            আলিয়া
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setClassPresetType(classPresetType === 'qawmi' ? null : 'qawmi')}
+                                            className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all ${classPresetType === 'qawmi' ? 'bg-white text-[#107044] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            কওমি
+                                        </button>
+                                    </div>
+                                    <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => setClassLanguage('bn')}
+                                            className={`px-3 py-2 text-xs font-bold rounded-lg transition-all ${classLanguage === 'bn' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            BN
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setClassLanguage('en')}
+                                            className={`px-3 py-2 text-xs font-bold rounded-lg transition-all ${classLanguage === 'en' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            EN
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setClassLanguage('ar')}
+                                            className={`px-3 py-2 text-[14px] font-arabic font-bold rounded-lg transition-all ${classLanguage === 'ar' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            عربي
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {classPresetType && PRESET_CLASSES[classPresetType] && (
+                                    <div className="grid grid-cols-2 gap-2 mt-2 max-h-[320px] overflow-y-auto p-1 custom-scrollbar bg-slate-50 border border-slate-200 rounded-xl">
+                                        {PRESET_CLASSES[classPresetType][classLanguage]?.map(cls => {
+                                            const isSelected = bulkClassText.includes(cls);
+                                            return (
+                                                <button
+                                                    key={cls}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!isSelected) {
+                                                            setBulkClassText(prev => prev ? prev + '\n' + cls : cls);
+                                                        } else {
+                                                            setBulkClassText(prev => prev.split('\n').filter(line => line.trim() && !line.includes(cls)).join('\n'));
+                                                        }
+                                                    }}
+                                                    className={`p-2 text-[11px] ${classLanguage === 'ar' ? 'font-arabic text-[14px]' : 'font-bold'} rounded-lg border text-left transition-all ${isSelected ? 'border-red-500 bg-red-50 text-red-600 shadow-sm' : 'border-transparent bg-white text-slate-600 hover:border-slate-300 hover:shadow-sm'}`}
+                                                >
+                                                    {cls}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-                    {!isBulkClassMode ? (
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">ক্লাসের নাম</label>
-                            <input
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-slate-900"
-                                placeholder="যেমন: ষষ্ঠ শ্রেণী"
-                                value={classData.name}
-                                onChange={(e) => setClassData({ ...classData, name: e.target.value })}
-                                required={!isBulkClassMode}
+                            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">ক্লাস লিস্ট (বা নিজে লিখুন)</label>
+                            <textarea
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-slate-900 min-h-[250px] resize-none"
+                                placeholder={"যেমন:\n1. Class One\n2. Class Two"}
+                                value={bulkClassText}
+                                onChange={(e) => setBulkClassText(e.target.value)}
+                                required
                             />
                         </div>
-                    ) : (
-                        <textarea
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-slate-900 min-h-[150px] resize-none"
-                            placeholder={"যেমন:\n1. Class One\n2. Class Two"}
-                            value={bulkClassText}
-                            onChange={(e) => setBulkClassText(e.target.value)}
-                            required={isBulkClassMode}
-                        />
-                    )}
-                    <button
-                        type="submit"
-                        disabled={actionLoading}
-                        className="w-full py-4 bg-[#045c84] text-white font-bold rounded-2xl shadow-lg shadow-blue-100 transition-all flex items-center justify-center gap-2"
-                    >
-                        {actionLoading ? (
-                            <Loader2 className="animate-spin" size={20} />
-                        ) : editingStudent?.metadata?.admissionStatus === 'PENDING' ? (
-                            <CheckCircle size={20} />
-                        ) : (
-                            <Save size={20} />
-                        )}
-                        <span>
-                            {editingStudent?.metadata?.admissionStatus === 'PENDING'
-                                ? 'মঞ্জুর ও নিশ্চিত করুন'
-                                : 'সেভ করুন'}
-                        </span>
-                    </button>
+                    </div>
+                    <div className="p-5 md:p-8 pt-4 border-t border-slate-100 bg-white shrink-0 rounded-b-2xl">
+                        <button
+                            type="submit"
+                            disabled={actionLoading}
+                            className="w-full py-4 bg-[#045c84] text-white font-bold rounded-2xl shadow-lg shadow-blue-100 transition-all flex items-center justify-center gap-2"
+                        >
+                            {actionLoading ? (
+                                <Loader2 className="animate-spin" size={20} />
+                            ) : editingStudent?.metadata?.admissionStatus === 'PENDING' ? (
+                                <CheckCircle size={20} />
+                            ) : (
+                                <Save size={20} />
+                            )}
+                            <span>
+                                {editingStudent?.metadata?.admissionStatus === 'PENDING'
+                                    ? 'মঞ্জুর ও নিশ্চিত করুন'
+                                    : 'সেভ করুন'}
+                            </span>
+                        </button>
+                    </div>
                 </form>
             </Modal>
 
@@ -5609,6 +5892,10 @@ export default function StudentManagementPage() {
                                                 newItems.splice(index + 1, 0, newClass);
                                                 setManagedClasses(newItems);
                                                 setTimeout(() => {
+                                                    setFormData({
+                                                        name: '', email: '', password: '',
+                                                        metadata: { classId: selectedClassId, religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] }
+                                                    });
                                                     document.getElementById(`class-input-${index + 1}`)?.focus();
                                                 }, 0);
                                             } else if (e.key === 'ArrowUp' && index > 0) {
@@ -5753,15 +6040,28 @@ export default function StudentManagementPage() {
                         <button
                             onClick={() => {
                                 if (activeTab === 'students') {
-                                    if (selectedClassId !== 'all') {
-                                        setFormData({
-                                            name: '',
-                                            email: '',
-                                            password: '',
-                                            metadata: { classId: selectedClassId }
-                                        });
+                                    const draft = localStorage.getItem('edusy_student_form_draft');
+                                    if (draft) {
+                                        try {
+                                            const parsed = JSON.parse(draft);
+                                            if (selectedClassId !== 'all') {
+                                                parsed.metadata = { ...parsed.metadata, classId: selectedClassId };
+                                            }
+                                            setFormData(parsed);
+                                        } catch (e) {
+                                            console.error("Failed to parse draft", e);
+                                        }
                                     } else {
-                                        setFormData({ name: '', email: '', password: '', metadata: {} });
+                                        if (selectedClassId !== 'all') {
+                                            setFormData({
+                                                name: '',
+                                                email: '',
+                                                password: '',
+                                                metadata: { classId: selectedClassId, religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] }
+                                            });
+                                        } else {
+                                            setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
+                                        }
                                     }
                                     setIsAddModalOpen(true);
                                 } else if (activeTab === 'books') {

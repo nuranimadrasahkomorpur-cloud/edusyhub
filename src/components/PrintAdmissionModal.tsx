@@ -32,7 +32,7 @@ export default function PrintAdmissionModal({ isOpen, onClose, student, institut
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-8">
-            <div className="bg-white w-full max-w-4xl h-full flex flex-col rounded-2xl overflow-hidden shadow-2xl animate-fade-in">
+            <div className="bg-white w-full max-w-4xl h-[90vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl animate-fade-in">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 shrink-0">
                     <h2 className="text-lg font-bold text-slate-800">ভর্তি ফর্ম প্রিন্ট করুন</h2>
@@ -54,7 +54,10 @@ export default function PrintAdmissionModal({ isOpen, onClose, student, institut
                 </div>
 
                 {/* Print Preview Area */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100 flex justify-center custom-scrollbar">
+                <div 
+                    className="flex-1 overflow-y-auto min-h-0 p-4 md:p-8 bg-slate-100 flex justify-center custom-scrollbar"
+                    data-lenis-prevent
+                >
                     <div 
                         id="admission-print-area" 
                         className="bg-white shadow-sm w-full max-w-[210mm] min-h-[297mm] rounded"

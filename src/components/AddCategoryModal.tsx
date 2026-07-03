@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     TrendingUp, 
     TrendingDown, 
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { normalizeBengaliDigits } from '@/utils/digit-utils';
+import { createPortal } from 'react-dom';
+import CustomDatePicker from '@/components/ui/CustomDatePicker';
 
 interface AddCategoryModalProps {
     onClose: () => void;
@@ -30,14 +32,14 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
         frequencyType: initialData?.config?.frequencyType || (initialData as any)?.frequencyType || 'fixed',
         interval: initialData?.config?.interval || (initialData as any)?.interval || 'monthly',
         provider: initialData?.config?.provider || (initialData as any)?.provider || 'anyone',
-        studentAmountType: initialData?.config?.studentAmountType || (initialData as any)?.provider === 'students' ? (initialData?.config?.studentAmountType || 'flat') : 'flat',
+        studentAmountType: initialData?.config?.studentAmountType || 'per-class',
         customGroupAllowed: initialData?.config?.customGroupAllowed || false,
         customGroupName: initialData?.config?.customGroupName || '',
         customGroupScope: initialData?.config?.customGroupScope || 'institute',
-        startDate: initialData?.config?.startDate || '',
-        endDate: initialData?.config?.endDate || '',
+        startDate: initialData?.config?.startDate || `${new Date().getFullYear()}-01-01`,
+        endDate: initialData?.config?.endDate || `${new Date().getFullYear()}-12-31`,
         dueDays: initialData?.config?.dueDays || 5,
-        dueTiming: initialData?.config?.dueTiming || 'start',
+        dueTiming: initialData?.config?.dueTiming || 'end',
         alertDays: initialData?.config?.alertDays || 2,
         alertType: initialData?.config?.alertType || 'before',
         amount: (initialData?.amount === 'variable' || typeof initialData?.amount === 'string') ? 0 : (initialData?.amount || 0),
@@ -48,9 +50,12 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
         deselectedStudents: initialData?.config?.deselectedStudents || {},
         customStudentAmounts: initialData?.config?.customStudentAmounts || {},
         studentWaivers: initialData?.config?.studentWaivers || {},
-        thresholdDays: initialData?.config?.thresholdDays || 0,
+        thresholdDays: initialData?.config?.thresholdDays !== undefined ? initialData.config.thresholdDays : 10,
         isExcludedFromSummary: initialData?.config?.isExcludedFromSummary || false,
         isOptional: initialData?.config?.isOptional || false,
+        hasSeparateResidentialRates: initialData?.config?.hasSeparateResidentialRates || false,
+        studentClassAmounts_abasik: initialData?.config?.studentClassAmounts_abasik || {},
+        studentClassAmounts_onabasik: initialData?.config?.studentClassAmounts_onabasik || {},
         residentialStatus: initialData?.config?.residentialStatus || 'all'
     });
 
@@ -67,6 +72,36 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
     const [studentSearch, setStudentSearch] = useState('');
 
     const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+    const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+    const [activePreset, setActivePreset] = useState<string | null>(null);
+    const [amountTypeDropdownOpen, setAmountTypeDropdownOpen] = useState(false);
+    const scrollTargetRef = useRef<HTMLDivElement>(null);
+
+    const applyPreset = (presetId: string) => {
+        setActivePreset(presetId);
+        
+        // Auto scroll to the revealed section
+        setTimeout(() => {
+            scrollTargetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+        switch(presetId) {
+            case 'monthly':
+                setFormData({...formData, name: 'মাসিক বেতন', frequencyType: 'fixed', interval: 'monthly', provider: 'students'});
+                break;
+            case 'exam':
+                setFormData({...formData, name: '১ম সাময়িক পরীক্ষার ফি', frequencyType: 'fixed', interval: 'one_time_year', provider: 'students', startDate: new Date().toISOString().split('T')[0]});
+                break;
+            case 'transport':
+                setFormData({...formData, name: 'গাড়ি ভাড়া', frequencyType: 'fixed', interval: 'daily', provider: 'students'});
+                break;
+            case 'admission':
+                setFormData({...formData, name: 'ভর্তি ফি', frequencyType: 'fixed', interval: 'one_time_ever', provider: 'students', startDate: new Date().toISOString().split('T')[0]});
+                break;
+            case 'session':
+                setFormData({...formData, name: 'সেশন ফি', frequencyType: 'fixed', interval: 'one_time_year', provider: 'students'});
+                break;
+        }
+    };
 
     const handleExpandClass = async (classId: string) => {
         if (expandedClassId === classId) {
@@ -212,8 +247,12 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
         fetchAllData();
     }, [activeInstitute?.id]);
 
-    return (
-        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4">
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+    if (!mounted) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[100000] overflow-y-auto flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
             
             <div className="relative bg-white w-full max-w-2xl rounded-[48px] shadow-2xl overflow-hidden animate-scale-in flex flex-col font-bengali h-[90vh]">
@@ -248,18 +287,104 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                 {/* Modal Content - Scrollable Unified View */}
                 <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar text-slate-800 pb-20 relative" data-lenis-prevent>
                     
-                    {/* SECTION 1: BASIC INFO */}
-                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-4">খাতের নাম</label>
-                        <input 
-                            type="text" 
-                            placeholder="যেমন: মাসিক বেতন বা বিদ্যুৎ বিল"
-                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-lg font-black placeholder:text-slate-300 focus:ring-4 focus:ring-[#045c84]/10 focus:border-[#045c84]/30 transition-all outline-none"
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        />
+                    {/* SECTION 0: PRESETS (Only Income) */}
+                    {formData.type === 'income' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-4">কুইক প্রিসেট (Quick Presets)</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 px-2">
+                                {[
+                                    { id: 'monthly', label: 'মাসিক বেতন', sub: 'প্রতি মাসের ফি', icon: Calendar },
+                                    { id: 'exam', label: 'পরীক্ষার ফি', sub: 'যেকোনো পরীক্ষার ফি', icon: Clock },
+                                    { id: 'transport', label: 'গাড়ি ভাড়া', sub: 'দৈনিক যাতায়াত', icon: TrendingUp },
+                                    { id: 'admission', label: 'ভর্তি ফি', sub: 'নতুন ভর্তি', icon: Users },
+                                    { id: 'session', label: 'সেশন ফি', sub: 'বার্ষিক সেশন', icon: TrendingUp }
+                                ].map((preset) => (
+                                    <button 
+                                        key={preset.id}
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); applyPreset(preset.id); }}
+                                        className={`p-5 rounded-3xl text-left transition-all border-2 flex flex-col items-start gap-3 ${
+                                            activePreset === preset.id ? 'border-[#045c84] bg-blue-50 shadow-md scale-[1.02]' : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
+                                        }`}
+                                    >
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activePreset === preset.id ? 'bg-[#045c84] text-white' : 'bg-slate-50 text-slate-400'}`}>
+                                            <preset.icon size={20} />
+                                        </div>
+                                        <div>
+                                            <span className="block text-sm font-black text-slate-800">{preset.label}</span>
+                                            <span className="block text-[10px] font-bold text-slate-400 mt-0.5">{preset.sub}</span>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-between px-4">
+                        <label className="text-sm font-black text-slate-800 uppercase">
+                            {activePreset ? 'অ্যাডভান্সড সেটিংস (Advanced Settings)' : 'কাস্টম খাত তৈরি করুন (Advanced)'}
+                        </label>
+                        <button 
+                            onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                            className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${showAdvancedSettings ? 'bg-[#045c84]' : 'bg-slate-200'}`}
+                        >
+                            <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${showAdvancedSettings ? 'translate-x-6' : ''}`} />
+                        </button>
                     </div>
 
+                    {(showAdvancedSettings || formData.type === 'expense') && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-4">খাতের নাম</label>
+                            <input 
+                                type="text" 
+                                list="exam-name-suggestions"
+                                placeholder="যেমন: মাসিক বেতন বা বিদ্যুৎ বিল"
+                                className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-lg font-black placeholder:text-slate-300 focus:ring-4 focus:ring-[#045c84]/10 focus:border-[#045c84]/30 transition-all outline-none"
+                                value={formData.name}
+                                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            />
+                            <datalist id="exam-name-suggestions">
+                                <option value="১ম সাময়িক পরীক্ষার ফি" />
+                                <option value="২য় সাময়িক পরীক্ষার ফি" />
+                                <option value="৩য় সাময়িক পরীক্ষার ফি" />
+                                <option value="অর্ধ-বার্ষিক পরীক্ষার ফি" />
+                                <option value="বার্ষিক পরীক্ষার ফি" />
+                                <option value="টেস্ট পরীক্ষার ফি" />
+                                <option value="প্রি-টেস্ট পরীক্ষার ফি" />
+                                <option value="মডেল টেস্ট পরীক্ষার ফি" />
+                            </datalist>
+                        </div>
+                    )}
+
+                    {(showAdvancedSettings || activePreset !== null || formData.type === 'expense') && (
+                        <>
+                            <div ref={scrollTargetRef} className="scroll-mt-10" />
+                            {/* SECTION 1.5: DATES (Always visible for fixed frequency) */}
+                            {formData.frequencyType === 'fixed' && (
+                                <div className={`grid grid-cols-1 ${!['one_time_ever', 'one_time_year'].includes(formData.interval) ? 'sm:grid-cols-2' : ''} gap-6 animate-in fade-in duration-300`}>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-2">শুরুর তারিখ</label>
+                                        <CustomDatePicker
+                                            value={formData.startDate}
+                                            onChange={(val) => setFormData({...formData, startDate: val})}
+                                        />
+                                    </div>
+                                    {!['one_time_ever', 'one_time_year'].includes(formData.interval) && (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-2">শেষের তারিখ (ঐচ্ছিক)</label>
+                                            <CustomDatePicker
+                                                value={formData.endDate}
+                                                onChange={(val) => setFormData({...formData, endDate: val})}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {showAdvancedSettings && (
+                        <div className="p-8 bg-slate-50/50 rounded-[40px] border border-slate-100 space-y-10">
                     {/* SECTION 2: SCHEDULE */}
                     <div className="space-y-6 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-4">ফ্রিকোয়েন্সি ধরণ</label>
@@ -290,6 +415,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2">সময়কাল নির্বাচন করুন</label>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                         {[
+                                            { id: 'daily', label: 'দৈনিক' },
                                             { id: 'weekly', label: 'সাপ্তাহিক' },
                                             { id: 'monthly', label: 'মাসিক' },
                                             { id: 'semester', label: 'সামাসিক' },
@@ -307,33 +433,6 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                 {opt.label}
                                             </button>
                                         ))}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6 border-t border-slate-200/50">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-2">শুরুর তারিখ</label>
-                                        <div className="relative group">
-                                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input 
-                                                type="date" 
-                                                value={formData.startDate}
-                                                onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                                                className="w-full pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-[#045c84]/10"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 px-2">শেষের তারিখ (ঐচ্ছিক)</label>
-                                        <div className="relative group">
-                                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input 
-                                                type="date" 
-                                                value={formData.endDate}
-                                                onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                                                className="w-full pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-[#045c84]/10"
-                                            />
-                                        </div>
                                     </div>
                                 </div>
 
@@ -460,7 +559,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                         <button 
                                             key={opt.id}
                                             type="button"
-                                            onClick={(e) => { e.preventDefault(); setFormData({...formData, residentialStatus: opt.id as any}); }}
+                                            onClick={(e) => { e.preventDefault(); setFormData({...formData, residentialStatus: opt.id as any, hasSeparateResidentialRates: false}); }}
                                             className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border-2 ${
                                                 (formData.residentialStatus || 'all') === opt.id ? 'border-[#045c84] bg-[#045c84] text-white shadow-md' : 'border-slate-100 bg-white text-slate-500 hover:bg-slate-50'
                                             }`}
@@ -471,8 +570,13 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                 </div>
                             </div>
                         )}
+                        </div>
+                    </div>
+                    )}
 
-                        {formData.provider === 'donors' && (
+                    {(showAdvancedSettings || activePreset !== null || formData.type === 'expense') && (
+                        <>
+                            {formData.provider === 'donors' && (
                             <div className="bg-[#045c84]/5 p-8 rounded-[40px] border border-[#045c84]/10 text-center space-y-4 animate-in zoom-in-95 duration-300">
                                 <div className="w-16 h-16 bg-white text-[#045c84] rounded-3xl flex items-center justify-center mx-auto mb-2 shadow-sm border border-[#045c84]/10">
                                     <Users size={28} />
@@ -486,10 +590,12 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                     <div className="relative">
                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
                                         <input 
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={formData.amount || ''}
                                             onChange={(e) => setFormData({...formData, amount: parseInt(e.target.value) || 0})}
-                                            className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3 focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none text-black font-black placeholder:font-normal placeholder:text-slate-300 shadow-sm"
+                                            className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3 focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none text-black font-black placeholder:font-normal placeholder:text-slate-300 shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             placeholder="পরিমাণ দিন"
                                         />
                                     </div>
@@ -509,9 +615,11 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                 <div className="pt-6 max-w-xs mx-auto text-left">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] mb-3 block pl-2">নির্ধারিত পরিমাণ (ঐচ্ছিক)</label>
                                     <input 
-                                        type="number" 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         placeholder="৳ ০.০০"
-                                        className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-lg font-black text-[#045c84] focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none"
+                                        className="w-full px-6 py-4 bg-white border border-slate-100 rounded-2xl text-lg font-black text-[#045c84] focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         value={formData.amount || ''}
                                         onChange={(e) => setFormData({...formData, amount: normalizeBengaliDigits(e.target.value) || 0})}
                                     />
@@ -523,25 +631,62 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                             <div className="space-y-6 bg-slate-50 p-8 rounded-[40px] border border-slate-100 animate-in fade-in duration-300">
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2">পরিমাণ নির্ধারণ পদ্ধতি</label>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {[
-                                            { id: 'flat', label: 'সবার জন্য সমান পরিমাণ', sub: 'প্রতিষ্ঠানের সকল শিক্ষার্থীর জন্য একই পরিমাণ' },
-                                            { id: 'per-class', label: 'শ্রেণী অনুযায়ী ভিন্ন পরিমাণ', sub: 'প্রাথমিক, মাধ্যমিক ইত্যাদি অনুযায়ী আলাদা রেট' },
-                                            { id: 'per-group', label: 'গ্রুপ অনুযায়ী ভিন্ন পরিমাণ', sub: 'বিজ্ঞান, মানবিক ইত্যাদি গ্রুপ অনুযায়ী আলাদা রেট' },
-                                        ].map((opt) => (
-                                            <button 
-                                                key={opt.id}
-                                                onClick={() => setFormData({...formData, studentAmountType: opt.id as any})}
-                                                className={`w-full p-6 rounded-3xl border-2 transition-all text-left flex items-center justify-between ${
-                                                    formData.studentAmountType === opt.id ? 'border-[#045c84] bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200'
-                                                }`}
-                                            >
-                                                <div>
-                                                    <p className="font-black text-slate-800">{opt.label}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{opt.sub}</p>
+                                    <div className="relative">
+                                        <div 
+                                            onClick={() => setAmountTypeDropdownOpen(!amountTypeDropdownOpen)}
+                                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 flex items-center justify-between cursor-pointer transition-all shadow-sm group hover:border-[#045c84]/30"
+                                        >
+                                            <div>
+                                                <p className="font-black text-slate-800 text-sm">
+                                                    {formData.studentAmountType === 'flat' ? 'সবার জন্য সমান পরিমাণ' : 
+                                                     formData.studentAmountType === 'per-class' ? 'শ্রেণী অনুযায়ী ভিন্ন পরিমাণ' : 
+                                                     'গ্রুপ অনুযায়ী ভিন্ন পরিমাণ'}
+                                                </p>
+                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                                    {formData.studentAmountType === 'flat' ? 'প্রতিষ্ঠানের সকল শিক্ষার্থীর জন্য একই পরিমাণ' : 
+                                                     formData.studentAmountType === 'per-class' ? 'প্রাথমিক, মাধ্যমিক ইত্যাদি অনুযায়ী আলাদা রেট' : 
+                                                     'বিজ্ঞান, মানবিক ইত্যাদি গ্রুপ অনুযায়ী আলাদা রেট'}
+                                                </p>
+                                            </div>
+                                            <ChevronDown className={`text-slate-400 transition-transform duration-300 ${amountTypeDropdownOpen ? 'rotate-180' : ''}`} size={20} />
+                                        </div>
+
+                                        {amountTypeDropdownOpen && (
+                                            <>
+                                                <div 
+                                                    className="fixed inset-0 z-[110000]" 
+                                                    onClick={() => setAmountTypeDropdownOpen(false)}
+                                                />
+                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl z-[120000] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                                    {[
+                                                        { id: 'flat', label: 'সবার জন্য সমান পরিমাণ', sub: 'প্রতিষ্ঠানের সকল শিক্ষার্থীর জন্য একই পরিমাণ' },
+                                                        { id: 'per-class', label: 'শ্রেণী অনুযায়ী ভিন্ন পরিমাণ', sub: 'প্রাথমিক, মাধ্যমিক ইত্যাদি অনুযায়ী আলাদা রেট' },
+                                                        { id: 'per-group', label: 'গ্রুপ অনুযায়ী ভিন্ন পরিমাণ', sub: 'বিজ্ঞান, মানবিক ইত্যাদি গ্রুপ অনুযায়ী আলাদা রেট' }
+                                                    ].map((opt) => (
+                                                        <div 
+                                                            key={opt.id}
+                                                            onClick={() => {
+                                                                setFormData({...formData, studentAmountType: opt.id as any});
+                                                                setAmountTypeDropdownOpen(false);
+                                                            }}
+                                                            className={`px-6 py-4 cursor-pointer transition-colors flex items-center justify-between border-b last:border-b-0 border-slate-50 ${
+                                                                formData.studentAmountType === opt.id ? 'bg-[#045c84]/5' : 'hover:bg-slate-50'
+                                                            }`}
+                                                        >
+                                                            <div>
+                                                                <p className={`font-black text-sm ${formData.studentAmountType === opt.id ? 'text-[#045c84]' : 'text-slate-700'}`}>
+                                                                    {opt.label}
+                                                                </p>
+                                                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">{opt.sub}</p>
+                                                            </div>
+                                                            {formData.studentAmountType === opt.id && (
+                                                                <Check className="text-[#045c84]" size={18} />
+                                                            )}
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            </button>
-                                        ))}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -549,9 +694,11 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 pt-4">
                                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2">সবার জন্য নির্ধারিত পরিমাণ (৳)</label>
                                         <input 
-                                            type="number" 
+                                            type="text" 
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             placeholder="৳ ০.০০"
-                                            className="w-full px-8 py-5 bg-white border border-slate-100 rounded-2xl text-xl font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all"
+                                            className="w-full px-8 py-5 bg-white border border-slate-100 rounded-2xl text-xl font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             value={formData.amount || ''}
                                             onChange={(e) => setFormData({...formData, amount: normalizeBengaliDigits(e.target.value)})}
                                         />
@@ -559,31 +706,46 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                 )}                                
                                 
                                 {/* Threshold Days Setting */}
-                                <div className="space-y-2 pt-6 border-t border-slate-200/50">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] block">থ্রেশহোল্ড দিন (Admission Threshold)</label>
-                                            <p className="text-[9px] font-bold text-slate-400 italic">মাসের কত তারিখের পর ভর্তি হলে হাফ ফি?</p>
+                                {formData.interval === 'monthly' && (
+                                    <div className="mt-4 w-full bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all shadow-sm animate-in fade-in slide-in-from-top-2">
+                                        <div>
+                                            <p className="font-black text-slate-800 text-sm">থ্রেশহোল্ড দিন (Admission Threshold)</p>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">মাসের কত তারিখের পর ভর্তি হলে হাফ ফি?</p>
                                         </div>
-                                        <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                                            <div className="relative group w-20 shrink-0">
-                                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <div className="relative group">
                                                 <input 
-                                                    type="number" 
+                                                    type="text" 
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     min="0"
                                                     max="31"
-                                                    className="w-full pl-8 pr-2 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    placeholder="0"
+                                                    className="w-24 pl-4 pr-8 py-3 bg-slate-50 border border-slate-100 rounded-xl text-base font-black text-[#045c84] outline-none focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 focus:border-[#045c84]/30 transition-all text-center shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     value={formData.thresholdDays === 0 ? '' : formData.thresholdDays}
                                                     onChange={(e) => setFormData({...formData, thresholdDays: (e.target.value === '' ? '' : (Math.floor(normalizeBengaliDigits(e.target.value)) || 0)) as any})}
                                                 />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">দিন</span>
                                             </div>
-                                            <span className="text-[10px] font-black text-slate-400 shrink-0">তারিখ</span>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {formData.studentAmountType === 'per-class' && (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 pt-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar" data-lenis-prevent>
+                                        {(formData.residentialStatus || 'all') === 'all' && (
+                                            <div className="flex justify-end mb-2">
+                                                <label className="flex items-center gap-2 cursor-pointer text-[10px] font-black uppercase tracking-wider text-[#045c84] border-2 border-[#045c84]/10 bg-[#045c84]/5 px-4 py-2.5 rounded-xl hover:border-[#045c84]/30 transition-all">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 text-[#045c84] rounded border-slate-300 focus:ring-[#045c84] cursor-pointer"
+                                                        checked={formData.hasSeparateResidentialRates}
+                                                        onChange={(e) => setFormData({...formData, hasSeparateResidentialRates: e.target.checked})}
+                                                    />
+                                                    আবাসিক/অনাবাসিক আলাদা ফি
+                                                </label>
+                                            </div>
+                                        )}
                                         {availableClasses.map((cls: any) => {
                                             const isExpanded = expandedClassId === cls.id;
                                             const students = classStudents[cls.id] || [];
@@ -643,17 +805,69 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                             {selectedCount > 0 && <Check size={12} strokeWidth={3} />}
                                                         </button>
                                                         <span className="text-sm font-black text-slate-700 flex-1">{cls.name} <span className={`text-[10px] px-2 py-0.5 rounded-full ml-2 transition-colors ${selectedCount === 0 && totalInClass > 0 ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-500'}`}>{selectedCount} / {totalInClass} জন</span></span>
-                                                        <div onClick={e => e.stopPropagation()}>
-                                                            <input 
-                                                                type="number" 
-                                                                placeholder="৳ ০.০০"
-                                                                value={formData.studentClassAmounts?.[cls.id] === 0 ? '' : formData.studentClassAmounts?.[cls.id] || ''}
-                                                                onChange={(e) => setFormData({
-                                                                    ...formData,
-                                                                    studentClassAmounts: { ...formData.studentClassAmounts, [cls.id]: normalizeBengaliDigits(e.target.value) }
-                                                                })}
-                                                                className="w-32 bg-slate-50 border border-slate-100 focus:border-[#045c84]/30 rounded-2xl p-3 text-sm font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all text-right group-hover:bg-white"
-                                                            />
+                                                        <div onClick={e => e.stopPropagation()} className="flex items-center gap-2">
+                                                            {!formData.hasSeparateResidentialRates ? (
+                                                                <input 
+                                                                    type="text" 
+                                                                    inputMode="numeric"
+                                                                    pattern="[0-9]*"
+                                                                    placeholder="৳ ০.০০"
+                                                                    value={formData.studentClassAmounts?.[cls.id] === 0 ? '' : formData.studentClassAmounts?.[cls.id] || ''}
+                                                                    onChange={(e) => setFormData({
+                                                                        ...formData,
+                                                                        studentClassAmounts: { ...formData.studentClassAmounts, [cls.id]: normalizeBengaliDigits(e.target.value) }
+                                                                    })}
+                                                                    className="w-32 bg-slate-50 border border-slate-100 focus:border-[#045c84]/30 rounded-2xl p-3 text-sm font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all text-right group-hover:bg-white"
+                                                                />
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex flex-col gap-1 items-end">
+                                                                        <span className="text-[9px] font-black text-slate-400 mr-1">সাধারণ</span>
+                                                                        <input 
+                                                                            type="text" 
+                                                                            inputMode="numeric"
+                                                                            pattern="[0-9]*"
+                                                                            placeholder="৳ ০.০০"
+                                                                            value={formData.studentClassAmounts?.[cls.id] === 0 ? '' : formData.studentClassAmounts?.[cls.id] || ''}
+                                                                            onChange={(e) => setFormData({
+                                                                                ...formData,
+                                                                                studentClassAmounts: { ...formData.studentClassAmounts, [cls.id]: normalizeBengaliDigits(e.target.value) }
+                                                                            })}
+                                                                            className="w-[72px] bg-slate-50 border border-slate-100 focus:border-[#045c84]/30 rounded-xl p-2 text-xs font-black text-[#045c84] outline-none focus:ring-2 focus:ring-[#045c84]/10 transition-all text-right group-hover:bg-white"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1 items-end">
+                                                                        <span className="text-[9px] font-black text-slate-400 mr-1">আবাসিক</span>
+                                                                        <input 
+                                                                            type="text" 
+                                                                            inputMode="numeric"
+                                                                            pattern="[0-9]*"
+                                                                            placeholder="৳ ০.০০"
+                                                                            value={formData.studentClassAmounts_abasik?.[cls.id] === 0 ? '' : formData.studentClassAmounts_abasik?.[cls.id] || ''}
+                                                                            onChange={(e) => setFormData({
+                                                                                ...formData,
+                                                                                studentClassAmounts_abasik: { ...formData.studentClassAmounts_abasik, [cls.id]: normalizeBengaliDigits(e.target.value) }
+                                                                            })}
+                                                                            className="w-[72px] bg-slate-50 border border-slate-100 focus:border-[#045c84]/30 rounded-xl p-2 text-xs font-black text-[#045c84] outline-none focus:ring-2 focus:ring-[#045c84]/10 transition-all text-right group-hover:bg-white"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1 items-end">
+                                                                        <span className="text-[9px] font-black text-slate-400 mr-1">অনাবাসিক</span>
+                                                                        <input 
+                                                                            type="text" 
+                                                                            inputMode="numeric"
+                                                                            pattern="[0-9]*"
+                                                                            placeholder="৳ ০.০০"
+                                                                            value={formData.studentClassAmounts_onabasik?.[cls.id] === 0 ? '' : formData.studentClassAmounts_onabasik?.[cls.id] || ''}
+                                                                            onChange={(e) => setFormData({
+                                                                                ...formData,
+                                                                                studentClassAmounts_onabasik: { ...formData.studentClassAmounts_onabasik, [cls.id]: normalizeBengaliDigits(e.target.value) }
+                                                                            })}
+                                                                            className="w-[72px] bg-slate-50 border border-slate-100 focus:border-[#045c84]/30 rounded-xl p-2 text-xs font-black text-[#045c84] outline-none focus:ring-2 focus:ring-[#045c84]/10 transition-all text-right group-hover:bg-white"
+                                                                        />
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -760,7 +974,9 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                                                             
                                                                                             return (
                                                                                                 <input 
-                                                                                                    type="number"
+                                                                                                    type="text"
+                                                                                                    inputMode="numeric"
+                                                                                                    pattern="[0-9]*"
                                                                                                     placeholder={baseClassAmt > 0 ? `৳ ${effectiveBaseAmt}` : 'নিজস্ব পরিমাণ'}
                                                                                                     value={customAmounts[student.id] === undefined ? '' : customAmounts[student.id]}
                                                                                                     onChange={e => {
@@ -792,7 +1008,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                                                                             }
                                                                                                         });
                                                                                                     }}
-                                                                                                    className="w-24 bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-black text-[#045c84] outline-none text-right focus:bg-white focus:border-[#045c84]/30 focus:ring-4 focus:ring-[#045c84]/10 placeholder:text-slate-300 transition-all"
+                                                                                                    className="w-24 bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs font-black text-[#045c84] outline-none text-right focus:bg-white focus:border-[#045c84]/30 focus:ring-4 focus:ring-[#045c84]/10 placeholder:text-slate-300 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                                                 />
                                                                                             );
                                                                                         })()}
@@ -824,14 +1040,16 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                                                     <span className="text-sm font-black text-slate-800">{cls.name}</span>
                                                     <input 
-                                                        type="number" 
+                                                        type="text" 
+                                                        inputMode="numeric"
+                                                        pattern="[0-9]*"
                                                         placeholder="Base ৳"
                                                         value={formData.studentClassAmounts?.[cls.id] || ''}
                                                         onChange={(e) => setFormData({
                                                             ...formData,
                                                             studentClassAmounts: { ...formData.studentClassAmounts, [cls.id]: normalizeBengaliDigits(e.target.value) }
                                                         })}
-                                                        className="w-24 bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all"
+                                                        className="w-24 bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     />
                                                 </div>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -839,14 +1057,16 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                         <div key={grp.id} className="bg-slate-50 p-3.5 rounded-2xl flex items-center gap-2 border border-slate-100">
                                                             <span className="text-[10px] font-black text-slate-500 flex-1">{grp.name}</span>
                                                             <input 
-                                                                type="number" 
+                                                                type="text" 
+                                                                inputMode="numeric"
+                                                                pattern="[0-9]*"
                                                                 placeholder="৳"
                                                                 value={formData.studentGroupAmounts?.[`${cls.id}-${grp.id}`] || ''}
                                                                 onChange={(e) => setFormData({
                                                                     ...formData,
                                                                     studentGroupAmounts: { ...formData.studentGroupAmounts, [`${cls.id}-${grp.id}`]: normalizeBengaliDigits(e.target.value) }
                                                                 })}
-                                                                className="w-20 bg-white border border-slate-200 rounded-xl p-2 text-xs font-black text-[#045c84] outline-none focus:border-[#045c84]/40"
+                                                                className="w-20 bg-white border border-slate-200 rounded-xl p-2 text-xs font-black text-[#045c84] outline-none focus:border-[#045c84]/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             />
                                                         </div>
                                                     ))}
@@ -863,9 +1083,11 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[#045c84] px-2">বেস অ্যামাউন্ট (৳)</label>
                                     <input 
-                                        type="number" 
+                                        type="text" 
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         placeholder="৳ ০.০০"
-                                        className="w-full px-8 py-5 bg-white border border-slate-100 rounded-2xl text-xl font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all"
+                                        className="w-full px-8 py-5 bg-white border border-slate-100 rounded-2xl text-xl font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         value={formData.amount || ''}
                                         onChange={(e) => setFormData({...formData, amount: normalizeBengaliDigits(e.target.value)})}
                                     />
@@ -879,14 +1101,16 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                             </div>
                                             <span className="text-sm font-black text-slate-700 flex-1">{teacher.name || teacher.user?.name || 'অজানা শিক্ষক'}</span>
                                             <input 
-                                                type="number" 
+                                                type="text" 
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
                                                 placeholder="৳ বেস"
                                                 value={formData.teacherAmounts?.[teacher.id] || ''}
                                                 onChange={(e) => setFormData({
                                                     ...formData,
                                                     teacherAmounts: { ...formData.teacherAmounts, [teacher.id]: normalizeBengaliDigits(e.target.value) }
                                                 })}
-                                                className="w-28 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10"
+                                                className="w-28 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-black text-[#045c84] outline-none focus:ring-4 focus:ring-[#045c84]/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     ))}
@@ -924,7 +1148,9 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                     className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-black outline-none focus:border-[#045c84]/30 focus:ring-4 focus:ring-[#045c84]/10"
                                                 />
                                                 <input 
-                                                    type="number" 
+                                                    type="text" 
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     placeholder="৳ পরিমাণ"
                                                     value={rec.amount === undefined ? '' : rec.amount}
                                                     onChange={(e) => {
@@ -932,7 +1158,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                                         newRecs[idx].amount = normalizeBengaliDigits(e.target.value);
                                                         setFormData({...formData, customRecipients: newRecs});
                                                     }}
-                                                    className="w-32 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-black text-[#045c84] outline-none focus:border-[#045c84]/30 focus:ring-4 focus:ring-[#045c84]/10"
+                                                    className="w-32 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-black text-[#045c84] outline-none focus:border-[#045c84]/30 focus:ring-4 focus:ring-[#045c84]/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 />
                                                 {formData.customRecipients.length > 1 && (
                                                     <button 
@@ -951,7 +1177,7 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                                 </div>
                             </div>
                         )}
-                    </div>
+                        
                     {/* EXCLUSION SETTING */}
                     <div className="bg-amber-50/50 border border-amber-100 rounded-3xl p-6 flex items-start gap-4 mt-8 animate-in fade-in zoom-in-95 duration-300">
                         <div className="mt-1">
@@ -1030,6 +1256,8 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                             </div>
                         )}
                     </div>
+                        </>
+                    )}
 
                 </div>
 
@@ -1157,6 +1385,6 @@ export default function AddCategoryModal({ onClose, initialData, onSave }: AddCa
                     </div>
                 </div>
             )}
-        </div>
+        </div>, document.body
     );
 }

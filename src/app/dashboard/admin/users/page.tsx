@@ -24,6 +24,7 @@ import { useSession } from '@/components/SessionProvider';
 export default function GlobalUserManagement() {
     const { confirm } = useUI();
     const { activeRole } = useSession();
+
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -159,6 +160,18 @@ export default function GlobalUserManagement() {
             console.error('Delete user error:', error);
         }
     };
+
+    if (activeRole !== 'SUPER_ADMIN') {
+        return (
+            <div className="p-6 h-[calc(100vh-100px)] flex items-center justify-center">
+                <div className="bg-red-50 border border-red-200 text-red-600 p-6 rounded-2xl flex flex-col items-center gap-4 text-center max-w-md shadow-xl">
+                    <ShieldCheck className="w-16 h-16 text-red-500" />
+                    <h2 className="text-2xl font-black">Access Denied</h2>
+                    <p className="font-medium text-red-700/80">Only Super Admins can access the Global User Database.</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 md:p-8 space-y-8 animate-fade-in-up">

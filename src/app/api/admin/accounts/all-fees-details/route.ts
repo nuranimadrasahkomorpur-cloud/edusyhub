@@ -25,7 +25,7 @@ export async function GET(req: Request) {
         
         // 1. Fetch pending fees for all students in the institute
         const allPendingFees = await (prisma as any).transaction.findMany({
-            where: { instituteId, status: 'PENDING' },
+            where: { instituteId, status: 'PENDING', date: { lte: new Date() } },
             orderBy: { date: 'asc' }
         });
 

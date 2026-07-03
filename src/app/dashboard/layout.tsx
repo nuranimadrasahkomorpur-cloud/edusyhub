@@ -273,7 +273,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'শিক্ষক', icon: GraduationCap, href: '/dashboard/teachers', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'অভিভাবক', icon: HeartPulse, href: '/dashboard/guardians', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'দাতা', icon: HeartPulse, href: '/dashboard/donors', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
-        { name: 'ইউজার ডাটাবেস', icon: Users, href: '/dashboard/admin/users', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
+        { name: 'ইউজার ডাটাবেস', icon: Users, href: '/dashboard/admin/users', roles: ['SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'অ্যাপ ব্র্যান্ডিং', icon: Settings, href: '/dashboard/admin/settings/branding', roles: ['SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'নোটিফিকেশন সেট', icon: Bell, href: '/dashboard/admin/settings/notifications', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'নোটিফিকেশন এনালিটিক্স', icon: BarChart3, href: '/dashboard/admin/notifications/analytics', roles: ['ADMIN', 'SUPER_ADMIN', 'TEACHER'], section: 'বিশ্লেষণ ও রিপোর্ট' },

@@ -15,6 +15,24 @@ import Modal from '@/components/Modal';
 import Toast from '@/components/Toast';
 import ClassScheduleSettingsModal from '@/components/ClassScheduleSettingsModal';
 
+const PRESET_CLASSES = {
+    school: {
+        bn: ['প্লে', 'নার্সারি', 'প্রথম শ্রেণী', 'দ্বিতীয় শ্রেণী', 'তৃতীয় শ্রেণী', 'চতুর্থ শ্রেণী', 'পঞ্চম শ্রেণী', 'ষষ্ঠ শ্রেণী', 'সপ্তম শ্রেণী', 'অষ্টম শ্রেণী', 'নবম শ্রেণী', 'দশম শ্রেণী', 'একাদশ শ্রেণী', 'দ্বাদশ শ্রেণী'],
+        en: ['Play', 'Nursery', 'Class One', 'Class Two', 'Class Three', 'Class Four', 'Class Five', 'Class Six', 'Class Seven', 'Class Eight', 'Class Nine', 'Class Ten', 'Class Eleven', 'Class Twelve'],
+        ar: ['روصة', 'تمهيدي', 'الصف الأول', 'الصف الثاني', 'الصف الثالث', 'الصف الرابع', 'الصف الخامس', 'الصف السادس', 'الصف السابع', 'الصف الثامن', 'الصف التاسع', 'الصف العاشر', 'الحادي عشر', 'الثاني عشر']
+    },
+    alia: {
+        bn: ['প্লে', 'নার্সারি', 'ইবতেদায়ী ১ম', 'ইবতেদায়ী ২য়', 'ইবতেদায়ী ৩য়', 'ইবতেদায়ী ৪র্থ', 'ইবতেদায়ী ৫ম', 'দাখিল ৬ষ্ঠ', 'দাখিল ৭ম', 'দাখিল ৮ম', 'দাখিল ৯ম', 'দাখিল ১০ম', 'আলিম ১ম বর্ষ', 'আলিম ২য় বর্ষ', 'ফাযিল', 'কামিল', 'হিফজ', 'নূরানী', 'মক্তব'],
+        en: ['Play', 'Nursery', 'Ibtedayi One', 'Ibtedayi Two', 'Ibtedayi Three', 'Ibtedayi Four', 'Ibtedayi Five', 'Dakhil Six', 'Dakhil Seven', 'Dakhil Eight', 'Dakhil Nine', 'Dakhil Ten', 'Alim First Year', 'Alim Second Year', 'Fazil', 'Kamil', 'Hifz', 'Noorani', 'Maktab'],
+        ar: ['روصة', 'تمهيدي', 'الابتدائي الأول', 'الابتدائي الثاني', 'الابتدائي الثالث', 'الابتدائي الرابع', 'الابتدائي الخامس', 'الداخل السادس', 'الداخل السابع', 'الداخل الثامن', 'الداخل التاسع', 'الداخل العاشر', 'عالم سنة أولى', 'عالم سنة ثانية', 'فاضل', 'كامل', 'حفظ', 'نوراني', 'مكتب']
+    },
+    qawmi: {
+        bn: ['নূরানী / মক্তব', 'নাজেরা', 'হিফজ', 'আউয়াল (১ম)', 'ছানী (২য়)', 'ছালেছ (৩য়)', 'রাবে (৪র্থ)', 'খামেস (৫ম)', 'নাহবেমীর', 'হেদায়াতুন নাহু', 'কাফিয়া', 'শরহে জামী', 'শরহে বেকায়া', 'জালালাইন', 'মিশকাত', 'দাওরায়ে হাদীস', 'ইফতা'],
+        en: ['Noorani / Maktab', 'Nazira', 'Hifz', 'Awwal', 'Sani', 'Salis', 'Rabi', 'Khamis', 'Nahw-e-Mir', 'Hidayatun Nahw', 'Kafiyah', 'Sharh-e-Jami', 'Sharh-e-Wiqayah', 'Jalalain', 'Mishkat', 'Dawra-e-Hadith', 'Ifta'],
+        ar: ['نوراني / مكتب', 'ناظرة', 'حفظ', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'نحو مير', 'هداية النحو', 'كافية', 'شرح جامي', 'شرح وقاية', 'جلالين', 'مشكاة', 'دورة الحديث', 'إفتاء']
+    }
+};
+
 export default function ClassesPage() {
     const { activeInstitute, activeRole } = useSession();
     const [classes, setClasses] = useState<any[]>([]);
@@ -23,12 +41,12 @@ export default function ClassesPage() {
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [selectedClass, setSelectedClass] = useState<any>(null);
+    const [classPresetType, setClassPresetType] = useState<'school' | 'alia' | 'qawmi' | null>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
 
-    const [classData, setClassData] = useState({ name: '' });
+    const [classLanguage, setClassLanguage] = useState<'bn' | 'en' | 'ar'>('bn');
     const [bulkClassText, setBulkClassText] = useState('');
-    const [isBulkMode, setIsBulkMode] = useState(false);
     const [groupData, setGroupData] = useState({ name: '' });
     const [startTimeInput, setStartTimeInput] = useState('');
 
@@ -59,31 +77,22 @@ export default function ClassesPage() {
         try {
             let payload: any = { instituteId: activeInstitute.id };
 
-            if (isBulkMode) {
-                const items = bulkClassText
-                    .split('\n')
-                    .map(line => {
-                        const slMatch = line.match(/^(\d+)[\.\)\s-]+/);
-                        const order = slMatch ? parseInt(slMatch[1]) : 0;
-                        const name = line.replace(/^\d+[\.\)\s-]+/, '').trim();
-                        return { name, order };
-                    })
-                    .filter(item => item.name.length > 0);
+            const items = bulkClassText
+                .split('\n')
+                .map(line => {
+                    const slMatch = line.match(/^(\d+)[\.\)\s-]+/);
+                    const order = slMatch ? parseInt(slMatch[1]) : 0;
+                    const name = line.replace(/^\d+[\.\)\s-]+/, '').trim();
+                    return { name, order };
+                })
+                .filter(item => item.name.length > 0);
 
-                if (items.length === 0) {
-                    setToast({ message: 'অনুগ্রহ করে ক্লাস লিস্ট বা সঠিক ফরম্যাট দিন।', type: 'error' });
-                    setActionLoading(false);
-                    return;
-                }
-                payload.names = items;
-            } else {
-                if (!classData.name) {
-                    setToast({ message: 'ক্লাসের নাম দিন।', type: 'error' });
-                    setActionLoading(false);
-                    return;
-                }
-                payload.name = classData.name;
+            if (items.length === 0) {
+                setToast({ message: 'অনুগ্রহ করে ক্লাস লিস্ট বা সঠিক ফরম্যাট দিন।', type: 'error' });
+                setActionLoading(false);
+                return;
             }
+            payload.names = items;
 
             const res = await fetch('/api/admin/classes', {
                 method: 'POST',
@@ -91,9 +100,8 @@ export default function ClassesPage() {
                 body: JSON.stringify(payload)
             });
             if (res.ok) {
-                setToast({ message: isBulkMode ? 'ক্লাসগুলো সফলভাবে তৈরি হয়েছে!' : 'ক্লাস সফলভাবে তৈরি হয়েছে!', type: 'success' });
+                setToast({ message: 'ক্লাসগুলো সফলভাবে তৈরি হয়েছে!', type: 'success' });
                 setIsClassModalOpen(false);
-                setClassData({ name: '' });
                 setBulkClassText('');
                 fetchClasses();
             }
@@ -238,56 +246,117 @@ export default function ClassesPage() {
             {/* Class Modal */}
             <Modal
                 isOpen={isClassModalOpen}
-                onClose={() => setIsClassModalOpen(false)}
+                onClose={() => {
+                    setIsClassModalOpen(false);
+                    setBulkClassText('');
+                }}
                 title="নতুন ক্লাস তৈরি করুন"
-                maxWidth="max-w-md"
+                maxWidth="max-w-xl"
+                noScroll={true}
             >
-                <form onSubmit={handleCreateClass} className="p-8 space-y-6">
-                    <div className="flex items-center justify-between p-2 bg-slate-50 rounded-xl">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-2">বাল্ক অ্যাড (Bulk Add)</span>
-                        <button
-                            type="button"
-                            onClick={() => setIsBulkMode(!isBulkMode)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${isBulkMode ? 'bg-[#045c84]' : 'bg-slate-300'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isBulkMode ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
-                    </div>
-
-                    {!isBulkMode ? (
+                <form onSubmit={handleCreateClass} className="flex flex-col h-full max-h-[90vh] sm:max-h-[85vh]">
+                    <div className="p-5 md:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">ক্লাসের নাম</label>
-                            <input
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black"
-                                placeholder="যেমন: ষষ্ঠ শ্রেণী"
-                                value={classData.name}
-                                onChange={(e) => setClassData({ ...classData, name: e.target.value })}
-                                required={!isBulkMode}
-                            />
+                            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">দ্রুত নির্বাচন করুন</label>
+                            
+                            <div className="flex flex-col-reverse sm:flex-row gap-2">
+                                <div className="flex-1 flex bg-slate-100 p-1 rounded-xl">
+                                    <button
+                                        type="button"
+                                        onClick={() => setClassPresetType(classPresetType === 'school' ? null : 'school')}
+                                        className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all ${classPresetType === 'school' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        জেনারেল/স্কুল
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setClassPresetType(classPresetType === 'alia' ? null : 'alia')}
+                                        className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all ${classPresetType === 'alia' ? 'bg-white text-[#107044] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        আলিয়া
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setClassPresetType(classPresetType === 'qawmi' ? null : 'qawmi')}
+                                        className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all ${classPresetType === 'qawmi' ? 'bg-white text-[#107044] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        কওমি
+                                    </button>
+                                </div>
+                                <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => setClassLanguage('bn')}
+                                        className={`px-3 py-2 text-xs font-bold rounded-lg transition-all ${classLanguage === 'bn' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        BN
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setClassLanguage('en')}
+                                        className={`px-3 py-2 text-xs font-bold rounded-lg transition-all ${classLanguage === 'en' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        EN
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setClassLanguage('ar')}
+                                        className={`px-3 py-2 text-[14px] font-arabic font-bold rounded-lg transition-all ${classLanguage === 'ar' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        عربي
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {classPresetType && PRESET_CLASSES[classPresetType] && (
+                                <div className="grid grid-cols-2 gap-2 mt-2 max-h-[320px] overflow-y-auto p-1 custom-scrollbar bg-slate-50 border border-slate-200 rounded-xl">
+                                    {PRESET_CLASSES[classPresetType][classLanguage]?.map(cls => {
+                                        const isSelected = bulkClassText.includes(cls);
+                                        return (
+                                            <button
+                                                key={cls}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!isSelected) {
+                                                        setBulkClassText(prev => prev ? prev + '\n' + cls : cls);
+                                                    } else {
+                                                        setBulkClassText(prev => prev.split('\n').filter(line => line.trim() && !line.includes(cls)).join('\n'));
+                                                    }
+                                                }}
+                                                className={`p-2 text-[11px] ${classLanguage === 'ar' ? 'font-arabic text-[14px]' : 'font-bold'} rounded-lg border text-left transition-all ${isSelected ? 'border-red-500 bg-red-50 text-red-600 shadow-sm' : 'border-transparent bg-white text-slate-600 hover:border-slate-300 hover:shadow-sm'}`}
+                                            >
+                                                {cls}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
-                    ) : (
+
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">ক্লাস লিস্ট (Pasted List)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">ক্লাস লিস্ট (বা নিজে লিখুন)</label>
                                 <span className="text-[10px] text-slate-400 font-bold uppercase">ইংরেজি SL নম্বর থাকলে সমস্যা নেই</span>
                             </div>
                             <textarea
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black min-h-[150px] resize-none"
+                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-medium text-black min-h-[250px] resize-none"
                                 placeholder={"যেমন:\n1. Class One\n2. Class Two"}
                                 value={bulkClassText}
                                 onChange={(e) => setBulkClassText(e.target.value)}
-                                required={isBulkMode}
+                                required
                             />
                         </div>
-                    )}
-                    <button
-                        type="submit"
-                        disabled={actionLoading}
-                        className="w-full py-4 bg-[#045c84] text-white font-bold rounded-2xl shadow-lg shadow-blue-100 transition-all flex items-center justify-center gap-2"
-                    >
-                        {actionLoading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                        <span>সেভ করুন</span>
-                    </button>
+                    </div>
+                    <div className="p-5 md:p-8 pt-4 border-t border-slate-100 bg-white shrink-0 rounded-b-2xl">
+                        <button
+                            type="submit"
+                            disabled={actionLoading}
+                            className="w-full py-4 bg-[#045c84] text-white font-bold rounded-2xl shadow-lg shadow-blue-100 transition-all flex items-center justify-center gap-2"
+                        >
+                            {actionLoading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                            <span>সেভ করুন</span>
+                        </button>
+                    </div>
                 </form>
             </Modal>
 

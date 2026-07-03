@@ -12,28 +12,16 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
         }
 
-        const match: any = { userId: { $oid: userId } };
-        if (unreadOnly) {
-            match.read = false;
-        }
-
-        const notificationsRaw = await (prisma as any).$runCommandRaw({
-            find: 'Notification',
-            filter: match,
-            sort: { createdAt: -1 },
-            limit: 50
+        const notifications = await (prisma as any).notification.findMany({
+            where: {
+                userId,
+                ...(unreadOnly ? { read: false } : {})
+            },
+            orderBy: {
+                createdAt: 'desc'
+            },
+            take: 50
         });
-
-        const notifications = (notificationsRaw.cursor?.firstBatch || []).map((n: any) => ({
-            id: n._id?.$oid || n._id?.toString(),
-            userId: n.userId?.$oid || n.userId,
-            type: n.type,
-            title: n.title,
-            message: n.message,
-            read: n.read || false,
-            metadata: n.metadata,
-            createdAt: n.createdAt?.$date || n.createdAt
-        }));
 
         return NextResponse.json(notifications);
     } catch (error) {

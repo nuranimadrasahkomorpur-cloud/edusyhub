@@ -159,6 +159,7 @@ export async function GET(req: Request) {
                 ...where,
                 type: 'INCOME',
                 status: 'PENDING',
+                date: { lte: new Date() },
                 NOT: [
                     ...(excludedCategoryNames.length > 0 || archivedCategoryNames.length > 0 ? [{
                         category: {
@@ -197,6 +198,9 @@ export async function GET(req: Request) {
         const status = searchParams.get('status');
         if (status) {
             txWhere.status = status;
+            if (status === 'PENDING') {
+                txWhere.date = { lte: new Date() };
+            }
         }
 
         const limit = studentId ? undefined : 300;
@@ -259,7 +263,7 @@ export async function GET(req: Request) {
                 }
                 
                 if (cycleName) {
-                    const baseCat = displayCategory.replace(/\s*\(.*\)\s*$/, '').trim(); 
+                    const baseCat = (displayCategory || '').replace(/\s*\(.*\)\s*$/, '').trim(); 
                     displayCategory = `${baseCat} (${cycleName})`;
                 }
             } else if (displayCategory && displayCategory.includes('মাসিক')) {
@@ -299,21 +303,33 @@ export async function GET(req: Request) {
                 const config = catInfo.config;
                 const dueTiming = config.dueTiming || 'start';
                 const dueDays = Number(config.dueDays) || 0;
-                
+                let effectiveDueTiming = dueTiming;
+
+                if (config.endDate) {
+                    const end = new Date(config.endDate);
+                    if (config.interval === 'monthly' && end.getFullYear() === dueDate.getFullYear() && end.getMonth() === dueDate.getMonth()) {
+                        effectiveDueTiming = 'start';
+                    } else if (config.interval === 'yearly' && end.getFullYear() === dueDate.getFullYear()) {
+                        effectiveDueTiming = 'start';
+                    } else if (config.interval === 'semester' && end.getFullYear() === dueDate.getFullYear() && Math.floor(end.getMonth()/6) === Math.floor(dueDate.getMonth()/6)) {
+                        effectiveDueTiming = 'start';
+                    }
+                }
+
                 if (config.interval === 'monthly') {
-                    if (dueTiming === 'end') {
+                    if (effectiveDueTiming === 'end') {
                         dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, dueDays || 1);
                     } else {
                         dueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDays || 1);
                     }
                 } else if (config.interval === 'weekly') {
-                    if (dueTiming === 'end') dueDate.setDate(dueDate.getDate() + 7);
+                    if (effectiveDueTiming === 'end') dueDate.setDate(dueDate.getDate() + 7);
                     dueDate.setDate(dueDate.getDate() + dueDays);
                 } else if (config.interval === 'semester') {
-                    if (dueTiming === 'end') dueDate.setMonth(dueDate.getMonth() + 6);
+                    if (effectiveDueTiming === 'end') dueDate.setMonth(dueDate.getMonth() + 6);
                     dueDate.setDate(dueDate.getDate() + dueDays);
                 } else if (config.interval === 'yearly') {
-                    if (dueTiming === 'end') dueDate.setFullYear(dueDate.getFullYear() + 1);
+                    if (effectiveDueTiming === 'end') dueDate.setFullYear(dueDate.getFullYear() + 1);
                     dueDate.setDate(dueDate.getDate() + dueDays);
                 }
             }

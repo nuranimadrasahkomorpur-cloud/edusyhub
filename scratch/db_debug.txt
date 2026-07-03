@@ -241661,3 +241661,1004 @@
   "isOwner": true
 }
 
+[2026-06-30T13:22:00.208Z] GET list request details
+{
+  "classId": "69916776764bc8eaf3d89113",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:00.212Z] GET list request details
+{
+  "classId": "69916776764bc8eaf3d89113",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:00.258Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:00.258Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:00.264Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:00.265Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:00.307Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:22:00.320Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:22:00.427Z] GET list request details
+{
+  "classId": "69916776764bc8eaf3d89113",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:00.448Z] GET list request details
+{
+  "classId": "69916776764bc8eaf3d89113",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:00.479Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:00.480Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:00.496Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:00.496Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:00.535Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:22:00.545Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:22:13.803Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:13.816Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:13.850Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:13.850Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:13.866Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:13.867Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:13.896Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:22:13.916Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:22:15.314Z] GET list request details
+{
+  "classId": "69916776764bc8eaf3d89113",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:15.325Z] GET list request details
+{
+  "classId": "69916776764bc8eaf3d89113",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:22:15.365Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:15.365Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:15.373Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:22:15.373Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:22:15.418Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:22:15.423Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:23:36.430Z] GET list request details
+{
+  "classId": "69916776764bc8eaf3d89113",
+  "instituteId": "699127f5df2f51a5b757bb56",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:23:36.478Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69908476e5f0040ce1af0616"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:23:36.478Z] GET list: isOwner evaluation
+{
+  "isOwner": false
+}
+
+[2026-06-30T13:23:36.528Z] GET list: Teacher Profile check for non-owner
+{
+  "profile": {
+    "id": "6991e4acee233b333081c30f",
+    "userId": "6990835251ab03d764c14410",
+    "instituteId": "699127f5df2f51a5b757bb56",
+    "status": "ACTIVE",
+    "isAdmin": false
+  }
+}
+
+[2026-06-30T13:34:38.328Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:34:38.355Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:34:38.375Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:34:38.376Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T13:34:38.405Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:34:38.405Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T13:34:38.547Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:34:38.588Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T13:34:38.592Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:34:38.592Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T13:34:38.641Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T13:34:38.641Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:39:39.756Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:39:39.767Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:39:39.839Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:39:39.840Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:39:39.868Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:39:39.869Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:39:40.018Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:39:40.048Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:39:40.065Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:39:40.066Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:39:40.122Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:39:40.122Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:38.395Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:38.443Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:38.444Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:44.024Z] GET list request details
+{
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:44.025Z] GET list request details
+{
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:44.072Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:44.072Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:44.075Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:44.075Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:45.029Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:45.035Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:45.079Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:45.079Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:45.082Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:45.082Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:45.273Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:45.280Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-06-30",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:45.319Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:45.320Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:45.328Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:45.328Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:47.147Z] Mark request details
+{
+  "studentId": "6a43ff8ec0f008220aea0056",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "dateString": "2026-06-30",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:47.195Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:47.195Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:47.930Z] Mark request details
+{
+  "studentId": "6a43ff8ec0f008220aea0056",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "dateString": "2026-06-30",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:47.978Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:47.978Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:48.770Z] Mark request details
+{
+  "studentId": "6a43ff8ec0f008220aea0056",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "dateString": "2026-06-30",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:48.817Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:48.818Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:49.426Z] Mark request details
+{
+  "studentId": "6a43ff8ec0f008220aea0056",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "dateString": "2026-06-30",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:49.473Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:49.474Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:49.930Z] Mark request details
+{
+  "studentId": "6a43ff8ec0f008220aea0056",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "dateString": "2026-06-30",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:49.979Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:49.980Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:50.282Z] Mark request details
+{
+  "studentId": "6a43ff8ec0f008220aea0056",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "classId": "6a43c61f6f9d283a431c7e9b",
+  "dateString": "2026-06-30",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:50.329Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:50.329Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:52.115Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-06",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:52.163Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:52.164Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-06-30T17:41:59.316Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-06-30T17:41:59.367Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-06-30T17:41:59.367Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+

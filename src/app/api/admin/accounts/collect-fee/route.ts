@@ -470,6 +470,16 @@ export async function GET(req: Request) {
 
         const activeCategories = categories.filter((c: any) => !(c.config?.isArchived === true));
         const pendingFees = allPendingFees.filter((f: any) => {
+            // Filter out mistakenly generated future pending fees
+            if (f.date) {
+                const feeDate = new Date(f.date);
+                const now = new Date();
+                // If it's strictly next month or later, it shouldn't be pending
+                if (feeDate.getFullYear() > now.getFullYear() || (feeDate.getFullYear() === now.getFullYear() && feeDate.getMonth() > now.getMonth())) {
+                    return false;
+                }
+            }
+
             if (f.categoryId) {
                 return activeCategories.some((c: any) => c.id === f.categoryId);
             } else {
