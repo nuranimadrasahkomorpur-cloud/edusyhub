@@ -680,6 +680,16 @@ export default function StudentManagementPage() {
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [activeTab, setActiveTab] = useState<'students' | 'applications' | 'books' | 'teachers'>('students');
+    const [admissionReport, setAdmissionReport] = useState<{ totalIssued: number, totalSubmitted: number, dropOffs: number } | null>(null);
+
+    useEffect(() => {
+        if (activeTab === 'applications' && activeInstitute?.id) {
+            fetch(`/api/admin/admissions/report?instituteId=${activeInstitute.id}`)
+                .then(res => res.json())
+                .then(data => setAdmissionReport(data))
+                .catch(err => console.error("Error fetching admission report:", err));
+        }
+    }, [activeTab, activeInstitute?.id]);
 
     const [teachers, setTeachers] = useState<any[]>([]);
     const [permissionModalData, setPermissionModalData] = useState<any>(null);
@@ -793,7 +803,12 @@ export default function StudentManagementPage() {
     useEffect(() => { localStorage.setItem('students_tableColumns', JSON.stringify(tableColumns)); }, [tableColumns]);
     useEffect(() => { localStorage.setItem('students_sortField', sortField); }, [sortField]);
     useEffect(() => { localStorage.setItem('students_sortDir', sortDir); }, [sortDir]);
+    
+    // Column Dropdown Ref and State
+    const columnBtnRef = useRef<HTMLButtonElement>(null);
+    const [columnDropdownPos, setColumnDropdownPos] = useState({ top: 0, left: 0, width: 0 });
     const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
+
     const [customColumns, setCustomColumns] = useState<{ id: string, label: string, type: string }[]>([]);
     const [isCustomFieldModalOpen, setIsCustomFieldModalOpen] = useState(false);
     const [newCustomColumnLabel, setNewCustomColumnLabel] = useState('');
@@ -2469,7 +2484,18 @@ export default function StudentManagementPage() {
                             {activeTab === 'students' && viewMode === 'ADMISSION' && (
                                 <div className="shrink-0">
                                     <button 
-                                        onClick={() => setIsColumnDropdownOpen(!isColumnDropdownOpen)}
+                                        ref={columnBtnRef}
+                                        onClick={() => {
+                                            if (columnBtnRef.current) {
+                                                const rect = columnBtnRef.current.getBoundingClientRect();
+                                                setColumnDropdownPos({
+                                                    top: rect.bottom + window.scrollY + 8,
+                                                    left: rect.right + window.scrollX - 256, // 256px is w-64
+                                                    width: rect.width
+                                                });
+                                            }
+                                            setIsColumnDropdownOpen(!isColumnDropdownOpen);
+                                        }}
                                         className="flex items-center gap-2 bg-white border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 shadow-sm cursor-pointer hover:border-[#045c84] hover:text-[#045c84] transition-all focus:outline-none"
                                     >
                                         <Settings2 size={16} />
@@ -2482,10 +2508,13 @@ export default function StudentManagementPage() {
                     </div>
                     
                     {/* Dropdown Menu - Extracted to prevent clipping */}
-                    {activeTab === 'students' && viewMode === 'ADMISSION' && isColumnDropdownOpen && (
+                    {activeTab === 'students' && viewMode === 'ADMISSION' && isColumnDropdownOpen && createPortal(
                         <>
-                            <div className="fixed inset-0 z-[205]" onClick={() => setIsColumnDropdownOpen(false)}></div>
-                            <div className="absolute right-0 top-full mt-2 w-64 z-[210] animate-fade-in bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col overflow-hidden">
+                            <div className="fixed inset-0 z-[9998]" onClick={() => setIsColumnDropdownOpen(false)}></div>
+                            <div 
+                                className="absolute mt-2 w-64 z-[9999] animate-fade-in bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col overflow-hidden"
+                                style={{ top: columnDropdownPos.top, left: columnDropdownPos.left }}
+                            >
                                 <div 
                                     className="p-2 flex flex-col gap-1 overflow-y-auto pointer-events-auto custom-scrollbar" 
                                     style={{ maxHeight: '50vh' }}
@@ -2529,7 +2558,8 @@ export default function StudentManagementPage() {
                                     </button>
                                 </div>
                             </div>
-                        </>
+                        </>,
+                        document.body
                     )}
                 </div>
 
@@ -2614,7 +2644,7 @@ export default function StudentManagementPage() {
             </div>
 
             <div key={activeTab} className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-forwards">
-                {activeTab === 'students' ? (
+                {activeTab === 'students' || activeTab === 'applications' ? (
                     loading && students.length === 0 ? (
                         <div className="py-20 text-center">
                             <Loader2 className="animate-spin mx-auto text-[#045c84] mb-4" size={40} />
@@ -2629,6 +2659,37 @@ export default function StudentManagementPage() {
                         </div>
                     ) : (
                         <>
+                        {activeTab === 'applications' && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">মোট ফর্ম ইস্যু</p>
+                                        <h3 className="text-2xl font-black text-slate-800">{admissionReport?.totalIssued || 0}</h3>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
+                                        <Layers size={20} />
+                                    </div>
+                                </div>
+                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">ফর্ম জমা</p>
+                                        <h3 className="text-2xl font-black text-emerald-600">{admissionReport?.totalSubmitted || 0}</h3>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                                        <CheckCircle2 size={20} />
+                                    </div>
+                                </div>
+                                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">বাদ পড়া (Drop-offs)</p>
+                                        <h3 className="text-2xl font-black text-rose-500">{admissionReport?.dropOffs || 0}</h3>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center">
+                                        <Users size={20} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         {viewMode === 'ADMISSION' ? (
                             <div 
                                 ref={tableContainerRef}

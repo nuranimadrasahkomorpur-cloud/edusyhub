@@ -17,6 +17,8 @@ export default function PublicAdmissionPage() {
     const [formConfig, setFormConfig] = useState<FieldDefinition[]>([]);
     const [credentials, setCredentials] = useState<{ studentId: string; password: string } | null>(null);
     const [draftStatus, setDraftStatus] = useState<'saved' | 'saving' | 'recovered' | null>(null);
+    const [draftId, setDraftId] = useState<string | null>(null);
+    const [formNumber, setFormNumber] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'profile' | 'account'>('profile');
 
     const [formData, setFormData] = useState<any>({
@@ -75,16 +77,46 @@ export default function PublicAdmissionPage() {
         fetchData();
 
         // Load Draft from LocalStorage
+        let hasLocalDraft = false;
         const savedDraft = localStorage.getItem(draftKey);
         if (savedDraft) {
             try {
                 const parsed = JSON.parse(savedDraft);
                 setFormData(parsed);
+                if (parsed.draftId) setDraftId(parsed.draftId);
+                if (parsed.formNumber) setFormNumber(parsed.formNumber);
+                hasLocalDraft = true;
                 setDraftStatus('recovered');
                 setTimeout(() => setDraftStatus(null), 3000);
             } catch (e) {
                 console.error("Draft recovery error", e);
             }
+        }
+
+        // Initialize a new Draft in the backend if none exists locally
+        if (!hasLocalDraft && instituteId) {
+            const initDraft = async () => {
+                try {
+                    const res = await fetch('/api/public/admission/draft', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ instituteId })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setDraftId(data.draftId);
+                        setFormNumber(data.formNumber);
+                        setFormData((prev: any) => ({
+                            ...prev,
+                            draftId: data.draftId,
+                            formNumber: data.formNumber
+                        }));
+                    }
+                } catch (err) {
+                    console.error("Failed to initialize draft", err);
+                }
+            };
+            initDraft();
         }
     }, [instituteId]);
 
@@ -223,7 +255,8 @@ export default function PublicAdmissionPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...formData,
-                    instituteId
+                    instituteId,
+                    draftId
                 })
             });
 

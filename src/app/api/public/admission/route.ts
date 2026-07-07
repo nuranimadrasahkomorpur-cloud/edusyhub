@@ -157,6 +157,21 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // --- Update Draft Status ---
+        if (body.draftId) {
+            try {
+                await prisma.admissionDraft.update({
+                    where: { id: body.draftId },
+                    data: {
+                        status: 'SUBMITTED',
+                        submittedAt: new Date()
+                    }
+                });
+            } catch (err) {
+                console.error("Failed to update draft status", err);
+            }
+        }
+
         return NextResponse.json({
             success: true,
             message: 'আবেদন সফলভাবে জমা দেওয়া হয়েছে।',

@@ -292,7 +292,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
     try {
         const body = await req.json();
-        const { id, name, type, address, phone, website, logo, coverImage, isDefault, userId } = body;
+        const { id, name, type, address, phone, website, logo, coverImage, isDefault, userId, studentFormConfig } = body;
 
         if (!id) return NextResponse.json({ message: 'ID is required' }, { status: 400 });
 
@@ -300,7 +300,7 @@ export async function PATCH(req: Request) {
         // Since POST required it, PATCH likely will too if we touch any fields Prisma is sensitive about.
         // Even for simple fields (name, type), using raw ensures consistency.
 
-        console.log('PATCHING INSTITUTE RAW:', { id, name, type, address, phone, website, logo, coverImage }); // Added logo/cover log
+        console.log('PATCHING INSTITUTE RAW:', { id, name, type, address, phone, website, logo, coverImage, studentFormConfig }); // Added logo/cover log
 
         const updateFields: any = {};
         if (name !== undefined) updateFields.name = name;
@@ -310,6 +310,7 @@ export async function PATCH(req: Request) {
         if (website !== undefined) updateFields.website = website;
         if (logo !== undefined) updateFields.logo = logo;             // Use undefined check for empty strings
         if (coverImage !== undefined) updateFields.coverImage = coverImage; // Use undefined check for empty strings
+        if (studentFormConfig !== undefined) updateFields.studentFormConfig = studentFormConfig;
         updateFields.updatedAt = { "$date": new Date().toISOString() };
 
         await prisma.$runCommandRaw({

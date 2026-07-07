@@ -76,6 +76,8 @@ model Institute {
   assignments Assignment[]
   attendances Attendance[]
   subscriptions Subscription[]
+  formSequences FormSequence[]
+  admissionDrafts AdmissionDraft[]
 }
 
 model Class {
@@ -434,4 +436,25 @@ model Announcement {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model FormSequence {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  instituteId String   @db.ObjectId
+  institute   Institute @relation(fields: [instituteId], references: [id])
+  year        Int
+  nextNumber  Int      @default(1)
+  
+  @@unique([instituteId, year])
+}
+
+model AdmissionDraft {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  instituteId String   @db.ObjectId
+  institute   Institute @relation(fields: [instituteId], references: [id])
+  formNumber  String
+  status      String   @default("DRAFT") // DRAFT, SUBMITTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  submittedAt DateTime?
 }
