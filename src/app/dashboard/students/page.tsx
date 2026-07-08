@@ -320,10 +320,16 @@ export default function StudentManagementPage() {
     const [classPresetType, setClassPresetType] = useState<'school' | 'alia' | 'qawmi' | null>(null);
     const [classLanguage, setClassLanguage] = useState<'bn' | 'en' | 'ar'>('bn');
 
-
-
-
-
+    // Accordion State for Admission Form
+    const [expandedSection, setExpandedSection] = useState<string>('basic');
+    const sectionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+    
+    const scrollToSection = (sectionId: string) => {
+        setExpandedSection(sectionId);
+        setTimeout(() => {
+            sectionRefs.current[sectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150); // slight delay to allow accordion expansion to begin
+    };
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
@@ -359,7 +365,7 @@ export default function StudentManagementPage() {
     const [editingGroup, setEditingGroup] = useState<any>(null);
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<string | null>(null);
     const [showAllActionsInline, setShowAllActionsInline] = useState(false);
-    const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null);
+    const [menuPosition, setMenuPosition] = useState<{ top?: number, bottom?: number, left: number } | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [editingStudent, setEditingStudent] = useState<any>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -387,6 +393,8 @@ export default function StudentManagementPage() {
     });
 
     const [gradingSystem, setGradingSystem] = useState<'school' | 'madrasa'>('school');
+    const [phoneCountryPickerField, setPhoneCountryPickerField] = useState<string | null>(null);
+    const [countrySearchTerm, setCountrySearchTerm] = useState('');
 
     // Auto-save form data draft
     useEffect(() => {
@@ -397,6 +405,7 @@ export default function StudentManagementPage() {
     
     // Direct Image Upload from Table
     const [uploadingStudentId, setUploadingStudentId] = useState<string | null>(null);
+    const [photoBgColor, setPhotoBgColor] = useState('#FFFFFF');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const fabRef = useRef<HTMLDivElement>(null);
@@ -1829,7 +1838,7 @@ export default function StudentManagementPage() {
                     type: 'success'
                 });
                 setIsAddModalOpen(false);
-                setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
+                setFormData({ name: '', email: '', password: '', skipAccountSetup: true, metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
                 localStorage.removeItem('edusy_student_form_draft');
                 
                 if (editingStudent) {
@@ -2819,7 +2828,7 @@ export default function StudentManagementPage() {
                                                                         setUploadingStudentId(s.id);
                                                                         fileInputRef.current?.click();
                                                                     }}
-                                                                    className={`w-10 h-10 rounded-full ${bgColor} border-[0.5px] border-slate-600 shadow-sm overflow-hidden flex items-center justify-center text-white font-bold text-sm relative shrink-0 mx-auto group-hover:scale-105 transition-transform cursor-pointer`}
+                                                                    className={`w-10 h-10 rounded-full ${bgColor} border-[0.5px] border-slate-600 shadow-sm overflow-hidden flex items-center justify-center text-white font-bold text-sm relative shrink-0 group-hover:scale-105 transition-transform cursor-pointer`}
                                                                 >
                                                                     <span className="absolute inset-0 flex items-center justify-center z-0">{s.name?.[0] || 'S'}</span>
                                                                     {(s.metadata?.studentPhoto || s.metadata?.photo) && (
@@ -3604,114 +3613,175 @@ export default function StudentManagementPage() {
                     setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
                     setActiveFormTab('student');
                 }}
-                title={editingStudent ? "শিক্ষার্থীর তথ্য আপডেট করুন" : "নতুন শিক্ষার্থী যুক্ত করুন"}
+                title={editingStudent ? "শিক্ষার্থীর তথ্য আপডেট করুন" : "ভর্তি ফরম"}
                 maxWidth="max-w-3xl"
+                fullScreenOnMobile={true}
                 headerActions={
-                    !editingStudent && (
-                        <div className="flex items-center gap-2 mr-2">
-                            {activeInstitute?.id && (
+                    <div className="flex items-center justify-end w-full gap-2">
+                        {!editingStudent && (
+                            <>
+                                {activeInstitute?.id && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const link = `${window.location.origin}/admission/${activeInstitute.id}`;
+                                            if (navigator.clipboard) {
+                                                navigator.clipboard.writeText(link).then(() => {
+                                                    setToast({ message: 'ভর্তি ফরমের লিঙ্ক কপি হয়েছে!', type: 'success' });
+                                                }).catch(err => {
+                                                    console.error('Failed to copy text: ', err);
+                                                    setToast({ message: 'কপি করতে সমস্যা হয়েছে!', type: 'error' });
+                                                });
+                                            } else {
+                                                const textArea = document.createElement("textarea");
+                                                textArea.value = link;
+                                                document.body.appendChild(textArea);
+                                                textArea.focus();
+                                                textArea.select();
+                                                try {
+                                                    document.execCommand('copy');
+                                                    setToast({ message: 'ভর্তি ফরমের লিঙ্ক কপি হয়েছে!', type: 'success' });
+                                                } catch (err) {
+                                                    console.error('Fallback: Oops, unable to copy', err);
+                                                    setToast({ message: 'কপি করতে সমস্যা হয়েছে!', type: 'error' });
+                                                }
+                                                document.body.removeChild(textArea);
+                                            }
+                                        }}
+                                        className="p-1.5 md:p-2 rounded-lg text-slate-400 hover:text-[#034a6b] hover:bg-blue-50 transition-all hidden sm:block"
+                                        title="অনলাইন ভর্তি লিঙ্ক কপি করুন"
+                                    >
+                                        <Link size={18} className="w-4 h-4 md:w-5 md:h-5" />
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        const link = `${window.location.origin}/admission/${activeInstitute.id}`;
-                                        if (navigator.clipboard) {
-                                            navigator.clipboard.writeText(link).then(() => {
-                                                setToast({ message: 'ভর্তি ফরমের লিঙ্ক কপি হয়েছে!', type: 'success' });
-                                            }).catch(err => {
-                                                console.error('Failed to copy text: ', err);
-                                                setToast({ message: 'কপি করতে সমস্যা হয়েছে!', type: 'error' });
-                                            });
-                                        } else {
-                                            const textArea = document.createElement("textarea");
-                                            textArea.value = link;
-                                            document.body.appendChild(textArea);
-                                            textArea.focus();
-                                            textArea.select();
-                                            try {
-                                                document.execCommand('copy');
-                                                setToast({ message: 'ভর্তি ফরমের লিঙ্ক কপি হয়েছে!', type: 'success' });
-                                            } catch (err) {
-                                                console.error('Fallback: Oops, unable to copy', err);
-                                                setToast({ message: 'কপি করতে সমস্যা হয়েছে!', type: 'error' });
-                                            }
-                                            document.body.removeChild(textArea);
+                                        if (window.confirm('আপনি কি ড্রাফটটি মুছে ফেলে নতুন করে ফর্ম পূরণ করতে চান?')) {
+                                            localStorage.removeItem('edusy_student_form_draft');
+                                            setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
+                                            setToast({ message: 'ড্রাফট ক্লিয়ার করা হয়েছে', type: 'success' });
                                         }
                                     }}
-                                    className="p-2 rounded-lg text-slate-400 hover:text-[#034a6b] hover:bg-blue-50 transition-all"
-                                    title="অনলাইন ভর্তি লিঙ্ক কপি করুন"
+                                    className="p-1.5 md:p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all hidden sm:block"
+                                    title="ড্রাফট মুছুন (Clear Draft)"
                                 >
-                                    <Link size={20} />
+                                    <Trash2 size={18} className="w-4 h-4 md:w-5 md:h-5" />
                                 </button>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (window.confirm('আপনি কি ড্রাফটটি মুছে ফেলে নতুন করে ফর্ম পূরণ করতে চান?')) {
-                                        localStorage.removeItem('edusy_student_form_draft');
-                                        setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
-                                        setToast({ message: 'ড্রাফট ক্লিয়ার করা হয়েছে', type: 'success' });
-                                    }
-                                }}
-                                className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all"
-                                title="ড্রাফট মুছুন (Clear Draft)"
-                            >
-                                <Trash2 size={20} />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (!isExcelMode) {
-                                        setExcelData([]);
-                                        setColumnMappings({});
-                                    }
-                                    setIsExcelMode(!isExcelMode);
-                                }}
-                                className={`p-2 rounded-lg transition-all ${isExcelMode ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'}`}
-                                title="ডাটাবেজ থেকে ইম্পোর্ট"
-                            >
-                                <FileSpreadsheet size={20} />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsLibraryOpen(true)}
-                                className="p-2 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-amber-50 transition-all"
-                                title="তথ্য ফিল্ড লাইব্রেরি"
-                            >
-                                <Library size={20} />
-                            </button>
-                        </div>
-                    )
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!isExcelMode) {
+                                            setExcelData([]);
+                                            setColumnMappings({});
+                                        }
+                                        setIsExcelMode(!isExcelMode);
+                                    }}
+                                    className={`p-1.5 md:p-2 rounded-lg transition-all hidden sm:block ${isExcelMode ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                                    title="ডাটাবেজ থেকে ইম্পোর্ট"
+                                >
+                                    <FileSpreadsheet size={18} className="w-4 h-4 md:w-5 md:h-5" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLibraryOpen(true)}
+                                    className="p-1.5 md:p-2 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-amber-50 transition-all"
+                                    title="তথ্য ফিল্ড লাইব্রেরি"
+                                >
+                                    <Library size={18} className="w-4 h-4 md:w-5 md:h-5" />
+                                </button>
+                            </>
+                        )}
+                        <div className="h-5 w-px bg-slate-200 mx-1"></div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setStudentToPrint(formData);
+                                setIsPrintAdmissionModalOpen(true);
+                            }}
+                            className="px-2 py-1.5 md:px-3 md:py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-1.5 text-xs md:text-sm"
+                            title="প্রিন্ট ফর্ম"
+                        >
+                            <Printer size={16} className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                            <span className="hidden sm:inline-block">প্রিন্ট</span>
+                        </button>
+                        <button
+                            type="submit"
+                            form="admission-form"
+                            disabled={actionLoading}
+                            className="px-3 py-1.5 md:px-4 md:py-1.5 bg-[#045c84] hover:bg-[#034d6e] text-white font-bold rounded-lg shadow-sm transition-all active:scale-95 flex items-center gap-1.5 disabled:opacity-50 text-xs md:text-sm"
+                            title="সংরক্ষণ করুন"
+                        >
+                            {actionLoading ? <Loader2 className="animate-spin w-3.5 h-3.5 md:w-4 md:h-4" /> : <Save className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                            <span className="hidden sm:inline-block">সংরক্ষণ</span>
+                        </button>
+                    </div>
                 }
             >
-                <form onSubmit={handleFormSubmit} className="p-5 md:p-8 space-y-6">
+                <form id="admission-form" onSubmit={handleFormSubmit} className="p-3 md:p-8 space-y-6">
                     {/* Institute Header & Form Number */}
                     <div className="text-center pb-6 border-b border-slate-100">
                         <h2 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-wider">{activeInstitute?.name || 'Institute Name'}</h2>
                         <p className="text-xs text-slate-500 font-bold mb-3">{activeInstitute?.address || 'Address'}</p>
                         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-100 rounded-full border border-slate-200">
                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">ফরম নম্বর:</span>
-                            <span className="text-sm font-bold text-slate-900 font-mono">FORM-{new Date().getFullYear()}-{Math.floor(1000 + Math.random() * 9000)}</span>
+                            <span className="text-sm font-bold text-slate-900 font-mono">FORM-{new Date().getFullYear()}-{String(students.length + 1).padStart(4, '0')}</span>
                         </div>
                     </div>
 
                     {/* Admission Type Toggle */}
                     {!editingStudent && !isExcelMode && (
-                        <div className="flex flex-col gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                            <div className="flex items-center gap-6">
+                        <div className="flex flex-col gap-4 p-2 md:p-4 bg-transparent md:bg-slate-50 rounded-none md:rounded-2xl border-b border-slate-200 md:border md:border-slate-200 pb-4 md:pb-4 mb-2">
+                            {/* Mobile View: 2 Dropdowns in same line */}
+                            <div className="grid md:hidden grid-cols-2 gap-3 items-center w-full">
+                                <div className="relative">
+                                    <select
+                                        className="w-full appearance-none bg-white border border-slate-200 text-slate-700 text-sm font-bold py-2.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84]"
+                                        value={admissionType}
+                                        onChange={(e) => {
+                                            const val = e.target.value as 'new' | 'old';
+                                            setAdmissionType(val);
+                                            setFormData({ ...formData, metadata: { ...formData.metadata, admissionType: val === 'new' ? 'নতুন ভর্তি' : 'পুরাতন ভর্তি' } });
+                                        }}
+                                    >
+                                        <option value="new">নতুন ভর্তি</option>
+                                        <option value="old">পুরাতন ভর্তি</option>
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                </div>
+                                <div className="relative">
+                                    <select
+                                        className="w-full appearance-none bg-white border border-slate-200 text-slate-700 text-sm font-bold py-2.5 pl-3 pr-8 rounded-xl focus:outline-none focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84]"
+                                        value={formData.metadata?.residentialStatus || residentialStatus}
+                                        onChange={(e) => {
+                                            const val = e.target.value as 'abasik' | 'onabasik';
+                                            setResidentialStatus(val);
+                                            setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: val } });
+                                        }}
+                                    >
+                                        <option value="abasik">আবাসিক</option>
+                                        <option value="onabasik">অনাবাসিক</option>
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                </div>
+                            </div>
+
+                            {/* Desktop View: Radio buttons side by side */}
+                            <div className="hidden md:flex items-center gap-6">
                                 <div className="flex items-center gap-4">
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name="admissionType" value="new" checked={admissionType === 'new'} onChange={() => {
+                                        <input type="radio" name="admissionType_desktop" value="new" checked={admissionType === 'new'} onChange={() => {
                                             setAdmissionType('new');
                                             setFormData({ ...formData, metadata: { ...formData.metadata, admissionType: 'নতুন ভর্তি' } });
                                         }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
-                                        <span className="text-sm font-bold text-slate-800">নতুন শিক্ষার্থী (New)</span>
+                                        <span className="text-sm font-bold text-slate-800">নতুন</span>
                                     </label>
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name="admissionType" value="old" checked={admissionType === 'old'} onChange={() => {
+                                        <input type="radio" name="admissionType_desktop" value="old" checked={admissionType === 'old'} onChange={() => {
                                             setAdmissionType('old');
                                             setFormData({ ...formData, metadata: { ...formData.metadata, admissionType: 'পুরাতন ভর্তি' } });
                                         }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
-                                        <span className="text-sm font-bold text-slate-800">পুরাতন শিক্ষার্থী (Old)</span>
+                                        <span className="text-sm font-bold text-slate-800">পুরাতন</span>
                                     </label>
                                 </div>
                                 
@@ -3719,18 +3789,18 @@ export default function StudentManagementPage() {
                                 
                                 <div className="flex items-center gap-4">
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name="headerResidentialStatus" value="abasik" checked={formData.metadata?.residentialStatus === 'abasik' || residentialStatus === 'abasik'} onChange={() => {
+                                        <input type="radio" name="headerResidentialStatus_desktop" value="abasik" checked={formData.metadata?.residentialStatus === 'abasik' || residentialStatus === 'abasik'} onChange={() => {
                                             setResidentialStatus('abasik');
                                             setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: 'abasik' } });
                                         }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
-                                        <span className="text-sm font-bold text-slate-800">আবাসিক (Res.)</span>
+                                        <span className="text-sm font-bold text-slate-800">আবাসিক</span>
                                     </label>
                                     <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name="headerResidentialStatus" value="onabasik" checked={formData.metadata?.residentialStatus === 'onabasik' || residentialStatus === 'onabasik'} onChange={() => {
+                                        <input type="radio" name="headerResidentialStatus_desktop" value="onabasik" checked={formData.metadata?.residentialStatus === 'onabasik' || residentialStatus === 'onabasik'} onChange={() => {
                                             setResidentialStatus('onabasik');
                                             setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: 'onabasik' } });
                                         }} className="w-4 h-4 text-[#045c84] focus:ring-[#045c84]" />
-                                        <span className="text-sm font-bold text-slate-800">অনাবাসিক (Non-res.)</span>
+                                        <span className="text-sm font-bold text-slate-800">অনাবাসিক</span>
                                     </label>
                                 </div>
                             </div>
@@ -4291,9 +4361,9 @@ export default function StudentManagementPage() {
                                         };
 
                                         return (
-                                            <div key={field.id} className={`space-y-2 group/field ${isPhoneField ? 'md:col-span-2' : ''}`}>
+                                            <div key={field.id} className={`space-y-1 md:space-y-1.5 group/field flex flex-col ${isPhoneField ? 'md:col-span-2' : ''}`}>
 
-                                                <label className="text-xs font-black text-slate-900 uppercase tracking-wider flex justify-between">
+                                                <label className="text-[11px] md:text-xs font-black text-slate-900 uppercase tracking-wider flex justify-between">
                                                     <span className="flex items-center gap-2">
                                                         <span>{field.label} {(isRequired || (isLoginField && !isOptionalLogin)) && <span className="text-red-600 font-black">*</span>}</span>
                                                         {field.id === 'dob' && fieldValue && (
@@ -4346,9 +4416,9 @@ export default function StudentManagementPage() {
                                                         </div>
                                                     </div>
                                                 ) : field.type === 'attachment' ? (
-                                                        <div className="relative group/attachment flex justify-center w-full">
-                                                            <div className="flex flex-col items-center w-full max-w-[200px]">
-                                                                <div className={`relative w-[160px] h-[160px] md:w-[200px] md:h-[200px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-[20px] overflow-hidden transition-all duration-500 flex-shrink-0 ${fieldValue ? 'border-none ring-2 ring-[#045c84]/10 shadow-lg' : 'hover:border-[#045c84] hover:bg-slate-100/50'}`}>
+                                                        <div className="relative group/attachment flex w-full">
+                                                            <div className="flex flex-col w-full">
+                                                                <div className={`relative w-full h-[80px] bg-slate-50 border border-slate-200 rounded-xl overflow-hidden transition-all duration-300 flex-shrink-0 ${fieldValue ? 'border-[#045c84]/30 bg-[#045c84]/5' : 'hover:border-[#045c84]/50 hover:bg-slate-100'}`}>
                                                                     <input
                                                                         type="file"
                                                                         className="absolute inset-0 opacity-0 cursor-pointer z-20"
@@ -4357,39 +4427,48 @@ export default function StudentManagementPage() {
                                                                     />
 
                                                                     {fieldValue ? (
-                                                                    <div className="absolute inset-0 w-full h-full">
-                                                                        <img
-                                                                            src={fieldValue}
-                                                                            alt="Preview"
-                                                                            className="w-full h-full object-cover transition-transform duration-700 group-hover/attachment:scale-110"
-                                                                            onError={(e) => {
-                                                                                (e.target as any).style.display = 'none';
-                                                                            }}
-                                                                        />
-                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/attachment:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
-                                                                            <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-2">
-                                                                                <CloudUpload size={20} />
-                                                                            </div>
-                                                                            <span className="text-white text-[10px] font-black uppercase tracking-widest text-center px-4">ছবি পরিবর্তন করুন</span>
+                                                                    <div className="absolute inset-0 w-full h-full flex items-center p-2 gap-3">
+                                                                        <div className="h-full aspect-square rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 bg-white">
+                                                                            <img
+                                                                                src={fieldValue}
+                                                                                alt="Preview"
+                                                                                className="w-full h-full object-cover"
+                                                                                onError={(e) => {
+                                                                                    (e.target as any).style.display = 'none';
+                                                                                }}
+                                                                            />
                                                                         </div>
-                                                                        <div className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-white/90 backdrop-blur-md shadow-lg flex items-center justify-center text-green-600">
+                                                                        <div className="flex-1 flex flex-col justify-center min-w-0">
+                                                                            <span className="text-xs font-bold text-slate-700 truncate">ছবি আপলোড করা হয়েছে</span>
+                                                                            <span className="text-[10px] text-slate-500">পরিবর্তন করতে ক্লিক করুন</span>
+                                                                        </div>
+                                                                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0 mr-1">
                                                                             <CheckCircle2 size={16} />
                                                                         </div>
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center bg-slate-50/50">
-                                                                        <div className="w-12 h-12 rounded-[16px] bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 group-hover/attachment:text-[#045c84] group-hover/attachment:scale-110 transition-all duration-500">
-                                                                            <CloudUpload size={24} />
+                                                                    <div className="absolute inset-0 flex items-center px-4 gap-3">
+                                                                        <div className="w-10 h-10 rounded-lg bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 group-hover/attachment:text-[#045c84] transition-colors">
+                                                                            <CloudUpload size={20} />
                                                                         </div>
-                                                                        <div className="space-y-1">
-                                                                            <p className="text-[10px] font-black text-slate-700 leading-tight">{field.label}</p>
-                                                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest italic font-black">Photo Box</p>
+                                                                        <div className="flex-1 flex flex-col min-w-0">
+                                                                            <p className="text-xs font-bold text-slate-700 truncate">ক্লিক করে ছবি নির্বাচন করুন</p>
+                                                                            <p className="text-[10px] text-slate-500 truncate">অথবা এখানে টেনে আনুন (Max 2MB)</p>
                                                                         </div>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             {field.id === 'studentPhoto' && (
-                                                                <div className="flex justify-center w-full mt-2">
+                                                                <div className="flex flex-col items-center gap-2 w-full mt-2">
+                                                                    <div className="flex items-center justify-between w-full max-w-[120px] px-1">
+                                                                        <span className="text-[10px] text-slate-500 font-bold">ছবির ব্যাকগ্রাউন্ড:</span>
+                                                                        <input 
+                                                                            type="color" 
+                                                                            value={photoBgColor}
+                                                                            onChange={(e) => setPhotoBgColor(e.target.value)}
+                                                                            className="w-5 h-5 p-0 border border-slate-200 rounded cursor-pointer"
+                                                                        />
+                                                                    </div>
                                                                     <button 
                                                                         type="button"
                                                                         onClick={(e) => {
@@ -4473,34 +4552,25 @@ export default function StudentManagementPage() {
                                                         </div>
                                                     </div>
                                                 ) : isPhoneField ? (
-                                                    <div className="flex gap-2 w-full items-stretch">
-                                                        <div className="relative shrink-0 w-[110px]">
-                                                            <select
-                                                                className="w-full h-full py-2 pl-3 pr-8 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-4 focus:ring-[#045c84]/10 transition-all outline-none font-bold text-slate-900 appearance-none text-xs sm:text-sm"
-                                                                value={parsedPhone!.dialCode}
-                                                                onChange={(e) => {
-                                                                    const newDialCode = e.target.value;
-                                                                    const finalVal = newDialCode + parsedPhone!.localNumber;
-                                                                    if (isTopLevel) setFormData({ ...formData, [field.id]: finalVal });
-                                                                    else setFormData({ ...formData, metadata: { ...formData.metadata, [field.id]: finalVal } });
-                                                                }}
+                                                    <div className="flex gap-1 md:gap-2 w-full items-stretch">
+                                                        <div className="relative shrink-0 w-[48px] md:w-[56px] flex items-center justify-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPhoneCountryPickerField(field.id)}
+                                                                className="w-full h-full bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center shadow-sm text-lg md:text-xl transition-all hover:bg-slate-100 hover:border-[#045c84]/30"
+                                                                title="দেশ পরিবর্তন করুন"
                                                             >
-                                                                {COUNTRIES.map(c => (
-                                                                    <option key={c.code} value={c.dialCode}>{c.flag} {c.dialCode}</option>
-                                                                ))}
-                                                            </select>
-                                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                                                <ChevronDown size={14} />
-                                                            </div>
+                                                                {currentCountry?.flag || '🌐'}
+                                                            </button>
                                                         </div>
-                                                        <div className="flex flex-1" dir="ltr">
+                                                        <div className="flex flex-1 overflow-x-auto custom-scrollbar pb-1 -mb-1" dir="ltr">
                                                             {Array.from({ length: currentCountry!.length }).map((_, i) => (
                                                                 <input
                                                                     key={i}
                                                                     type="text"
                                                                     inputMode="numeric"
                                                                     maxLength={1}
-                                                                    className={`flex-1 min-w-0 w-0 aspect-square max-w-[48px] md:max-w-[56px] text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === currentCountry!.length - 1 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-lg md:text-xl px-0 shadow-sm`}
+                                                                    className={`shrink-0 w-7 sm:w-8 md:w-10 h-10 md:h-12 text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === currentCountry!.length - 1 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-sm md:text-lg px-0 shadow-sm`}
                                                                     value={(parsedPhone!.localNumber)[i] || ''}
                                                                     onChange={(e) => {
                                                                         const val = normalizeAuthIdentifier(e.target.value).replace(/\D/g, '');
@@ -4556,14 +4626,14 @@ export default function StudentManagementPage() {
                                                         </div>
                                                     </div>
                                                 ) : field.id === 'birthRegNo' ? (
-                                                    <div className="flex w-full" dir="ltr">
+                                                    <div className="flex w-full overflow-x-auto custom-scrollbar pb-1 -mb-1" dir="ltr">
                                                         {Array.from({ length: 17 }).map((_, i) => (
                                                             <input
                                                                 key={i}
                                                                 type="text"
                                                                 inputMode="numeric"
                                                                 maxLength={1}
-                                                                className={`flex-1 min-w-0 w-0 h-10 md:h-12 text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === 16 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-xs sm:text-sm px-0 shadow-sm`}
+                                                                className={`shrink-0 w-7 sm:w-8 md:w-10 h-10 md:h-12 text-center bg-slate-50 border-y border-r border-slate-200 ${i === 0 ? 'border-l rounded-l-lg' : ''} ${i === 16 ? 'rounded-r-lg' : ''} focus:bg-white focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] focus:z-10 transition-all outline-none font-bold text-slate-900 text-xs sm:text-sm px-0 shadow-sm`}
                                                                 value={(fieldValue || '')[i] || ''}
                                                                 onChange={(e) => {
                                                                     const val = normalizeAuthIdentifier(e.target.value).replace(/\D/g, '');
@@ -4606,7 +4676,7 @@ export default function StudentManagementPage() {
                                                                         if (nextInput) nextInput.focus();
                                                                     }
                                                                 }}
-                                                                onPaste={(e) => {
+                                                                 onPaste={(e) => {
                                                                     e.preventDefault();
                                                                     const pasted = normalizeAuthIdentifier(e.clipboardData.getData('text')).replace(/\D/g, '').slice(0, 17);
                                                                     if (pasted) {
@@ -4622,7 +4692,7 @@ export default function StudentManagementPage() {
                                                                         const targetInput = e.currentTarget.parentElement?.children[nextIndex] as HTMLInputElement;
                                                                         if (targetInput) targetInput.focus();
                                                                     }
-                                                                }}
+                                                                 }}
                                                             />
                                                         ))}
                                                     </div>
@@ -4667,14 +4737,34 @@ export default function StudentManagementPage() {
                                         );
                                     };
 
-                                    return (
-                                        <div className="space-y-8">
+                                        const isSectionComplete = (section: string) => {
+                                            switch (section) {
+                                                case 'basic': return !!(formData.name && formData.metadata?.dob && formData.metadata?.gender && formData.metadata?.religion);
+                                                case 'academic': return !!(formData.metadata?.classId);
+                                                case 'guardian': return !!((formData.metadata?.fatherName || formData.metadata?.motherName || formData.metadata?.guardianName) && formData.metadata?.guardianPhone);
+                                                case 'address': return !!(formData.metadata?.presentAddress && formData.metadata?.permanentAddress);
+                                                case 'fees': return true;
+                                                case 'other': return true;
+                                                default: return false;
+                                            }
+                                        };
+
+                                        return (
+                                            <div className="space-y-4 md:space-y-6">
                                             {/* Scrollable Single Form Layout */}
                                             <div className="space-y-6">
                                                 {/* Section 1: Basic Info */}
-                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
-                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">ভর্তি ফর্ম</div>
-                                                    <div className="p-6 bg-slate-50 space-y-4">
+                                                <div ref={(el) => { sectionRefs.current['basic'] = el; }} className="bg-white border border-slate-200/80 rounded-[20px] md:rounded-[24px] overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                                    <button type="button" onClick={() => scrollToSection(expandedSection === 'basic' ? '' : 'basic')} className="w-full flex justify-between items-center bg-white hover:bg-slate-50 text-slate-800 py-4 px-5 md:px-6 transition-colors">
+                                                        <div className="flex items-center gap-3">
+                                                            {isSectionComplete('basic') ? <CheckCircle2 size={20} className="text-[#107044]" /> : <div className="w-[20px] h-[20px] rounded-full border-2 border-slate-200" />}
+                                                            <span className="font-black text-sm md:text-base">ভর্তি ফর্ম</span>
+                                                        </div>
+                                                        <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${expandedSection === 'basic' ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                    <div className={`grid transition-all duration-300 ease-in-out ${expandedSection === 'basic' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                                                        <div className="overflow-hidden">
+                                                            <div className="p-4 md:p-6 bg-slate-50/50 border-t border-slate-100 space-y-4">
                                                         <div className="space-y-4">
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                 <div className={effectiveFields.some(f => f.id === 'nameEnglish') ? "col-span-1" : "md:col-span-2"}>
@@ -4703,13 +4793,26 @@ export default function StudentManagementPage() {
                                                                 {renderField('birthRegNo')}
                                                             </div>
                                                         </div>
+                                                        <div className="flex justify-end pt-4 md:hidden">
+                                                            <button type="button" onClick={() => scrollToSection('academic')} className="px-5 py-2.5 bg-[#045c84] text-white rounded-xl font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-[#034664] transition-all">
+                                                                পরবর্তী ধাপ <ChevronDown size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Section 2: Academic Info */}
-                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
-                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">একাডেমিক তথ্য</div>
-                                                    <div className="p-6 bg-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div ref={(el) => { sectionRefs.current['academic'] = el; }} className="border-0 md:border md:border-[#107044]/20 rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm border-b border-slate-200 md:border-b-0 pb-4 md:pb-0 transition-all">
+                                                    <button type="button" onClick={() => scrollToSection(expandedSection === 'academic' ? '' : 'academic')} className="w-full flex justify-between items-center bg-transparent md:bg-[#107044] text-[#107044] md:text-white py-2 px-2 md:px-4 font-black md:font-bold text-left md:text-center text-sm md:text-base border-b-2 md:border-b-0 border-[#107044] mb-2 md:mb-0 transition-all md:pointer-events-none">
+                                                        <span>একাডেমিক তথ্য</span>
+                                                        {expandedSection === 'academic' ? <ChevronUp size={20} className="md:hidden" /> : <ChevronDown size={20} className="md:hidden" />}
+                                                    </button>
+                                                    <div className={`grid transition-all duration-300 ease-in-out ${expandedSection === 'academic' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 md:grid-rows-[1fr] md:opacity-100'}`}>
+                                                        <div className="overflow-hidden">
+                                                            <div className="p-0 md:p-6 bg-transparent md:bg-slate-50 space-y-4 pt-2 md:pt-6">
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         {renderField('admissionType')}
                                                         {renderField('admissionDate')}
                                                         {renderField('classId', true)}
@@ -4721,20 +4824,20 @@ export default function StudentManagementPage() {
                                                         
                                                         {effectiveFields.some(f => f.id === 'previousGpa' || f.id === 'result') && (
                                                             <div className="md:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                                                                <div className="flex items-center justify-between">
-                                                                    <label className="text-xs font-bold text-slate-700">গ্রেডিং সিস্টেম (Grading System)</label>
-                                                                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                                                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                                                                    <label className="text-xs font-bold text-slate-700 hidden md:block">গ্রেডিং সিস্টেম (Grading System)</label>
+                                                                    <div className="flex bg-slate-100 p-1 rounded-lg w-full md:w-auto">
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => setGradingSystem('school')}
-                                                                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${gradingSystem === 'school' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                            className={`flex-1 md:flex-none px-3 py-1.5 md:py-1 text-xs md:text-[10px] font-bold rounded-md transition-all ${gradingSystem === 'school' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                                                         >
                                                                             জেনারেল/স্কুল (General)
                                                                         </button>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => setGradingSystem('madrasa')}
-                                                                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${gradingSystem === 'madrasa' ? 'bg-white text-[#107044] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                                                            className={`flex-1 md:flex-none px-3 py-1.5 md:py-1 text-xs md:text-[10px] font-bold rounded-md transition-all ${gradingSystem === 'madrasa' ? 'bg-white text-[#107044] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                                                         >
                                                                             মাদরাসা (Madrasa)
                                                                         </button>
@@ -4811,13 +4914,27 @@ export default function StudentManagementPage() {
                                                         {effectiveFields.filter(f => f.category === 'একাডেমিক' && !['admissionType', 'admissionDate', 'classId', 'groupId', 'studentId', 'rollNumber', 'previousSchool', 'previousClass', 'previousGpa', 'result'].includes(f.id)).map(f => (
                                                             <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
                                                         ))}
+                                                                </div>
+                                                                <div className="flex justify-end pt-4 md:hidden">
+                                                                    <button type="button" onClick={() => scrollToSection('guardian')} className="px-5 py-2.5 bg-[#045c84] text-white rounded-xl font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-[#034664] transition-all">
+                                                                        পরবর্তী ধাপ <ChevronDown size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Section 3: Guardian Info */}
-                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
-                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">পিতা / মাতা / বর্তমান অভিভাবক</div>
-                                                    <div className="p-6 bg-slate-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div ref={(el) => { sectionRefs.current['guardian'] = el; }} className="border-0 md:border md:border-[#107044]/20 rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm border-b border-slate-200 md:border-b-0 pb-4 md:pb-0 transition-all">
+                                                    <button type="button" onClick={() => scrollToSection(expandedSection === 'guardian' ? '' : 'guardian')} className="w-full flex justify-between items-center bg-transparent md:bg-[#107044] text-[#107044] md:text-white py-2 px-2 md:px-4 font-black md:font-bold text-left md:text-center text-sm md:text-base border-b-2 md:border-b-0 border-[#107044] mb-2 md:mb-0 transition-all md:pointer-events-none">
+                                                        <span>পিতা / মাতা / বর্তমান অভিভাবক</span>
+                                                        {expandedSection === 'guardian' ? <ChevronUp size={20} className="md:hidden" /> : <ChevronDown size={20} className="md:hidden" />}
+                                                    </button>
+                                                    <div className={`grid transition-all duration-300 ease-in-out ${expandedSection === 'guardian' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 md:grid-rows-[1fr] md:opacity-100'}`}>
+                                                        <div className="overflow-hidden">
+                                                            <div className="p-0 md:p-6 bg-transparent md:bg-slate-50 pt-2 md:pt-6">
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div className="md:col-span-2 flex gap-2">
                                                             <button
                                                                 type="button"
@@ -4861,13 +4978,26 @@ export default function StudentManagementPage() {
                                                         {effectiveFields.filter(f => f.category === 'অভিভাবক তথ্য' && !['fathersName', 'mothersName', 'guardianName', 'guardianRelation', 'guardianPhone', 'guardianOccupation', 'guardian2', 'guardian2Phone', 'guardian3', 'guardian3Phone'].includes(f.id)).map(f => (
                                                             <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
                                                         ))}
+                                                                </div>
+                                                                <div className="flex justify-end pt-4 md:hidden">
+                                                                    <button type="button" onClick={() => scrollToSection('contact')} className="px-5 py-2.5 bg-[#045c84] text-white rounded-xl font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-[#034664] transition-all">
+                                                                        পরবর্তী ধাপ <ChevronDown size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Section 4: Address Info */}
-                                                <div className="border border-[#107044]/20 rounded-xl overflow-hidden shadow-sm">
-                                                    <div className="bg-[#107044] text-white py-2 px-4 font-bold text-center">যোগাযোগের ঠিকানা</div>
-                                                    <div className="p-6 bg-slate-50">
+                                                <div ref={(el) => { sectionRefs.current['contact'] = el; }} className="border-0 md:border md:border-[#107044]/20 rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm border-b border-slate-200 md:border-b-0 pb-4 md:pb-0 transition-all">
+                                                    <button type="button" onClick={() => scrollToSection(expandedSection === 'contact' ? '' : 'contact')} className="w-full flex justify-between items-center bg-transparent md:bg-[#107044] text-[#107044] md:text-white py-2 px-2 md:px-4 font-black md:font-bold text-left md:text-center text-sm md:text-base border-b-2 md:border-b-0 border-[#107044] mb-2 md:mb-0 transition-all md:pointer-events-none">
+                                                        <span>যোগাযোগের ঠিকানা</span>
+                                                        {expandedSection === 'contact' ? <ChevronUp size={20} className="md:hidden" /> : <ChevronDown size={20} className="md:hidden" />}
+                                                    </button>
+                                                    <div className={`grid transition-all duration-300 ease-in-out ${expandedSection === 'contact' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 md:grid-rows-[1fr] md:opacity-100'}`}>
+                                                        <div className="overflow-hidden">
+                                                            <div className="p-0 md:p-6 bg-transparent md:bg-slate-50 pt-2 md:pt-6">
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                                             {renderField('emergencyContact')}
                                                         </div>
@@ -4884,38 +5014,95 @@ export default function StudentManagementPage() {
                                                                 <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
                                                             ))}
                                                         </div>
+                                                                <div className="flex justify-end pt-4 md:hidden">
+                                                                    <button type="button" onClick={() => scrollToSection(editingStudent ? 'documents' : 'fees')} className="px-5 py-2.5 bg-[#045c84] text-white rounded-xl font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-[#034664] transition-all">
+                                                                        পরবর্তী ধাপ <ChevronDown size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Section 5: Admission Fees */}
                                                 {!editingStudent && (
-                                                    <div className="border border-blue-200 rounded-xl overflow-hidden shadow-sm">
-                                                        <div className="bg-[#045c84] text-white py-2 px-4 font-bold text-center">ভর্তি ফি ও আবাসিক অবস্থা</div>
-                                                        <div className="p-6 bg-slate-50 space-y-6">
-                                                            <div className="space-y-3">
-                                                                <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                                                    আবাসিক অবস্থা
-                                                                </label>
-                                                                <div className="flex gap-2">
-                                                                    {[
-                                                                        { id: 'all', label: 'সবার জন্য' },
-                                                                        { id: 'abasik', label: 'আবাসিক' },
-                                                                        { id: 'onabasik', label: 'অনাবাসিক' },
-                                                                    ].map(opt => (
-                                                                        <button
-                                                                            key={opt.id}
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setResidentialStatus(opt.id as any);
-                                                                                setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: opt.id } });
-                                                                            }}
-                                                                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border-2 ${
-                                                                                residentialStatus === opt.id ? 'border-[#045c84] bg-[#045c84] text-white shadow-md' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                                                                            }`}
-                                                                        >
-                                                                            {opt.label}
-                                                                        </button>
-                                                                    ))}
+                                                    <div ref={(el) => { sectionRefs.current['fees'] = el; }} className="border-0 md:border md:border-blue-200 rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm border-b border-slate-200 md:border-b-0 pb-4 md:pb-0 transition-all">
+                                                        <button type="button" onClick={() => scrollToSection(expandedSection === 'fees' ? '' : 'fees')} className="w-full flex justify-between items-center bg-transparent md:bg-[#045c84] text-[#045c84] md:text-white py-2 px-2 md:px-4 font-black md:font-bold text-left md:text-center text-sm md:text-base border-b-2 md:border-b-0 border-[#045c84] mb-2 md:mb-0 transition-all md:pointer-events-none">
+                                                            <span>ভর্তি ফি ও আবাসিক অবস্থা</span>
+                                                            {expandedSection === 'fees' ? <ChevronUp size={20} className="md:hidden" /> : <ChevronDown size={20} className="md:hidden" />}
+                                                        </button>
+                                                        <div className={`grid transition-all duration-300 ease-in-out ${expandedSection === 'fees' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 md:grid-rows-[1fr] md:opacity-100'}`}>
+                                                            <div className="overflow-hidden">
+                                                                <div className="p-0 md:p-6 bg-transparent md:bg-slate-50 space-y-6 pt-2 md:pt-6">
+                                                            {/* Residential Status & Waiver Shortcut Grid */}
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-4 rounded-[20px] border border-slate-200/60">
+                                                                <div className="space-y-3">
+                                                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                                        আবাসিক অবস্থা
+                                                                    </label>
+                                                                    <div className="flex gap-2">
+                                                                        {[
+                                                                            { id: 'all', label: 'সবার জন্য' },
+                                                                            { id: 'abasik', label: 'আবাসিক' },
+                                                                            { id: 'onabasik', label: 'অনাবাসিক' },
+                                                                        ].map(opt => (
+                                                                            <button
+                                                                                key={opt.id}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setResidentialStatus(opt.id as any);
+                                                                                    setFormData({ ...formData, metadata: { ...formData.metadata, residentialStatus: opt.id } });
+                                                                                }}
+                                                                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all border-2 ${
+                                                                                    residentialStatus === opt.id ? 'border-[#045c84] bg-[#045c84] text-white shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                                                                                }`}
+                                                                            >
+                                                                                {opt.label}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="space-y-3">
+                                                                    <label 
+                                                                        className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center justify-between group cursor-pointer"
+                                                                        onClick={() => {
+                                                                            const isEnabled = formData.metadata?.feeTier && formData.metadata.feeTier !== 'full';
+                                                                            setFormData({ ...formData, metadata: { ...formData.metadata, feeTier: !isEnabled ? 'half' : 'full' } });
+                                                                        }}
+                                                                    >
+                                                                        <span className="flex items-center gap-2">ফি ওয়েভার শর্টকাট</span>
+                                                                        <div className="relative">
+                                                                            <div className={`w-8 h-4 rounded-full transition-colors ${formData.metadata?.feeTier && formData.metadata.feeTier !== 'full' ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                                                                            <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${formData.metadata?.feeTier && formData.metadata.feeTier !== 'full' ? 'translate-x-4' : ''}`} />
+                                                                        </div>
+                                                                    </label>
+                                                                    
+                                                                    {formData.metadata?.feeTier && formData.metadata.feeTier !== 'full' ? (
+                                                                        <div className="flex gap-2">
+                                                                            {[
+                                                                                { value: 'half', label: 'হাফ ফ্রি', sublabel: '50%', color: 'border-amber-500 bg-amber-500 text-white shadow-sm', idle: 'border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50' },
+                                                                                { value: 'free', label: 'ফুল ফ্রি', sublabel: '100%', color: 'border-emerald-500 bg-emerald-500 text-white shadow-sm', idle: 'border-slate-200 bg-white text-slate-500 hover:border-emerald-300 hover:bg-emerald-50' },
+                                                                            ].map(tier => {
+                                                                                const isActive = formData.metadata?.feeTier === tier.value;
+                                                                                return (
+                                                                                    <button
+                                                                                        key={tier.value}
+                                                                                        type="button"
+                                                                                        onClick={() => setFormData({ ...formData, metadata: { ...formData.metadata, feeTier: tier.value } })}
+                                                                                        className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-2 ${isActive ? tier.color : tier.idle}`}
+                                                                                    >
+                                                                                        <span>{tier.label}</span>
+                                                                                        <span className={`text-[9px] font-bold ${isActive ? 'text-white/80' : 'text-slate-400'}`}>({tier.sublabel})</span>
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="px-4 py-2 bg-slate-100/50 border border-slate-200/50 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest text-center flex items-center justify-center">
+                                                                            পূর্ণ ফি (১০০%) প্রযোজ্য
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
@@ -5028,51 +5215,43 @@ export default function StudentManagementPage() {
                                                             {!formData.metadata?.classId && (
                                                                 <div className="text-sm font-bold text-slate-400 italic">ফি দেখতে শ্রেণী নির্বাচন করুন।</div>
                                                             )}
+                                                            <div className="flex justify-end pt-4 md:hidden">
+                                                                <button type="button" onClick={() => scrollToSection('documents')} className="px-5 py-2.5 bg-[#045c84] text-white rounded-xl font-bold text-sm shadow-sm flex items-center gap-2 hover:bg-[#034664] transition-all">
+                                                                    পরবর্তী ধাপ <ChevronDown size={16} />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                )}
+                                                </div>
+                                            </div>
+                                        )}
 
                                                 {/* Section 6: Other Dynamic Fields & Login */}
-                                                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                                    <div className="bg-slate-200 text-slate-700 py-2 px-4 font-bold text-center">অন্যান্য তথ্য ও লগইন</div>
-                                                    <div className="p-6 bg-slate-50 space-y-8">
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                            {effectiveFields.filter(f => !['মৌলিক তথ্য', 'পরিচয়', 'একাডেমিক', 'অভিভাবক তথ্য', 'যোগাযোগ'].includes(f.category || '')).map(f => (
-                                                                <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
-                                                            ))}
-                                                        </div>
-
-                                                        {/* Fee Tier Selector */}
-                                                        <div className="space-y-3 pt-4 border-t border-slate-200/60">
-                                                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                                                <span className="w-5 h-5 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px]">৳</span>
-                                                                ফি স্তর নির্ধারণ করুন
-                                                            </label>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                {[
-                                                                    { value: 'full', label: 'পূর্ণ ফি', sublabel: '100%', color: 'bg-blue-500 border-blue-500 text-white', idle: 'border-slate-200 text-blue-600 hover:border-blue-300 bg-slate-50' },
-                                                                    { value: 'half', label: 'অর্ধ ফি', sublabel: '50%', color: 'bg-amber-500 border-amber-500 text-white', idle: 'border-slate-200 text-amber-600 hover:border-amber-300 bg-slate-50' },
-                                                                    { value: 'free', label: 'বিনামূল্যে', sublabel: '০%', color: 'bg-emerald-500 border-emerald-500 text-white', idle: 'border-slate-200 text-emerald-600 hover:border-emerald-300 bg-slate-50' },
-                                                                ].map(tier => {
-                                                                    const current = formData.metadata?.feeTier || 'full';
-                                                                    const isActive = current === tier.value;
-                                                                    return (
-                                                                        <button
-                                                                            key={tier.value}
-                                                                            type="button"
-                                                                            onClick={() => setFormData({ ...formData, metadata: { ...formData.metadata, feeTier: tier.value } })}
-                                                                            className={`flex flex-col items-center justify-center py-3 px-2 rounded-2xl border-2 font-black transition-all ${isActive ? tier.color + ' shadow-md scale-[1.02]' : tier.idle}`}
-                                                                        >
-                                                                            <span className="text-sm">{tier.label}</span>
-                                                                            <span className={`text-[10px] font-bold ${isActive ? 'opacity-80' : 'opacity-60'}`}>{tier.sublabel}</span>
-                                                                        </button>
-                                                                    );
-                                                                })}
+                                                <div ref={(el) => { sectionRefs.current['documents'] = el; }} className="border-0 md:border md:border-slate-200 rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm border-b border-slate-200 md:border-b-0 pb-4 md:pb-0 transition-all">
+                                                    <button type="button" onClick={() => scrollToSection(expandedSection === 'documents' ? '' : 'documents')} className="w-full flex justify-between items-center bg-transparent md:bg-slate-200 text-slate-700 py-2 px-2 md:px-4 font-black md:font-bold text-left md:text-center text-sm md:text-base border-b-2 md:border-b-0 border-slate-400 mb-2 md:mb-0 transition-all md:pointer-events-none">
+                                                        <span>অন্যান্য তথ্য ও লগইন</span>
+                                                        {expandedSection === 'documents' ? <ChevronUp size={20} className="md:hidden" /> : <ChevronDown size={20} className="md:hidden" />}
+                                                    </button>
+                                                    <div className={`grid transition-all duration-300 ease-in-out ${expandedSection === 'documents' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 md:grid-rows-[1fr] md:opacity-100'}`}>
+                                                        <div className="overflow-hidden">
+                                                            <div className="p-0 md:p-6 bg-transparent md:bg-slate-50 space-y-8 pt-2 md:pt-6">
+                                                        {/* Documents & Others Section */}
+                                                        <div className="space-y-4">
+                                                            <div className="hidden">
+                                                                <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center text-white">
+                                                                    <ClipboardList size={18} />
+                                                                </div>
+                                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">ডকুমেন্ট ও অন্যান্য</h4>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                {effectiveFields.filter(f => !['মৌলিক তথ্য', 'পরিচয়', 'একাডেমিক', 'অভিভাবক তথ্য', 'যোগাযোগ'].includes(f.category || '')).map(f => (
+                                                                    <React.Fragment key={f.id}>{renderField(f.id)}</React.Fragment>
+                                                                ))}
                                                             </div>
                                                         </div>
 
                                                         {/* Login Credentials Section */}
-                                                        <div className="bg-white p-6 rounded-[24px] border border-slate-100 space-y-6">
+                                                        <div className="space-y-4">
                                                             <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className="w-8 h-8 rounded-xl bg-[#045c84] flex items-center justify-center text-white">
@@ -5140,34 +5319,14 @@ export default function StudentManagementPage() {
                                                                 </>
                                                             )}
                                                         </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
                                     );
                                 })()}
-                            </div>
-
-                            <div className="pt-6 border-t border-slate-100 flex justify-end items-center gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setStudentToPrint(formData);
-                                        setIsPrintAdmissionModalOpen(true);
-                                    }}
-                                    className="px-6 py-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold rounded-2xl shadow-sm transition-all active:scale-95 flex items-center gap-2"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                                    <span>প্রিন্ট ফর্ম</span>
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={actionLoading}
-                                    className="px-8 py-4 bg-[#045c84] hover:bg-[#034d6e] text-white font-bold rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
-                                >
-                                    {actionLoading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                                    <span>সংরক্ষণ করুন</span>
-                                </button>
                             </div>
                         </>
                     )}
@@ -5299,13 +5458,22 @@ export default function StudentManagementPage() {
                                         >
                                             EN
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setClassLanguage('ar')}
-                                            className={`px-3 py-2 text-[14px] font-arabic font-bold rounded-lg transition-all ${classLanguage === 'ar' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        <div
+                                            className="fixed w-[200px] bg-white rounded-xl shadow-2xl border border-slate-100 py-1 z-[999999] overflow-y-auto max-h-[70vh] custom-scrollbar text-slate-700 animate-in fade-in zoom-in duration-100"
+                                            style={{
+                                                top: menuPosition.top !== undefined ? `${menuPosition.top}px` : undefined,
+                                                bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom}px` : undefined,
+                                                left: `${menuPosition.left}px`
+                                            }}
                                         >
-                                            عربي
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setClassLanguage('ar')}
+                                                className={`px-3 py-2 text-[14px] font-arabic font-bold rounded-lg transition-all ${classLanguage === 'ar' ? 'bg-white text-[#045c84] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            >
+                                                عربي
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -5955,7 +6123,7 @@ export default function StudentManagementPage() {
                                                 setTimeout(() => {
                                                     setFormData({
                                                         name: '', email: '', password: '',
-                                                        metadata: { classId: selectedClassId, religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] }
+                                                        skipAccountSetup: true, metadata: { classId: selectedClassId, religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] }
                                                     });
                                                     document.getElementById(`class-input-${index + 1}`)?.focus();
                                                 }, 0);
@@ -6118,10 +6286,10 @@ export default function StudentManagementPage() {
                                                 name: '',
                                                 email: '',
                                                 password: '',
-                                                metadata: { classId: selectedClassId, religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] }
+                                                skipAccountSetup: true, metadata: { classId: selectedClassId, religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] }
                                             });
                                         } else {
-                                            setFormData({ name: '', email: '', password: '', metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
+                                            setFormData({ name: '', email: '', password: '', skipAccountSetup: true, metadata: { religion: 'ইসলাম', nationality: 'বাংলাদেশী', admissionType: 'নতুন ভর্তি', admissionDate: new Date().toISOString().split('T')[0] } });
                                         }
                                     }
                                     setIsAddModalOpen(true);
@@ -6441,6 +6609,64 @@ export default function StudentManagementPage() {
                     onCaptureOffline={handleOfflineFaceCapture}
                 />
             )}
+
+            {/* Country Picker Modal */}
+            <Modal
+                isOpen={!!phoneCountryPickerField}
+                onClose={() => { setPhoneCountryPickerField(null); setCountrySearchTerm(''); }}
+                title="দেশ নির্বাচন করুন"
+                maxWidth="max-w-md"
+                drawerOnMobile={true}
+            >
+                <div className="p-4 flex flex-col h-[75vh] md:h-[500px]">
+                    <div className="relative mb-4 shrink-0">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="দেশ খুঁজুন..."
+                            value={countrySearchTerm}
+                            onChange={(e) => setCountrySearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#045c84] focus:ring-1 focus:ring-[#045c84] text-sm"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 -mx-2 px-2 pb-4">
+                        {COUNTRIES.filter(c => c.name.toLowerCase().includes(countrySearchTerm.toLowerCase()) || c.dialCode.includes(countrySearchTerm)).map(c => (
+                            <button
+                                key={c.code}
+                                type="button"
+                                onClick={() => {
+                                    if (!phoneCountryPickerField) return;
+                                    const fieldId = phoneCountryPickerField;
+                                    const isTopLvl = fieldId === 'phone';
+                                    const currentVal = (isTopLvl ? formData[fieldId] : formData.metadata?.[fieldId]) || '';
+                                    const parsed = parsePhoneNumber(currentVal);
+                                    const finalVal = c.dialCode + (parsed ? parsed.localNumber : '');
+                                    
+                                    if (isTopLvl) setFormData({ ...formData, [fieldId]: finalVal });
+                                    else setFormData({ ...formData, metadata: { ...formData.metadata, [fieldId]: finalVal } });
+                                    
+                                    setPhoneCountryPickerField(null);
+                                    setCountrySearchTerm('');
+                                }}
+                                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors text-left"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <span className="text-2xl drop-shadow-sm">{c.flag}</span>
+                                    <span className="font-bold text-slate-700 text-sm">{c.name}</span>
+                                </div>
+                                <span className="text-slate-500 font-mono text-xs bg-slate-100 px-2 py-1 rounded-md">{c.dialCode}</span>
+                            </button>
+                        ))}
+                        {COUNTRIES.filter(c => c.name.toLowerCase().includes(countrySearchTerm.toLowerCase()) || c.dialCode.includes(countrySearchTerm)).length === 0 && (
+                            <div className="text-center py-10 text-slate-400 text-sm font-bold flex flex-col items-center gap-2">
+                                <Search size={32} className="opacity-20" />
+                                <span>কোনো দেশ পাওয়া যায়নি</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </Modal>
 
             {/* Print Admission Form Modal */}
             <PrintAdmissionModal

@@ -42,62 +42,60 @@ export interface FieldDefinition {
 }
 
 export const POSSIBLE_FIELDS: FieldDefinition[] = [
-    // Core (New defaults)
+    // Basic Info - Most Important First
     { id: 'name', label: 'শিক্ষার্থীর নাম (বাংলা)', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'পুরো নাম (বাংলায়)', required: true },
     { id: 'nameEnglish', label: 'শিক্ষার্থীর নাম (English)', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'Full Name in English' },
+    { id: 'fathersName', label: 'পিতার নাম', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'বাবার পুরো নাম' },
+    { id: 'mothersName', label: 'মাতার নাম', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'মায়ের পুরো নাম' },
+    { id: 'gender', label: 'লিঙ্গ', type: 'select', category: 'মৌলিক তথ্য', options: ['ছেলে', 'মেয়ে', 'তৃতীয় লিঙ্গ'], icon: Info },
+    { id: 'religion', label: 'ধর্ম', type: 'select', category: 'মৌলিক তথ্য', options: ['ইসলাম', 'হিন্দু', 'খ্রিস্টান', 'বৌদ্ধ', 'অন্যান্য'], icon: Anchor },
+    { id: 'bloodGroup', label: 'রক্তের গ্রুপ', type: 'select', category: 'মৌলিক তথ্য', options: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], icon: HeartPulse },
+    { id: 'fathersPhone', label: 'পিতার মোবাইল', type: 'text', category: 'মৌলিক তথ্য', icon: Smartphone, placeholder: 'বাবার মোবাইল নম্বর' },
+    { id: 'mothersPhone', label: 'মাতার মোবাইল', type: 'text', category: 'মৌলিক তথ্য', icon: Smartphone, placeholder: 'মায়ের মোবাইল নম্বর' },
+    { id: 'studentPhone', label: 'শিক্ষার্থীর মোবাইল (লগইন আইডি)', type: 'text', category: 'মৌলিক তথ্য', icon: Smartphone, placeholder: 'লগইন আইডি হিসেবে ব্যবহার হবে' },
     { id: 'email', label: 'ইমেইল (লগইন আইডি)', type: 'text', category: 'মৌলিক তথ্য', icon: Mail, placeholder: 'পুরো ইমেইল অ্যাড্রেস দিন', required: true },
     { id: 'password', label: 'পাসওয়ার্ড', type: 'text', category: 'মৌলিক তথ্য', icon: Fingerprint, placeholder: 'লগইন পাসওয়ার্ড (ফাঁকা রাখলে স্টুডেন্ট আইডি ব্যবহার হবে)' },
-    { id: 'studentPhone', label: 'শিক্ষার্থীর মোবাইল (লগইন আইডি)', type: 'text', category: 'মৌলিক তথ্য', icon: Smartphone, placeholder: 'লগইন আইডি হিসেবে ব্যবহার হবে' },
-
-    // Basic Info
-    { id: 'fathersName', label: 'পিতার নাম', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'বাবার পুরো নাম' },
-    { id: 'fathersPhone', label: 'পিতার মোবাইল', type: 'text', category: 'মৌলিক তথ্য', icon: Smartphone, placeholder: 'বাবার মোবাইল নম্বর' },
-    { id: 'mothersName', label: 'মাতার নাম', type: 'text', category: 'মৌলিক তথ্য', icon: UsersIcon, placeholder: 'মায়ের পুরো নাম' },
-    { id: 'mothersPhone', label: 'মাতার মোবাইল', type: 'text', category: 'মৌলিক তথ্য', icon: Smartphone, placeholder: 'মায়ের মোবাইল নম্বর' },
-    { id: 'gender', label: 'লিঙ্গ', type: 'select', category: 'মৌলিক তথ্য', options: ['ছেলে', 'মেয়ে', 'তৃতীয় লিঙ্গ'], icon: Info },
-    { id: 'bloodGroup', label: 'রক্তের গ্রুপ', type: 'select', category: 'মৌলিক তথ্য', options: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], icon: HeartPulse },
-    { id: 'religion', label: 'ধর্ম', type: 'select', category: 'মৌলিক তথ্য', options: ['ইসলাম', 'হিন্দু', 'খ্রিস্টান', 'বৌদ্ধ', 'অন্যান্য'], icon: Anchor },
     { id: 'hobby', label: 'শখ', type: 'text', category: 'মৌলিক তথ্য', icon: HeartPulse, placeholder: 'যেমন: বই পড়া, বাগান করা' },
 
     // Identity
     { id: 'dob', label: 'জন্ম তারিখ', type: 'date', category: 'পরিচয়', icon: Calendar, required: true },
     { id: 'birthRegNo', label: 'জন্ম নিবন্ধন নম্বর', type: 'text', category: 'পরিচয়', icon: Fingerprint, placeholder: '১৭ ডিজিটের নম্বর' },
-    { id: 'nationality', label: 'জাতীয়তা', type: 'text', category: 'পরিচয়', icon: Globe, placeholder: 'যেমন: বাংলাদেশী' },
+    { id: 'nid', label: 'এনআইডি নম্বর (প্রযোজ্য ক্ষেত্রে)', type: 'text', category: 'পরিচয়', icon: Fingerprint, placeholder: 'জাতীয় পরিচয়পত্র নম্বর' },
     { id: 'residentialStatus', label: 'আবাসিক অবস্থা', type: 'select', category: 'পরিচয়', options: ['আবাসিক', 'অনাবাসিক'], icon: Building2 },
     { id: 'version', label: 'ভার্সন', type: 'select', category: 'পরিচয়', options: ['বাংলা ভার্সন', 'ইংলিশ ভার্সন'], icon: BookOpen },
-    { id: 'nid', label: 'এনআইডি নম্বর (প্রযোজ্য ক্ষেত্রে)', type: 'text', category: 'পরিচয়', icon: Fingerprint, placeholder: 'জাতীয় পরিচয়পত্র নম্বর' },
+    { id: 'nationality', label: 'জাতীয়তা', type: 'text', category: 'পরিচয়', icon: Globe, placeholder: 'যেমন: বাংলাদেশী' },
     { id: 'orphan', label: 'এতিম', type: 'select', category: 'পরিচয়', options: ['না', 'হ্যাঁ'], icon: UsersIcon },
 
     // Contact
     { id: 'emergencyContact', label: 'জরুরী যোগাযোগ', type: 'text', category: 'যোগাযোগ', icon: Smartphone, placeholder: '০১৩********' },
+    { id: 'presentAddress', label: 'বর্তমান ঠিকানা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রাম, ডাকঘর, থানা, জেলা' },
+    { id: 'permanentAddress', label: 'স্থায়ী ঠিকানা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রাম, ডাকঘর, থানা, জেলা' },
     { id: 'village', label: 'গ্রাম/মহল্লা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রামের নাম' },
     { id: 'postOffice', label: 'ডাকঘর', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'ডাকঘরের নাম' },
     { id: 'thana', label: 'থানা/উপজেলা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'থানার নাম' },
     { id: 'district', label: 'জেলা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'জেলার নাম' },
-    { id: 'presentAddress', label: 'বর্তমান ঠিকানা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রাম, ডাকঘর, থানা, জেলা' },
-    { id: 'permanentAddress', label: 'স্থায়ী ঠিকানা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'গ্রাম, ডাকঘর, থানা, জেলা' },
 
     // Guardian Info
     { id: 'guardianName', label: 'অভিভাবকের নাম', type: 'text', category: 'অভিভাবক তথ্য', icon: UsersIcon, placeholder: 'অভিভাবকের নাম', required: true },
-    { id: 'guardianPhone', label: 'অভিভাবকের মোবাইল (লগইন আইডি - ঐচ্ছিক)', type: 'text', category: 'অভিভাবক তথ্য', icon: Smartphone, placeholder: 'লগইন আইডি হিসেবে ব্যবহার হবে' },
-    { id: 'guardianPassword', label: 'অভিভাবকের পাসওয়ার্ড', type: 'text', category: 'অভিভাবক তথ্য', icon: Fingerprint, placeholder: 'লগইন পাসওয়ার্ড (ফাঁকা রাখলে মোবাইল নম্বর ব্যবহার হবে)' },
     { id: 'guardianRelation', label: 'সম্পর্ক', type: 'select', category: 'অভিভাবক তথ্য', options: ['বাবা', 'মা', 'ভাই', 'বোন', 'চাচা', 'মামা', 'অন্যান্য'], icon: UsersIcon, required: true },
+    { id: 'guardianPhone', label: 'অভিভাবকের মোবাইল (লগইন আইডি - ঐচ্ছিক)', type: 'text', category: 'অভিভাবক তথ্য', icon: Smartphone, placeholder: 'লগইন আইডি হিসেবে ব্যবহার হবে' },
+    { id: 'guardianNid', label: 'অভিভাবকের এনআইডি', type: 'text', category: 'অভিভাবক তথ্য', icon: Fingerprint, placeholder: 'এনআইডি নম্বর' },
     { id: 'guardianOccupation', label: 'অভিভাবকের পেশা', type: 'text', category: 'অভিভাবক তথ্য', icon: Briefcase, placeholder: 'যেমন: শিক্ষক, ব্যবসায়ী' },
     { id: 'yearlyIncome', label: 'বার্ষিক আয়', type: 'number', category: 'অভিভাবক তথ্য', icon: DollarSign, placeholder: 'টাকায় পরিমাণ' },
-    { id: 'guardianNid', label: 'অভিভাবকের এনআইডি', type: 'text', category: 'অভিভাবক তথ্য', icon: Fingerprint, placeholder: 'এনআইডি নম্বর' },
+    { id: 'guardianPassword', label: 'অভিভাবকের পাসওয়ার্ড', type: 'text', category: 'অভিভাবক তথ্য', icon: Fingerprint, placeholder: 'লগইন পাসওয়ার্ড (ফাঁকা রাখলে মোবাইল নম্বর ব্যবহার হবে)' },
     { id: 'guardian2', label: 'অভিভাবক ২', type: 'text', category: 'অভিভাবক তথ্য', icon: UsersIcon, placeholder: 'দ্বিতীয় অভিভাবকের নাম' },
     { id: 'guardian2Phone', label: 'মোবাইল (অভিভাবক ২)', type: 'text', category: 'অভিভাবক তথ্য', icon: Smartphone, placeholder: 'মোবাইল নম্বর' },
     { id: 'guardian3', label: 'অভিভাবক ৩', type: 'text', category: 'অভিভাবক তথ্য', icon: UsersIcon, placeholder: 'তৃতীয় অভিভাবকের নাম' },
     { id: 'guardian3Phone', label: 'মোবাইল (অভিভাবক ৩)', type: 'text', category: 'অভিভাবক তথ্য', icon: Smartphone, placeholder: 'মোবাইল নম্বর' },
 
     // Academic
+    { id: 'studentId', label: 'শিক্ষার্থী আইডি', type: 'text', category: 'একাডেমিক', icon: Fingerprint, placeholder: 'যেমন: 0001' },
+    { id: 'rollNumber', label: 'রোল নম্বর', type: 'number', category: 'একাডেমিক', icon: Hash, placeholder: 'যেমন: 01' },
     { id: 'classId', label: 'শ্রেণী', type: 'class-lookup', category: 'একাডেমিক', icon: BookOpen },
     { id: 'groupId', label: 'গ্রুপ', type: 'group-lookup', category: 'একাডেমিক', icon: List },
-    { id: 'rollNumber', label: 'রোল নম্বর', type: 'number', category: 'একাডেমিক', icon: Hash, placeholder: 'যেমন: 01' },
-    { id: 'studentId', label: 'শিক্ষার্থী আইডি', type: 'text', category: 'একাডেমিক', icon: Fingerprint, placeholder: 'যেমন: 0001' },
-    { id: 'previousSchool', label: 'পূর্ববর্তী শিক্ষা প্রতিষ্ঠান', type: 'text', category: 'একাডেমিক', icon: Building2, placeholder: 'প্রতিষ্ঠানের নাম' },
-    { id: 'admissionDate', label: 'ভর্তির তারিখ', type: 'date', category: 'একাডেমিক', icon: Calendar },
     { id: 'shift', label: 'শিফট', type: 'select', category: 'একাডেমিক', options: ['প্রভাতি', 'দিবা'], icon: History },
+    { id: 'admissionDate', label: 'ভর্তির তারিখ', type: 'date', category: 'একাডেমিক', icon: Calendar },
+    { id: 'previousSchool', label: 'পূর্ববর্তী শিক্ষা প্রতিষ্ঠান', type: 'text', category: 'একাডেমিক', icon: Building2, placeholder: 'প্রতিষ্ঠানের নাম' },
     { id: 'previousGpa', label: 'পূর্ববর্তী জিপিএ', type: 'number', category: 'একাডেমিক', icon: Award, placeholder: '৫.০০ এর মধ্যে' },
     { id: 'admissionType', label: 'ভর্তির ধরন', type: 'select', category: 'একাডেমিক', options: ['নতুন ভর্তি', 'পুরাতন ভর্তি'], icon: UsersIcon },
     { id: 'result', label: 'রেজাল্ট', type: 'text', category: 'একাডেমিক', icon: Award, placeholder: 'যেমন: মুমতাজ/এ+' },

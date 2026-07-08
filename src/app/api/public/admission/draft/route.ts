@@ -10,31 +10,15 @@ export async function POST(req: Request) {
 
         const currentYear = new Date().getFullYear();
 
-        // 1. Atomically increment the sequence
-        const sequence = await prisma.formSequence.upsert({
+        // 1. Get exact used form count (total students in this institute)
+        const count = await prisma.user.count({
             where: {
-                instituteId_year: {
-                    instituteId,
-                    year: currentYear
-                }
-            },
-            update: {
-                nextNumber: { increment: 1 }
-            },
-            create: {
-                instituteId,
-                year: currentYear,
-                nextNumber: 2 // If it didn't exist, we just assigned 1, so next is 2
+                role: 'STUDENT',
+                instituteIds: { has: instituteId }
             }
         });
-
-        // The assigned number is either the incremented one, or 1 if it was just created
-        // Note: Prisma's upsert returns the UPDATED record. 
-        // If created, nextNumber is 2, so our assigned number is 1.
-        // If updated from 2 to 3, nextNumber is 3, so our assigned number is 3-1 = 2? 
-        // Actually, upsert `update: { increment: 1 }` returns the NEW value (e.g., 3).
-        // So the assigned number should be `sequence.nextNumber - 1`.
-        const assignedNumber = sequence.nextNumber - 1;
+        
+        const assignedNumber = count + 1;
 
         // Format as YYYY-XXXX
         const formNumber = `${currentYear}-${String(assignedNumber).padStart(4, '0')}`;
