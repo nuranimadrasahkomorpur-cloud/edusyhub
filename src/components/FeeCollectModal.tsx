@@ -187,7 +187,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                 }
 
                 // Sort newest first
-                groupedTxns.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                groupedTxns.sort((a: any, b: any) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime());
                 setHistoryTxns(groupedTxns);
             })
             .catch(() => setHistoryTxns([]))
@@ -878,7 +878,30 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                                 <BadgeCheck size={15} className="text-emerald-600" />
                                 <span className="text-xs font-black text-emerald-700">{historyTxns.length} টি পেমেন্ট সম্পন্ন</span>
                             </div>
-                            <span className="text-sm font-black text-emerald-700">৳ {totalPaid.toLocaleString()}</span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-black text-emerald-700">৳ {totalPaid.toLocaleString()}</span>
+                                {historyTxns.length > 0 && onPrintReceipt && (
+                                    <button
+                                        onClick={() => {
+                                            const ledgerTxn = {
+                                                isLedger: true,
+                                                studentName: student?.studentName,
+                                                studentId: student?.studentId,
+                                                studentUniqueId: student?.studentUniqueId || historyTxns[0]?.studentUniqueId,
+                                                className: historyTxns[0]?.className,
+                                                amount: totalPaid,
+                                                date: new Date().toISOString(),
+                                                subTransactions: historyTxns.flatMap((txn: any) => txn.subTransactions || [txn])
+                                            };
+                                            onPrintReceipt(ledgerTxn);
+                                        }}
+                                        className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all flex-shrink-0"
+                                        title="লেজার প্রিন্ট করুন"
+                                    >
+                                        <Printer size={15} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto flex flex-col" data-lenis-prevent>
@@ -906,7 +929,7 @@ const FeeCollectModal: React.FC<FeeCollectModalProps> = ({ student, onClose, onS
                                                         <span className="text-[9px] font-black text-[#045c84] bg-blue-50 px-2 py-0.5 rounded-full">{txn.receiptNo}</span>
                                                     )}
                                                     <span className="text-[10px] font-bold text-slate-400">
-                                                        {new Date(txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        {new Date(txn.createdAt || txn.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                     </span>
                                                 </div>
                                                 {txn.note && txn.note !== '' && (

@@ -175,7 +175,7 @@ export default function TeacherAssignmentPanel({
     }, [selectedDiaryClass]);
 
     // Theme Mode
-    const [themeMode, setThemeMode] = useState<'modern' | 'diary'>('diary');
+    const [themeMode, setThemeMode] = useState<'modern' | 'diary'>('modern');
     const [fastEntryBookId, setFastEntryBookId] = useState<string | null>(null);
     const [fastEntryText, setFastEntryText] = useState('');
     const [activeCategory, setActiveCategory] = useState<'HW' | 'CW' | 'PR' | 'CM'>('HW');

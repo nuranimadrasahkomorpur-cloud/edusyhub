@@ -259,7 +259,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
         { name: 'হাজিরা', icon: Zap, href: '/dashboard/attendance/scan', roles: ['ADMIN', 'TEACHER'], section: 'দৈনন্দিন কার্যক্রম' },
         { name: 'হিসাব', icon: CreditCard, href: '/dashboard/accounts', section: 'দৈনন্দিন কার্যক্রম' },
-        // { name: 'ক্লাস ডাইরি', icon: ClipboardList, href: '/dashboard/assignments', section: 'দৈনন্দিন কার্যক্রম' },
+        { name: 'ক্লাস ডাইরি', icon: ClipboardList, href: '/dashboard/class-diary', section: 'দৈনন্দিন কার্যক্রম' },
         { name: 'ক্লাস রুম', icon: Presentation, href: '/dashboard/classroom', section: 'দৈনন্দিন কার্যক্রম' },
 
         // একাডেমিক
@@ -592,7 +592,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                                     activeTab?.includes('/dashboard/settings') ? 'সেটিংস' :
                                                         activeTab?.includes('/dashboard/guardians') ? 'অভিভাবক' :
                                                             activeTab?.includes('/dashboard/calendar') ? 'ক্যালেন্ডার' :
-                                                                activeTab?.includes('/dashboard/assignments') ? 'ক্লাস ডাইরি' :
+                                                                activeTab?.includes('/dashboard/assignments') || activeTab?.includes('/dashboard/class-diary') ? 'ক্লাস ডাইরি' :
                                                                     activeTab?.includes('/dashboard/attendance') ? 'হাজিরা' :
                                                                         activeTab?.includes('/dashboard') ? 'ড্যাশবোর্ড' : ''}
                             </h2>

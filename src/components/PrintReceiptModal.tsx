@@ -53,6 +53,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
     const [isPrinting, setIsPrinting] = useState(false);
     const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
     const [overallDue, setOverallDue] = useState<number | null>(null);
+    const [pendingFeesList, setPendingFeesList] = useState<any[]>([]);
     const [categoryDues, setCategoryDues] = useState<Record<string, number>>({});
     const [imageError, setImageError] = useState(false);
 
@@ -115,7 +116,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
         
         const subTxns = transaction.subTransactions || [transaction];
         subTxns.forEach((t: any) => {
-            const itemLabel = isLedger ? `${new Date(t.date || t.createdAt || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' })} — ${t.note || t.category || 'বিবরণ'}` : `${t.category}`;
+            const itemLabel = isLedger ? `${new Date(t.createdAt || t.date || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' })} — ${t.note || t.category || 'বিবরণ'}` : `${t.category}`;
             text += `- ${itemLabel}: ৳${(Number(t.amount) || 0).toLocaleString()}\n`;
         });
         
@@ -238,12 +239,12 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
             <div className="flex flex-col items-center justify-center gap-1.5 opacity-90 -translate-y-2">
                 <div className="p-1.5 border border-slate-300 rounded-lg bg-white">
                     <QRCodeSVG 
-                        value={typeof window !== 'undefined' ? `${window.location.origin}/dashboard/students/profile/${transaction.studentId || ''}?tab=accounts` : ''} 
+                        value={typeof window !== 'undefined' ? `${window.location.origin}/ledger/${transaction.studentId || ''}` : ''} 
                         size={72} 
                         level="L" 
                     />
                 </div>
-                <span className="text-[11px] text-slate-500 font-bold tracking-wide">হিস্ট্রি স্ক্যান করুন</span>
+                <span className="text-[11px] text-slate-500 font-bold tracking-wide">লেজার স্ক্যান করুন</span>
             </div>
         ) : null;
 
@@ -251,7 +252,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
             <PrintLayout 
                 title={isLedger ? 'লেনদেন লেজার' : 'মানি রশিদ'} 
                 institute={activeInstitute} 
-                date={isLedger && generatedAt ? generatedDateStr : ''} 
+                date=""
                 pageSize="A5"
                 previewOnly={isPreview}
                 hideLogo={true}
@@ -259,19 +260,21 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 pagePadding={24}
             >
                 <div className="mb-3">
-                    <div className="flex justify-between items-start mb-2" style={{ marginTop: isLedger ? '-50px' : '-15px' }}>
+                    <div className="flex justify-between items-start mb-2" style={{ marginTop: '-15px' }}>
                         {/* Left: Date */}
                         <div className="text-left">
-                            {!isLedger && (
-                                <table className="border-collapse border border-slate-400 text-[13px] text-left min-w-[200px]">
-                                    <tbody>
-                                        <tr>
-                                            <td className="border border-slate-400 px-2 py-1 font-bold text-slate-600 bg-slate-50 w-20">তারিখ</td>
-                                            <td className="border border-slate-400 px-2 py-1 font-black text-slate-900">{new Date(transaction.createdAt || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            )}
+                            <table className="border-collapse border border-slate-400 text-[13px] text-left min-w-[200px]">
+                                <tbody>
+                                    <tr>
+                                        <td className="border border-slate-400 px-2 py-1 font-bold text-slate-600 bg-slate-50 w-20">তারিখ</td>
+                                        <td className="border border-slate-400 px-2 py-1 font-black text-slate-900">
+                                            {isLedger && generatedAt 
+                                                ? generatedAt.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })
+                                                : new Date(transaction.createdAt || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
 
                         {/* Right: Receipt No */}
@@ -279,8 +282,8 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                             <table className="border-collapse border border-slate-400 text-[13px] text-left min-w-[200px]">
                                 <tbody>
                                     <tr>
-                                        <td className="border border-slate-400 px-2 py-1 font-bold text-slate-600 bg-slate-50">{isLedger ? 'লেজার' : 'রশিদ নং'}</td>
-                                        <td className="border border-slate-400 px-2 py-1 font-black text-slate-900 font-mono">{isLedger ? (transaction.studentUniqueId || 'লেজার') : (transaction.receiptNo || 'N/A')}</td>
+                                        <td className="border border-slate-400 px-2 py-1 font-bold text-slate-600 bg-slate-50">{isLedger ? 'ধরণ' : 'রশিদ নং'}</td>
+                                        <td className="border border-slate-400 px-2 py-1 font-black text-slate-900 font-mono">{isLedger ? 'লেজার' : (transaction.receiptNo || 'N/A')}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -350,12 +353,40 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                             <tbody>
                                 {sortedTxns.map((t: any, idx: number) => {
                                     const feeLabel = buildFeeLabel(t, t.originalCategory || t.category || '');
-                                    const dateStr = new Date(t.date || t.createdAt || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+                                    const dateStr = new Date(t.createdAt || t.date || transaction.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+                                    
+                                    let rowSpan = 1;
+                                    let isFirstInGroup = true;
+                                    if (idx > 0 && sortedTxns[idx - 1].receiptNo === t.receiptNo && t.receiptNo) {
+                                        isFirstInGroup = false;
+                                    } else if (t.receiptNo) {
+                                        let nextIdx = idx + 1;
+                                        while (nextIdx < sortedTxns.length && sortedTxns[nextIdx].receiptNo === t.receiptNo) {
+                                            rowSpan++;
+                                            nextIdx++;
+                                        }
+                                    }
+
+                                    let serialCounter = 0;
+                                    let lastReceipt = null;
+                                    for (let i = 0; i <= idx; i++) {
+                                        if (sortedTxns[i].receiptNo !== lastReceipt || !sortedTxns[i].receiptNo) {
+                                            serialCounter++;
+                                            lastReceipt = sortedTxns[i].receiptNo;
+                                        }
+                                    }
+
                                     return (
                                         <tr key={`ledger-row-${idx}`}>
-                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 font-bold text-[14px] text-center">{idx + 1}</td>
-                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px]">{t.receiptNo || '-'}</td>
-                                            <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px]">{dateStr}</td>
+                                            {isFirstInGroup && (
+                                                <td className="py-1 px-3 border border-slate-400 text-slate-800 font-bold text-[14px] align-middle text-center" rowSpan={rowSpan}>{serialCounter}</td>
+                                            )}
+                                            {isFirstInGroup && (
+                                                <>
+                                                    <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px] align-middle text-center" rowSpan={rowSpan}>{t.receiptNo || '-'}</td>
+                                                    <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px] align-middle text-center" rowSpan={rowSpan}>{dateStr}</td>
+                                                </>
+                                            )}
                                             <td className="py-1 px-3 border border-slate-400 text-slate-800 text-[14px]">{feeLabel}</td>
                                             <td className="py-1 px-3 border border-slate-400 text-slate-800 text-right text-[14px]">{(Number(t.amount) || 0).toLocaleString()}/-</td>
                                         </tr>
@@ -430,9 +461,21 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                         </div>
                         
                         {overallDue !== null && (
-                            <div className="border border-slate-800 rounded-md px-2 py-1.5 flex justify-between items-center bg-white w-full max-w-[300px] ml-auto">
-                                <span className="font-bold text-slate-800 text-[12px]">বর্তমান মোট বকেয়া (পরিশোধের পর):</span>
-                                <span className="font-bold text-[14px] text-rose-600">{overallDue.toLocaleString()}/-</span>
+                            <div className="border border-slate-800 rounded-md p-2 flex flex-col bg-white w-full max-w-[320px] ml-auto">
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="font-bold text-slate-800 text-[12px]">বর্তমান মোট বকেয়া (পরিশোধের পর):</span>
+                                    <span className="font-bold text-[14px] text-rose-600">{overallDue.toLocaleString()}/-</span>
+                                </div>
+                                {pendingFeesList.length > 0 && (
+                                    <div className="mt-1.5 pt-1.5 border-t border-slate-200 divide-y divide-slate-100">
+                                        {pendingFeesList.map((fee, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 py-0.5">
+                                                <span className="truncate pr-2">• {fee.category}</span>
+                                                <span className="shrink-0">{fee.amount.toLocaleString()}/-</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -453,6 +496,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                     const res = await fetch(`/api/admin/accounts/collect-fee?studentId=${studentId}&instituteId=${instId}`);
                     const data = await res.json();
                     if (data.pendingFees) {
+                        setPendingFeesList(data.pendingFees);
                         const total = data.pendingFees.reduce((sum: number, f: any) => sum + f.amount, 0);
                         setOverallDue(total);
                         

@@ -27,6 +27,7 @@ model User {
   updatedAt   DateTime @updatedAt
 
   // Dynamic fields storage
+
   metadata    Json?
 
   teacherProfiles TeacherProfile[]
@@ -36,6 +37,7 @@ model User {
   // Attendance & FRS
   faceDescriptor  Json?
   attendances     Attendance[] @relation("StudentAttendance")
+  classDiaries    ClassDiary[]
 }
 
 model Institute {
@@ -78,6 +80,7 @@ model Institute {
   subscriptions Subscription[]
   formSequences FormSequence[]
   admissionDrafts AdmissionDraft[]
+  classDiaries    ClassDiary[]
 }
 
 model Class {
@@ -457,4 +460,30 @@ model AdmissionDraft {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   submittedAt DateTime?
+}
+
+model ClassDiary {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instituteId  String   @db.ObjectId
+  institute    Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  name         String
+  startDate    String // YYYY-MM-DD
+  type         String // "daily" | "weekly" | "monthly"
+  config       Json // Selected classes & book names: Array of { className: string, books: Array<{ id: string, name: string }> }
+  entries      Json // Daily log entries: Record<date, Record<className, Record<bookId, { cw: string, hw: string, notice?: string }>>>
+  logTypes     Json? // Custom log types: Array of { id, label, color }
+  holidays     Json? // Array of Holiday objects
+  teacherLinks Json? // Array of generated teacher links
+  publishTime  String? // Daily publish time (e.g., "14:00")
+  printSettings Json? 
+  coverTemplate String?
+  targetClass  Json? // string or string[]
+  targetDates  Json? // string[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([instituteId])
 }

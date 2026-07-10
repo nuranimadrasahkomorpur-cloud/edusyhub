@@ -586,14 +586,16 @@ export async function GET(req: Request) {
                     while (current < start) {
                         if (config.interval === 'weekly') current.setDate(current.getDate() + 7);
                         else if (config.interval === 'semester') current.setMonth(current.getMonth() + 6);
-                        else if (config.interval === 'yearly') current.setFullYear(current.getFullYear() + 1);
+                        else if (config.interval === 'yearly' || config.interval === 'one_time_year') current.setFullYear(current.getFullYear() + 1);
+                        else if (config.interval === 'one_time_ever') break; // No fast forward, just generated once
                         else current.setMonth(current.getMonth() + 1);
                     }
 
                     while (current <= actualEnd) {
                         let dateKey = '';
                         if (config.interval === 'weekly') dateKey = `${category.id}-${current.getFullYear()}-${current.getMonth()}-${current.getDate()}`;
-                        else if (config.interval === 'yearly') dateKey = `${category.id}-${current.getFullYear()}`;
+                        else if (config.interval === 'yearly' || config.interval === 'one_time_year') dateKey = `${category.id}-${current.getFullYear()}`;
+                        else if (config.interval === 'one_time_ever') dateKey = `${category.id}-ever`;
                         else dateKey = `${category.id}-${current.getFullYear()}-${current.getMonth()}`;
 
                         if (!existingKeys.has(dateKey)) {
@@ -627,9 +629,10 @@ export async function GET(req: Request) {
                             }
                         }
 
+                        if (config.interval === 'one_time_ever') break; // Only generate once
                         if (config.interval === 'weekly') current.setDate(current.getDate() + 7);
                         else if (config.interval === 'semester') current.setMonth(current.getMonth() + 6);
-                        else if (config.interval === 'yearly') current.setFullYear(current.getFullYear() + 1);
+                        else if (config.interval === 'yearly' || config.interval === 'one_time_year') current.setFullYear(current.getFullYear() + 1);
                         else current.setMonth(current.getMonth() + 1);
                     }
                 }
