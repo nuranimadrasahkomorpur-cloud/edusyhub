@@ -21,6 +21,12 @@ import {
 } from "lucide-react";
 import ModalLayout from "@/components/Modal";
 
+// Fallback toast if no library is available
+const toast = {
+  success: (msg: string) => alert(msg),
+  error: (msg: string) => alert(msg),
+};
+
 // Helper for Bangla date formatting and digits
 const banglaMonths = [
   "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
@@ -437,9 +443,9 @@ export default function CheckupModal({
   return (
     <ModalLayout
       isOpen={isOpen}
-      onChange={onClose}
+      onClose={onClose}
       title="ডায়েরি চেকআপ"
-      modalSize="xl"
+      maxWidth="max-w-4xl"
     >
       <div className="flex flex-col gap-5 py-2 select-none h-[80vh] overflow-y-auto custom-scrollbar pr-1">
         
