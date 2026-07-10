@@ -34,6 +34,7 @@ import dynamic from 'next/dynamic';
 import Modal from './Modal';
 import AttendanceSummary from './AttendanceSummary';
 import { getCleanId } from '@/utils/digit-utils';
+import BanglaDateRangePicker from './BanglaDateRangePicker';
 
 const StudentProfileModal = dynamic(() => import('./StudentProfileModal'), { ssr: false });
 
@@ -58,6 +59,10 @@ interface Student {
     classId?: string;
     className?: string;
     metadata?: any;
+    assignedRoll?: string | number;
+    presentCount?: number;
+    sData?: any;
+    totalCount?: number;
 }
 
 export default function ManualAttendance({ classId, selectedDate }: { classId: string, selectedDate: string }) {
@@ -135,6 +140,15 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
         }
         setSortConfig({ key, direction });
     };
+
+    // Multi-Day Leave State
+    const [multiDayLeaveTarget, setMultiDayLeaveTarget] = useState<Student | null>(null);
+    const [multiDayStartDate, setMultiDayStartDate] = useState(selectedDate);
+    const [multiDayEndDate, setMultiDayEndDate] = useState(selectedDate);
+    const [localLeaveRanges, setLocalLeaveRanges] = useState<Record<string, {start: string, end: string}>>({});
+    const [isSubmittingMultiDay, setIsSubmittingMultiDay] = useState(false);
+    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+    const isLongPressTriggered = useRef<boolean>(false);
 
     const showToast = (message: string, type: 'SUCCESS' | 'ERROR' | 'INFO' = 'SUCCESS') => {
         setToast({ message, type });
@@ -389,6 +403,125 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
             console.error('Error fetching students:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleLeavePointerDown = (e: React.PointerEvent, student: Student, dayStr?: string) => {
+        if (isReadOnlyAttendance) return;
+        isLongPressTriggered.current = false;
+        longPressTimer.current = setTimeout(() => {
+            isLongPressTriggered.current = true;
+            setMultiDayLeaveTarget(student);
+            
+            if (localLeaveRanges[student.id]) {
+                setMultiDayStartDate(localLeaveRanges[student.id].start);
+                setMultiDayEndDate(localLeaveRanges[student.id].end);
+            } else {
+                setMultiDayStartDate(dayStr || selectedDate);
+                setMultiDayEndDate(dayStr || selectedDate);
+            }
+            // Vibrate if supported
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }, 600); // 600ms long press
+    };
+
+    const handleLeavePointerUp = (e: React.PointerEvent, student: Student, action: () => void) => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+        if (!isLongPressTriggered.current) {
+            // It was a short click, handle normally
+            action();
+        }
+    };
+
+    const handleLeavePointerLeave = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
+
+    const handleSubmitMultiDayLeave = async () => {
+        if (!multiDayLeaveTarget || !multiDayStartDate || !multiDayEndDate) return;
+        
+        setIsSubmittingMultiDay(true);
+        try {
+            const start = new Date(multiDayStartDate);
+            const end = new Date(multiDayEndDate);
+            if (start > end) {
+                showToast('শেষ তারিখ শুরুর তারিখের আগে হতে পারে না।', 'ERROR');
+                setIsSubmittingMultiDay(false);
+                return;
+            }
+
+            const datesToProcess: string[] = [];
+            const d = new Date(start);
+            while (d <= end) {
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                datesToProcess.push(dateStr);
+                d.setDate(d.getDate() + 1);
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Send requests in parallel
+            await Promise.all(datesToProcess.map(async (dateStr) => {
+                const targetDate = new Date(dateStr);
+                targetDate.setHours(0, 0, 0, 0);
+                const status = targetDate > today ? 'LEAVE_PENDING' : 'LEAVE';
+
+                return fetch('/api/attendance/mark', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        studentId: multiDayLeaveTarget.id,
+                        instituteId: activeInstitute?.id,
+                        classId: multiDayLeaveTarget.classId || classId || 'all',
+                        dateString: dateStr,
+                        status: status,
+                        method: 'MANUAL'
+                    })
+                });
+            }));
+
+            showToast(`${datesToProcess.length} দিনের ছুটি সফলভাবে সেট করা হয়েছে।`, 'SUCCESS');
+            
+            // Save to local cache so if they reopen it, the range is remembered
+            setLocalLeaveRanges(prev => ({
+                ...prev,
+                [multiDayLeaveTarget.id]: { start: multiDayStartDate, end: multiDayEndDate }
+            }));
+            
+            // Optimistically update if selectedDate is in the range
+            if (datesToProcess.includes(selectedDate)) {
+                const targetDateObj = new Date(selectedDate);
+                targetDateObj.setHours(0, 0, 0, 0);
+                const currentStatus = targetDateObj > today ? 'LEAVE_PENDING' : 'LEAVE';
+                
+                setStudents(prev => prev.map(s => {
+                    if (s.id === multiDayLeaveTarget.id) {
+                        return { ...s, attendance: currentStatus, initialAttendance: currentStatus, updatedAt: new Date().toISOString() };
+                    }
+                    return s;
+                }));
+                setRegisterData(prev => {
+                    const next = { ...prev };
+                    next[multiDayLeaveTarget.id] = { ...prev[multiDayLeaveTarget.id], [selectedDate]: currentStatus };
+                    return next;
+                });
+            }
+
+            setMultiDayLeaveTarget(null);
+        } catch (e) {
+            console.error('Error setting multi-day leave:', e);
+            showToast('ছুটি সেট করতে সমস্যা হয়েছে।', 'ERROR');
+        } finally {
+            setIsSubmittingMultiDay(false);
         }
     };
 
@@ -1356,13 +1489,15 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                             <tbody>
                                 {filteredStudents.map((student, idx) => {
                                         const { sData, presentCount, totalCount } = student;
+                                        const isInactive = student.metadata?.status === 'INACTIVE';
+                                        const isRowDisabled = isReadOnlyAttendance || isInactive;
 
                                         return (
                                             <tr
                                                 key={student.id}
                                                 className={`border-b border-slate-100 transition-colors ${
                                                     idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                                                } hover:bg-blue-50/40`}
+                                                } hover:bg-blue-50/40 ${isInactive ? 'opacity-50 grayscale' : ''}`}
                                             >
                                                 {/* SL / Roll */}
                                                 <td className={`sticky left-0 z-10 px-1.5 py-1.5 font-black text-slate-400 text-center border-r border-slate-100 ${
@@ -1398,9 +1533,11 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                         <td
                                                             key={day}
                                                             id={`cell-${idx}-${visibleDays.indexOf(day)}`}
-                                                            tabIndex={isReadOnlyAttendance ? -1 : 0}
-                                                            onClick={isReadOnlyAttendance ? undefined : () => handleQuickCellUpdate(student.id, dayStr, status, student.classId)}
-                                                            onKeyDown={isReadOnlyAttendance ? undefined : (e) => {
+                                                            tabIndex={isRowDisabled ? -1 : 0}
+                                                            onPointerDown={isRowDisabled ? undefined : (e) => handleLeavePointerDown(e, student as Student, dayStr)}
+                                                            onPointerUp={isRowDisabled ? undefined : (e) => handleLeavePointerUp(e, student as Student, () => handleQuickCellUpdate(student.id, dayStr, status, student.classId))}
+                                                            onPointerLeave={isRowDisabled ? undefined : handleLeavePointerLeave}
+                                                            onKeyDown={isRowDisabled ? undefined : (e) => {
                                                                 const dayIdx = visibleDays.indexOf(day);
                                                                 if (e.key === 'ArrowUp') {
                                                                     document.getElementById(`cell-${idx - 1}-${dayIdx}`)?.focus();
@@ -1517,12 +1654,13 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
 
                                 const optimizedPhoto = getThumbnailUrl(student.photo);
 
+                                const isInactive = student.metadata?.status === 'INACTIVE';
                                 return (
                                     <div
                                         key={student.id}
-                                        className="bg-white rounded-[20px] p-2 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center justify-between gap-3 relative group"
+                                        className={`bg-white rounded-[20px] p-2 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between gap-3 relative group ${activeActionId === student.id ? 'z-50 ring-2 ring-[#045c84]/10' : 'z-10'}`}
                                     >
-                                        <div className="flex items-center gap-3 min-w-0">
+                                        <div className={`flex items-center gap-3 min-w-0 ${isInactive ? 'opacity-50 grayscale' : ''}`}>
                                             <div className="relative shrink-0">
                                                 <div
                                                     className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 shadow-inner cursor-pointer relative"
@@ -1546,61 +1684,8 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                 </div>
                                             </div>
                                             <div className="flex flex-col min-w-0">
-                                                <div className="flex items-start justify-between w-full">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <h4 className="text-[15px] font-black text-slate-800 truncate mb-0.5 cursor-pointer hover:text-[#045c84]" onClick={() => setSelectedStudentForModal(student)}>{student.name}</h4>
-                                                    </div>
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setActiveActionId(activeActionId === student.id ? null : student.id);
-                                                            }}
-                                                            className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
-                                                        >
-                                                            <MoreVertical size={13} />
-                                                        </button>
-
-                                                        <AnimatePresence>
-                                                            {activeActionId === student.id && (
-                                                                <motion.div
-                                                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                                                    className="absolute left-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-[100] font-bengali"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                >
-                                                                    <div className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">দ্রুত অ্যাকশন</div>
-
-                                                                    <a href={`tel:${student.phone}`} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-emerald-600 transition-colors text-sm font-bold group/item">
-                                                                        <Phone size={16} className="group-hover/item:scale-110 transition-transform" />
-                                                                        <span>কল করুন</span>
-                                                                    </a>
-
-                                                                    <a href={`sms:${student.phone}`} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-blue-600 transition-colors text-sm font-bold group/item">
-                                                                        <MessageSquare size={16} className="group-hover/item:scale-110 transition-transform" />
-                                                                        <span>মেসেজ দিন</span>
-                                                                    </a>
-
-                                                                    <button
-                                                                        onClick={() => openProfileModal(student, 'face')}
-                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors text-sm font-bold group/item"
-                                                                    >
-                                                                        <UserCircle size={16} className="group-hover/item:scale-110 transition-transform" />
-                                                                        <span>প্রোফাইল / ফেস আইডি</span>
-                                                                    </button>
-
-                                                                    <button
-                                                                        onClick={() => openProfileModal(student, 'attendance')}
-                                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-amber-50 text-amber-600 transition-colors text-sm font-bold group/item"
-                                                                    >
-                                                                        <Edit3 size={16} className="group-hover/item:scale-110 transition-transform" />
-                                                                        <span>এডিট তথ্য</span>
-                                                                    </button>
-                                                                </motion.div>
-                                                            )}
-                                                        </AnimatePresence>
-                                                    </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <h4 className="text-[15px] font-black text-slate-800 truncate mb-0.5 cursor-pointer hover:text-[#045c84]" onClick={() => setSelectedStudentForModal(student)}>{student.name}</h4>
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -1630,7 +1715,58 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
 
                                         <div className="flex items-center gap-3 shrink-0">
-                                            <div className="flex flex-col items-end gap-1">
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActiveActionId(activeActionId === student.id ? null : student.id);
+                                                    }}
+                                                    className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+                                                >
+                                                    <MoreVertical size={20} />
+                                                </button>
+
+                                                <AnimatePresence>
+                                                    {activeActionId === student.id && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                                            className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 p-2 z-[100] font-bengali"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <div className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">দ্রুত অ্যাকশন</div>
+
+                                                            <a href={`tel:${student.phone}`} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-emerald-600 transition-colors text-sm font-bold group/item">
+                                                                <Phone size={16} className="group-hover/item:scale-110 transition-transform" />
+                                                                <span>কল করুন</span>
+                                                            </a>
+
+                                                            <a href={`sms:${student.phone}`} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-blue-600 transition-colors text-sm font-bold group/item">
+                                                                <MessageSquare size={16} className="group-hover/item:scale-110 transition-transform" />
+                                                                <span>মেসেজ দিন</span>
+                                                            </a>
+
+                                                            <button
+                                                                onClick={() => openProfileModal(student, 'face')}
+                                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors text-sm font-bold group/item"
+                                                            >
+                                                                <UserCircle size={16} className="group-hover/item:scale-110 transition-transform" />
+                                                                <span>প্রোফাইল / ফেস আইডি</span>
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => openProfileModal(student, 'attendance')}
+                                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-amber-50 text-amber-600 transition-colors text-sm font-bold group/item"
+                                                            >
+                                                                <Edit3 size={16} className="group-hover/item:scale-110 transition-transform" />
+                                                                <span>এডিট তথ্য</span>
+                                                            </button>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                            <div className={`flex flex-col items-end gap-1 ${isInactive ? 'opacity-50 grayscale' : ''}`}>
                                                 <span className={`text-[9px] font-black uppercase tracking-widest text-${current.color}-600 opacity-70`}>{current.label}</span>
                                                 {isAdmin && status === 'LEAVE_PENDING' ? (
                                                     <div className="flex items-center gap-2">
@@ -1651,10 +1787,12 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                                     </div>
                                                 ) : (
                                                     <button
-                                                        onClick={() => updateStatus(student.id, getStatusConfig(status).next as any)}
-                                                        disabled={isReadOnlyAttendance}
+                                                        onPointerDown={(e) => handleLeavePointerDown(e, student)}
+                                                        onPointerUp={(e) => handleLeavePointerUp(e, student, () => updateStatus(student.id, getStatusConfig(status).next as any))}
+                                                        onPointerLeave={handleLeavePointerLeave}
+                                                        disabled={isReadOnlyAttendance || isInactive}
                                                         className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                                                            isReadOnlyAttendance ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''
+                                                            (isReadOnlyAttendance || isInactive) ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''
                                                         } ${status === 'PRESENT' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/10 ring-4 ring-emerald-500/5' :
                                                             status === 'ABSENT' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/10 ring-4 ring-rose-500/5' :
                                                                 status === 'LEAVE' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/10 ring-4 blue-500/5' :
@@ -1669,7 +1807,7 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                                         </div>
 
                                         {/* Segmented Bottom Border */}
-                                        <div className="absolute inset-x-0 bottom-0 h-[20px] pointer-events-none opacity-40">
+                                        <div className={`absolute inset-x-0 bottom-0 h-[20px] pointer-events-none opacity-40 ${isInactive ? 'grayscale' : ''}`}>
                                             {total === 0 ? (
                                                 <div className="absolute inset-0 border-b-[1.5px] border-slate-200 rounded-b-[20px]" />
                                             ) : (
@@ -1738,6 +1876,74 @@ export default function ManualAttendance({ classId, selectedDate }: { classId: s
                     )
                 }
             </AnimatePresence >
+
+            {/* Multi-Day Leave Modal */}
+            <Modal
+                isOpen={!!multiDayLeaveTarget}
+                onClose={() => setMultiDayLeaveTarget(null)}
+                title="একাধিক দিনের ছুটি"
+                maxWidth="max-w-md"
+            >
+                {multiDayLeaveTarget && (
+                    <div className="p-6">
+                        <div className="mb-4 flex items-center gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                            <div className="w-12 h-12 rounded-xl shrink-0 flex items-center justify-center shadow-inner"
+                                style={{
+                                    backgroundColor: `hsl(${(multiDayLeaveTarget.name.charCodeAt(0) * 15) % 360}, 60%, 90%)`,
+                                    color: `hsl(${(multiDayLeaveTarget.name.charCodeAt(0) * 15) % 360}, 70%, 40%)`
+                                }}
+                            >
+                                <span className="text-xl font-black opacity-80">{multiDayLeaveTarget.name.charAt(0)}</span>
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                                <h3 className="text-base font-black text-slate-800 truncate leading-tight">{multiDayLeaveTarget.name}</h3>
+                                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                                    রোল: {multiDayLeaveTarget.metadata?.rollNumber || multiDayLeaveTarget.assignedRoll || 'N/A'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mb-4 text-[10px] text-amber-600 bg-amber-50 px-3 py-2 rounded-xl border border-amber-100 flex items-center gap-2 font-bold">
+                            <Clock8 size={14} className="shrink-0" />
+                            ভবিষ্যতের তারিখ 'অপেক্ষমাণ' হিসেবে সেভ হবে এবং নির্দিষ্ট দিনে স্বয়ংক্রিয়ভাবে 'ছুটি' হবে।
+                        </div>
+
+                        <div className="flex justify-center">
+                            <BanglaDateRangePicker 
+                                startDate={multiDayStartDate} 
+                                endDate={multiDayEndDate} 
+                                onChange={(start, end) => {
+                                    setMultiDayStartDate(start);
+                                    setMultiDayEndDate(end);
+                                }} 
+                            />
+                        </div>
+
+                        <div className="flex gap-3 mt-8">
+                            <button
+                                onClick={() => setMultiDayLeaveTarget(null)}
+                                className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-black text-sm hover:bg-slate-50 transition-colors"
+                            >
+                                বাতিল
+                            </button>
+                            <button
+                                onClick={handleSubmitMultiDayLeave}
+                                disabled={isSubmittingMultiDay}
+                                className="flex-1 py-3 px-4 rounded-xl bg-blue-600 text-white font-black text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                            >
+                                {isSubmittingMultiDay ? (
+                                    <Loader2 size={18} className="animate-spin" />
+                                ) : (
+                                    <>
+                                        <Check size={18} />
+                                        প্রয়োগ করুন
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
 
             {/* Summary Modal */}
             <Modal

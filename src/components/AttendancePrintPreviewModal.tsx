@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo, useDeferredValue } from 'react';
 import { createPortal } from 'react-dom';
 import PrintLayout from '@/components/PrintLayout';
 import {
@@ -109,6 +109,29 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
         return `${startDayBn} ${banglaMonths[startMonth]} ${startYearBn} - ${endDayBn} ${banglaMonths[endMonth]} ${endYearBn}`;
     };
 
+    const [leaveBonusPercentage, setLeaveBonusPercentage] = useState(0);
+    const [totalMarks, setTotalMarks] = useState(20);
+    const [isSettingsInitialized, setIsSettingsInitialized] = useState(false);
+
+    // Load saved settings from local storage on mount
+    useEffect(() => {
+        const savedBonus = localStorage.getItem('attendanceLeaveBonusPercentage');
+        if (savedBonus !== null) setLeaveBonusPercentage(Number(savedBonus));
+        
+        const savedMarks = localStorage.getItem('attendanceTotalMarks');
+        if (savedMarks !== null) setTotalMarks(Number(savedMarks));
+        
+        setIsSettingsInitialized(true);
+    }, []);
+
+    // Save settings to local storage whenever they change
+    useEffect(() => {
+        if (isSettingsInitialized) {
+            localStorage.setItem('attendanceLeaveBonusPercentage', leaveBonusPercentage.toString());
+            localStorage.setItem('attendanceTotalMarks', totalMarks.toString());
+        }
+    }, [leaveBonusPercentage, totalMarks, isSettingsInitialized]);
+
     // Calculate total working days (days where attendance was taken)
     const classWorkingDays = useMemo(() => {
         const uniqueDates = new Set(attendanceList.map((a: any) => a.dateString));
@@ -118,6 +141,8 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
         });
         return count;
     }, [attendanceList, dateList]);
+
+    const deferredLeaveBonusPercentage = useDeferredValue(leaveBonusPercentage);
 
     // Calculate individual student stats
     const studentWithStats = useMemo(() => {
@@ -139,9 +164,15 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
             const late = records.filter((r: any) => r.status === 'LATE').length;
             const leave = records.filter((r: any) => ['LEAVE', 'LEAVE_PENDING'].includes(r.status)).length;
             
+            const leaveBonus = deferredLeaveBonusPercentage > 0 ? Number((leave * (deferredLeaveBonusPercentage / 100)).toFixed(2)) : 0;
+            const totalEquivalentPresent = present + late + leaveBonus;
+            
             // Total school days can be approximated by number of days in range that had at least one attendance record across the class
             const totalWorking = classWorkingDays > 0 ? classWorkingDays : dateList.length;
-            const rate = totalWorking > 0 ? Math.round(((present + late) / totalWorking) * 100) : 0;
+            const exactBaseRate = totalWorking > 0 ? ((present + late) / totalWorking) * 100 : 0;
+            const exactRate = totalWorking > 0 ? (totalEquivalentPresent / totalWorking) * 100 : 0;
+            const baseRate = Math.round(exactBaseRate);
+            const rate = Math.round(exactRate);
 
             return {
                 ...s,
@@ -149,14 +180,28 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                 absent,
                 late,
                 leave,
+                leaveBonus,
+                totalEquivalentPresent,
                 totalWorking,
+                baseRate,
                 rate,
+                exactBaseRate,
+                exactRate,
                 dateStatusMap
             };
         });
-    }, [students, attendanceList, dateList]);
+    }, [students, attendanceList, dateList, deferredLeaveBonusPercentage, classWorkingDays]);
 
     // Selection & filter states
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
     const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(() => {
         return new Set(studentWithStats.map(s => s.id));
     });
@@ -180,7 +225,6 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
     const [isAutoFit, setIsAutoFit] = useState(true);
     const [translateX, setTranslateX] = useState(0);
     const [translateY, setTranslateY] = useState(0);
-    const [totalMarks, setTotalMarks] = useState(20);
     const [cardColumns, setCardColumns] = useState(2);
     
     // Touch gesture tracking refs
@@ -231,6 +275,8 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
         });
     }, [studentWithStats, selectedStudentIds, selectedClassId, filterText]);
 
+    const deferredTotalMarks = useDeferredValue(totalMarks);
+
     // Group print students by class
     const groupedStudents = useMemo(() => {
         const groups: Record<string, any[]> = {};
@@ -242,13 +288,48 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
 
         return Object.entries(groups).map(([cid, students]) => {
             const cName = classes.find(c => c.id === cid)?.name || 'অজানা ক্লাস';
-            return { classId: cid, className: cName, students };
+            
+            let sortedStudents = [...students];
+            if (sortConfig) {
+                sortedStudents.sort((a, b) => {
+                    let valA, valB;
+                    switch (sortConfig.key) {
+                        case 'roll':
+                            valA = Number(a.metadata?.rollNumber || a.assignedRoll || 0);
+                            valB = Number(b.metadata?.rollNumber || b.assignedRoll || 0);
+                            break;
+                        case 'name':
+                            valA = a.name;
+                            valB = b.name;
+                            break;
+                        case 'present':
+                            valA = a.totalEquivalentPresent;
+                            valB = b.totalEquivalentPresent;
+                            break;
+                        case 'percentage':
+                            valA = a.rate;
+                            valB = b.rate;
+                            break;
+                        case 'marks':
+                            valA = a.totalWorking > 0 ? (a.totalEquivalentPresent / a.totalWorking) * deferredTotalMarks : 0;
+                            valB = b.totalWorking > 0 ? (b.totalEquivalentPresent / b.totalWorking) * deferredTotalMarks : 0;
+                            break;
+                        default:
+                            return 0;
+                    }
+                    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            return { classId: cid, className: cName, students: sortedStudents };
         }).sort((a, b) => {
             const idxA = classes.findIndex(c => c.id === a.classId);
             const idxB = classes.findIndex(c => c.id === b.classId);
             return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
         });
-    }, [printStudents, classes]);
+    }, [printStudents, classes, sortConfig, deferredTotalMarks]);
 
     // Toggle single student
     const toggleStudent = (id: string) => {
@@ -390,10 +471,16 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
         
         let tsv = '';
         if (viewMode === 'card') {
-            tsv = ['ক্র.নং', 'রোল', 'নাম', 'আইডি', 'মোট কর্মদিবস', 'উপস্থিত', 'অনুপস্থিত', 'ছুটি', 'গড় হার'].join('\t') + '\n';
+            const cardHeaders = ['ক্র.নং', 'রোল', 'নাম', 'আইডি', 'মোট কর্মদিবস', 'উপস্থিত', 'অনুপস্থিত', 'ছুটি'];
+            if (leaveBonusPercentage > 0) {
+                cardHeaders.push('বোনাস নম্বর');
+            }
+            cardHeaders.push('গড় হার');
+            tsv = cardHeaders.join('\t') + '\n';
+            
             let idx = 1;
             printStudents.forEach(s => {
-                tsv += [
+                const cardRow = [
                     idx++,
                     s.metadata?.rollNumber || '-',
                     s.name,
@@ -401,27 +488,43 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                     s.totalWorking,
                     s.present + s.late,
                     s.absent,
-                    s.leave,
-                    `${s.rate}%`
-                ].join('\t') + '\n';
+                    s.leave
+                ];
+                if (leaveBonusPercentage > 0) {
+                    const bonusMarks = (((s.exactRate * totalMarks) / 100) - ((s.exactBaseRate * totalMarks) / 100)).toFixed(2);
+                    cardRow.push(bonusMarks);
+                }
+                cardRow.push(`${s.rate}%`);
+                tsv += cardRow.join('\t') + '\n';
             });
         } else {
             // Register Grid Headers
-            const headers = ['রোল', 'নাম', ...dateList.map(d => d.split('-')[2]), 'উপস্থিত', '%', 'প্রাপ্ত নম্বর'];
+            const headers = ['রোল', 'নাম', ...dateList.map(d => d.split('-')[2]), 'উপস্থিত'];
+            if (leaveBonusPercentage > 0) {
+                headers.push('বোনাস নম্বর');
+            }
+            headers.push('%', 'প্রাপ্ত নম্বর');
             tsv = headers.join('\t') + '\n';
+            
             printStudents.forEach(s => {
                 const datesRow = dateList.map(d => {
                     const status = s.dateStatusMap[d];
                     return status === 'PRESENT' ? 'P' : status === 'ABSENT' ? 'A' : status === 'LATE' ? 'L' : status === 'LEAVE' || status === 'LEAVE_PENDING' ? 'H' : '-';
                 });
-                tsv += [
+                
+                const registerRow: any[] = [
                     s.metadata?.rollNumber || '-',
                     s.name,
                     ...datesRow,
-                    `${s.present + s.late}/${s.totalWorking}`,
-                    `${s.rate}%`,
-                    Math.round((s.rate * totalMarks) / 100)
-                ].join('\t') + '\n';
+                    `${s.present + s.late}/${s.totalWorking}`
+                ];
+                if (leaveBonusPercentage > 0) {
+                    const bonusMarks = (((s.exactRate * totalMarks) / 100) - ((s.exactBaseRate * totalMarks) / 100)).toFixed(2);
+                    registerRow.push(bonusMarks);
+                }
+                registerRow.push(`${s.rate}%`, ((s.exactRate * totalMarks) / 100).toFixed(2));
+                
+                tsv += registerRow.join('\t') + '\n';
             });
         }
 
@@ -675,8 +778,18 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                     >
                                                         <thead>
                                                             <tr className="bg-slate-100 font-black text-slate-800 select-none">
-                                                                <th className="py-2.5 px-2 font-black" style={{ minWidth: '3em' }}>রোল</th>
-                                                                <th className="py-2.5 px-3 font-black text-left" style={{ minWidth: '10em' }}>নাম</th>
+                                                                <th onClick={() => handleSort('roll')} className="py-2.5 px-2 font-black cursor-pointer hover:bg-slate-200 transition-colors" style={{ minWidth: '3em' }}>
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        রোল
+                                                                        {sortConfig?.key === 'roll' && <span className="text-[10px] text-indigo-600">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>}
+                                                                    </div>
+                                                                </th>
+                                                                <th onClick={() => handleSort('name')} className="py-2.5 px-3 font-black text-left cursor-pointer hover:bg-slate-200 transition-colors" style={{ minWidth: '10em' }}>
+                                                                    <div className="flex items-center gap-1">
+                                                                        নাম
+                                                                        {sortConfig?.key === 'name' && <span className="text-[10px] text-indigo-600">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>}
+                                                                    </div>
+                                                                </th>
                                                                 {dateList.map((dayStr) => {
                                                                     const dayNum = dayStr.split('-')[2];
                                                                     const dayName = getBengaliDayName(dayStr);
@@ -687,14 +800,34 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                         </th>
                                                                     );
                                                                 })}
-                                                                <th className="py-2.5 px-2 font-black" style={{ minWidth: '4em' }}>উপস্থিত</th>
-                                                                <th className="py-2.5 px-2 font-black" style={{ minWidth: '3em' }}>%</th>
-                                                                <th className="py-2.5 px-2 font-black" style={{ minWidth: '4em' }}>প্রাপ্ত নম্বর</th>
+                                                                <th onClick={() => handleSort('present')} className="py-2.5 px-2 font-black cursor-pointer hover:bg-slate-200 transition-colors" style={{ minWidth: '4em' }}>
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        উপস্থিত
+                                                                        {sortConfig?.key === 'present' && <span className="text-[10px] text-indigo-600">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>}
+                                                                    </div>
+                                                                </th>
+                                                                {leaveBonusPercentage > 0 && (
+                                                                    <th className="py-2.5 px-2 font-black" style={{ minWidth: '3em' }}>বোনাস নম্বর</th>
+                                                                )}
+                                                                <th onClick={() => handleSort('percentage')} className="py-2.5 px-2 font-black cursor-pointer hover:bg-slate-200 transition-colors" style={{ minWidth: '3em' }}>
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        %
+                                                                        {sortConfig?.key === 'percentage' && <span className="text-[10px] text-indigo-600">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>}
+                                                                    </div>
+                                                                </th>
+                                                                <th onClick={() => handleSort('marks')} className="py-2.5 px-2 font-black cursor-pointer hover:bg-slate-200 transition-colors" style={{ minWidth: '4em' }}>
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        প্রাপ্ত নম্বর
+                                                                        {sortConfig?.key === 'marks' && <span className="text-[10px] text-indigo-600">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>}
+                                                                    </div>
+                                                                </th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            {group.students.map((s) => (
-                                                                <tr key={s.id} className="hover:bg-slate-50 transition-colors font-bold text-slate-700">
+                                                            {group.students.map((s) => {
+                                                                const isInactive = s.metadata?.status === 'INACTIVE';
+                                                                return (
+                                                                <tr key={s.id} className={`hover:bg-slate-50 transition-colors font-bold text-slate-700 ${isInactive ? 'opacity-50 grayscale' : ''}`}>
                                                                     <td className="py-2 px-1 font-black text-slate-400">
                                                                         {s.metadata?.rollNumber || '-'}
                                                                     </td>
@@ -720,6 +853,11 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                     <td className="py-2 px-1 text-[#045c84] font-black">
                                                                         {s.present + s.late}/{s.totalWorking}
                                                                     </td>
+                                                                    {leaveBonusPercentage > 0 && (
+                                                                        <td className="py-2 px-1 text-teal-600 font-black">
+                                                                            {(((s.exactRate * totalMarks) / 100) - ((s.exactBaseRate * totalMarks) / 100)).toFixed(2)}
+                                                                        </td>
+                                                                    )}
                                                                     <td className="py-2 px-1 text-slate-900">
                                                                         <span className={`font-black px-1 py-0.5 rounded-md ${
                                                                             s.rate >= 80 ? 'bg-emerald-100 text-emerald-700' :
@@ -729,10 +867,11 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                         </span>
                                                                     </td>
                                                                     <td className="py-2 px-1 text-indigo-700 font-black">
-                                                                        {Math.round((s.rate * totalMarks) / 100)}
+                                                                        {((s.exactRate * totalMarks) / 100).toFixed(2)}
                                                                     </td>
                                                                 </tr>
-                                                            ))}
+                                                                );
+                                                            })}
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -802,57 +941,75 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                                                                 className="grid gap-4 mt-2"
                                                                 style={{ gridTemplateColumns: `repeat(${cardColumns}, 1fr)` }}
                                                             >
-                                                                {chunkStudents.map((s) => (
-                                                                    <div 
-                                                                        key={s.id}
-                                                                        className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm flex flex-col justify-between leading-normal hover:shadow transition-shadow"
-                                                                        style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
-                                                                    >
-                                                                        <div>
-                                                                            <div className="flex items-center justify-between mb-2">
-                                                                                <span className="text-[11px] font-black px-2 py-0.5 bg-slate-100 rounded-md text-slate-500">
-                                                                                    রোল: {s.metadata?.rollNumber || '-'}
-                                                                                </span>
-                                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                                                                                    s.rate >= 80 ? 'bg-emerald-100 text-emerald-700' :
-                                                                                    s.rate >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600'
-                                                                                }`}>
-                                                                                    {s.rate}% গড় হার
-                                                                                </span>
+                                                                {chunkStudents.map((s) => {
+                                                                    const isInactive = s.metadata?.status === 'INACTIVE';
+                                                                    return (
+                                                                        <div 
+                                                                            key={s.id}
+                                                                            className={`relative border border-slate-200/70 rounded-2xl p-3 bg-white shadow-sm flex flex-col justify-between leading-normal hover:shadow-md hover:border-slate-300 transition-all overflow-hidden group ${isInactive ? 'opacity-50 grayscale' : ''}`}
+                                                                            style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
+                                                                        >
+                                                                            <div>
+                                                                                <div className="flex items-start justify-between mb-2.5">
+                                                                                    <div>
+                                                                                        <span className="inline-block text-[9px] font-black px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-md text-slate-500 mb-1.5">
+                                                                                            রোল: <span className="text-slate-800 text-[10px] ml-0.5">{s.metadata?.rollNumber || '-'}</span>
+                                                                                        </span>
+                                                                                        <h4 className="text-[14px] font-black text-slate-800 truncate mb-0.5">{s.name}</h4>
+                                                                                        <p className="text-[9.5px] font-bold text-slate-400">আইডি: {s.metadata?.studentId || '-'}</p>
+                                                                                    </div>
+                                                                                    
+                                                                                    <div className="flex flex-col items-end">
+                                                                                        <div className={`flex flex-col items-center justify-center min-w-[3rem] px-2 py-1.5 rounded-xl border ${
+                                                                                            s.rate >= 80 ? 'bg-emerald-50/80 border-emerald-100 text-emerald-700' :
+                                                                                            s.rate >= 50 ? 'bg-amber-50/80 border-amber-100 text-amber-700' : 'bg-rose-50/80 border-rose-100 text-rose-600'
+                                                                                        }`}>
+                                                                                            <span className="text-[14px] font-black leading-none">{s.rate}%</span>
+                                                                                            <span className="text-[7.5px] font-bold mt-1 opacity-80">গড় হার</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
                                                                             </div>
-                                                                            <h4 className="text-[15px] font-black text-slate-800 truncate mb-1">{s.name}</h4>
-                                                                            <p className="text-[10px] font-bold text-slate-400 mb-3">আইডি: {s.metadata?.studentId || '-'}</p>
+                                                                            
+                                                                            <div className="w-full bg-slate-100/80 rounded-full h-1.5 mb-3 overflow-hidden shadow-inner">
+                                                                                <div 
+                                                                                    className={`h-full rounded-full transition-all duration-500 ${s.rate >= 80 ? 'bg-emerald-500' : s.rate >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                                                                                    style={{ width: `${s.rate}%` }}
+                                                                                />
+                                                                            </div>
+                                                                            
+                                                                            <div className="grid grid-cols-3 gap-1.5 text-center text-[9px] font-bold">
+                                                                                <div className="bg-slate-50/80 p-1.5 rounded-xl border border-slate-100 flex flex-col justify-center transition-colors group-hover:bg-slate-100/80">
+                                                                                    <span className="block text-slate-400 leading-none mb-1 text-[8px]">মোট</span>
+                                                                                    <span className="text-slate-700 font-black text-[11px]">{s.totalWorking}</span>
+                                                                                </div>
+                                                                                <div className="bg-emerald-50/40 p-1.5 rounded-xl border border-emerald-100/50 flex flex-col justify-center transition-colors group-hover:bg-emerald-50/80">
+                                                                                    <span className="block text-emerald-500 leading-none mb-1 text-[8px]">উপস্থিত</span>
+                                                                                    <span className="text-emerald-700 font-black text-[11px]">{s.present + s.late}</span>
+                                                                                </div>
+                                                                                <div className="bg-rose-50/40 p-1.5 rounded-xl border border-rose-100/50 flex flex-col justify-center transition-colors group-hover:bg-rose-50/80">
+                                                                                    <span className="block text-rose-500 leading-none mb-1 text-[8px]">অনুপস্থিত</span>
+                                                                                    <span className="text-rose-700 font-black text-[11px]">{s.absent}</span>
+                                                                                </div>
+                                                                                
+                                                                                <div className="bg-blue-50/40 p-1.5 rounded-xl border border-blue-100/50 flex flex-col justify-center transition-colors group-hover:bg-blue-50/80">
+                                                                                    <span className="block text-blue-500 leading-none mb-1 text-[8px]">ছুটি</span>
+                                                                                    <span className="text-blue-700 font-black text-[11px]">{s.leave}</span>
+                                                                                </div>
+                                                                                {leaveBonusPercentage > 0 && (
+                                                                                    <div className="bg-teal-50/40 p-1.5 rounded-xl border border-teal-100/50 flex flex-col justify-center transition-colors group-hover:bg-teal-50/80">
+                                                                                        <span className="block text-teal-500 leading-none mb-1 text-[8px]">বোনাস</span>
+                                                                                        <span className="text-teal-700 font-black text-[11px]">{(((s.exactRate * totalMarks) / 100) - ((s.exactBaseRate * totalMarks) / 100)).toFixed(2)}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                <div className={`${leaveBonusPercentage > 0 ? '' : 'col-span-2'} bg-indigo-50/40 p-1.5 rounded-xl border border-indigo-100/50 flex flex-col justify-center transition-colors group-hover:bg-indigo-50/80`}>
+                                                                                    <span className="block text-indigo-500 leading-none mb-1 text-[8px]">প্রাপ্ত নম্বর</span>
+                                                                                    <span className="text-indigo-700 font-black text-[11px]">{((s.exactRate * totalMarks) / 100).toFixed(2)}</span>
+                                                                                </div>
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="w-full bg-slate-100 rounded-full h-1.5 mb-4 overflow-hidden">
-                                                                            <div 
-                                                                                className={`h-full rounded-full ${s.rate >= 80 ? 'bg-emerald-500' : s.rate >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                                                                                style={{ width: `${s.rate}%` }}
-                                                                            />
-                                                                        </div>
-                                                                        <div className="grid grid-cols-5 gap-1.5 text-center text-[9px] font-bold">
-                                                                            <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                                                                <span className="block text-slate-400 leading-none mb-1">মোট</span>
-                                                                                <span className="text-slate-700 font-black">{s.totalWorking}</span>
-                                                                            </div>
-                                                                            <div className="bg-emerald-50/50 p-1.5 rounded-lg border border-emerald-100/50">
-                                                                                <span className="block text-emerald-500 leading-none mb-1">উপস্থিত</span>
-                                                                                <span className="text-emerald-700 font-black">{s.present + s.late}</span>
-                                                                            </div>
-                                                                            <div className="bg-rose-50/50 p-1.5 rounded-lg border border-rose-100/50">
-                                                                                <span className="block text-rose-500 leading-none mb-1">অনুপস্থিত</span>
-                                                                                <span className="text-rose-700 font-black">{s.absent}</span>
-                                                                            </div>
-                                                                            <div className="bg-blue-50/50 p-1.5 rounded-lg border border-blue-100/50">
-                                                                                <span className="block text-blue-500 leading-none mb-1">ছুটি</span>
-                                                                                <span className="text-blue-700 font-black">{s.leave}</span>
-                                                                            </div>
-                                                                            <div className="bg-indigo-50/50 p-1.5 rounded-lg border border-indigo-100/50">
-                                                                                <span className="block text-indigo-500 leading-none mb-1">নম্বর</span>
-                                                                                <span className="text-indigo-700 font-black">{Math.round((s.rate * totalMarks) / 100)}</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         )}
                                                     </PrintLayout>
@@ -914,15 +1071,27 @@ export default function AttendancePrintPreviewModal({ payload, onClose }: Props)
                         </div>
                     </div>
                     
-                    <div className="px-4 pb-3 border-b border-slate-100 bg-slate-50/50">
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1">মোট হাজিরা নম্বর</label>
-                        <input
-                            type="number"
-                            value={totalMarks}
-                            onChange={e => setTotalMarks(Number(e.target.value))}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-700 outline-none focus:border-[#4f46e5] transition-all shadow-sm focus:shadow-indigo-100/50"
-                            placeholder="যেমন: 20"
-                        />
+                    <div className="px-4 pb-3 border-b border-slate-100 bg-slate-50/50 flex flex-col gap-3">
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">মোট হাজিরা নম্বর</label>
+                            <input
+                                type="number"
+                                value={totalMarks}
+                                onChange={e => setTotalMarks(Number(e.target.value))}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-700 outline-none focus:border-[#4f46e5] transition-all shadow-sm focus:shadow-indigo-100/50"
+                                placeholder="যেমন: 20"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1">ছুটির বোনাস (%)</label>
+                            <input
+                                type="number"
+                                value={leaveBonusPercentage}
+                                onChange={e => setLeaveBonusPercentage(Number(e.target.value))}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-black text-slate-700 outline-none focus:border-[#4f46e5] transition-all shadow-sm focus:shadow-indigo-100/50"
+                                placeholder="যেমন: 30"
+                            />
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-6 custom-scrollbar">

@@ -99,6 +99,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
     const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
     const [profileImage, setProfileImage] = useState<string | null>(student?.metadata?.studentPhoto || student?.metadata?.photo || null);
+    const isInactive = student?.metadata?.status === 'INACTIVE';
 
     useEffect(() => {
         setProfileImage(student?.metadata?.studentPhoto || student?.metadata?.photo || null);
@@ -1068,7 +1069,9 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                                                         <p className="text-[10px] text-slate-500 font-bold mt-0.5">পরিমাণ: ৳{c.amount} ({c.config?.interval || 'মাসিক'})</p>
                                                                     </div>
                                                                     <button
+                                                                        disabled={isInactive}
                                                                         onClick={async () => {
+                                                                            if (isInactive) return;
                                                                             const newActive = !isOptedIn;
                                                                             const newOptFees = { ...optFees };
                                                                             if (!newOptFees[c.id]) newOptFees[c.id] = { active: false, history: [] };
@@ -1103,7 +1106,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                                                                 console.error(e);
                                                                             }
                                                                         }}
-                                                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isOptedIn ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                                                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isInactive ? 'opacity-50 cursor-not-allowed' : ''} ${isOptedIn ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
                                                                     >
                                                                         {isOptedIn ? 'বন্ধ করুন' : 'চালু করুন'}
                                                                     </button>
@@ -1334,11 +1337,11 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
                                                 </p>
                                             </div>
                                             <div className="flex gap-2 mt-4 flex-wrap justify-center">
-                                                <button onClick={() => { setEnrollmentAction('overwrite'); setShowEnrollment(true); }} className="px-6 py-2.5 bg-white text-blue-600 text-[11px] font-black rounded-xl shadow-md border border-blue-100 hover:bg-blue-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
+                                                <button disabled={isInactive} onClick={() => { if (isInactive) return; setEnrollmentAction('overwrite'); setShowEnrollment(true); }} className={`px-6 py-2.5 bg-white text-blue-600 text-[11px] font-black rounded-xl shadow-md border border-blue-100 transition-all uppercase tracking-widest flex items-center gap-2 ${isInactive ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50 active:scale-95'}`}>
                                                     <RefreshCw size={14} />
                                                     আপডেট
                                                 </button>
-                                                <button onClick={() => { setEnrollmentAction('append'); setShowEnrollment(true); }} className="px-6 py-2.5 bg-white text-emerald-600 text-[11px] font-black rounded-xl shadow-md border border-emerald-100 hover:bg-emerald-50 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-2">
+                                                <button disabled={isInactive} onClick={() => { if (isInactive) return; setEnrollmentAction('append'); setShowEnrollment(true); }} className={`px-6 py-2.5 bg-white text-emerald-600 text-[11px] font-black rounded-xl shadow-md border border-emerald-100 transition-all uppercase tracking-widest flex items-center gap-2 ${isInactive ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-50 active:scale-95'}`}>
                                                     <PlusCircle size={14} />
                                                     নতুন যুক্ত
                                                 </button>

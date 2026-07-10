@@ -242886,3 +242886,5096 @@
   "isOwner": true
 }
 
+[2026-07-10T08:17:12.984Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:12.988Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:13.029Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:13.029Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:13.032Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:13.033Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:13.189Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:13.205Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:13.233Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:13.234Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:13.249Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:13.250Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:34.847Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:34.901Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:34.902Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:38.338Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:38.384Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:38.384Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:38.551Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:38.597Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:38.598Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:38.769Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:38.813Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:38.813Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:42.130Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:42.132Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:42.176Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:42.176Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:42.180Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:42.180Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:42.346Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:42.348Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:42.390Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:42.390Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:42.393Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:42.393Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:47.674Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:47.718Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:47.719Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:17:54.444Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "6a43c5ed5eb5cd370e930482",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c14410",
+    "email": "admin@edusy.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:17:54.491Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c14410"
+    ]
+  },
+  "userId": "6990835251ab03d764c14410"
+}
+
+[2026-07-10T08:17:54.492Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:18:11.562Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:18:11.582Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:18:11.609Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:18:11.610Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:18:11.636Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:18:11.637Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:18:11.818Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:18:11.862Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:18:11.863Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:18:12.819Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:18:12.867Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:18:12.867Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:18:14.731Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:18:14.777Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:18:14.777Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:18:24.913Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:18:24.961Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:18:24.961Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:25:17.780Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:25:17.781Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:25:17.835Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:25:17.836Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:25:17.838Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:25:17.838Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:25:18.012Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:25:18.056Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:25:18.057Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:25:18.265Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:25:18.312Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:25:18.312Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:34:44.320Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:34:44.365Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:34:44.367Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:34:49.710Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:34:49.754Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:34:49.754Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:35:19.333Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:35:19.337Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:35:19.386Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:35:19.387Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:35:19.389Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:35:19.389Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:35:19.781Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:35:19.829Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:35:19.829Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:35:19.853Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:35:19.927Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:35:19.927Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:35:41.239Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:35:41.287Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:35:41.287Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:35:45.112Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:35:45.157Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:35:45.157Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:28.329Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:28.338Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:28.375Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:28.376Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:28.386Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:28.387Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:32.076Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:32.078Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:32.122Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:32.122Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:32.123Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:32.124Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:33.784Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6b",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:33.793Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6b",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:33.828Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:33.829Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:33.841Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:33.841Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:36.853Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6c",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:36.854Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6c",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:36.899Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:36.899Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:36.900Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:36.901Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:40.112Z] GET list request details
+{
+  "classId": "69b2db39b66279e1d62673c3",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:40.114Z] GET list request details
+{
+  "classId": "69b2db39b66279e1d62673c3",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:40.158Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:40.158Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:40.161Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:40.161Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:42.258Z] GET list request details
+{
+  "classId": "69caa3d3d3e3cbc095f2fedf",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:42.259Z] GET list request details
+{
+  "classId": "69caa3d3d3e3cbc095f2fedf",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:42.305Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:42.306Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:42.307Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:42.307Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:44.071Z] GET list request details
+{
+  "classId": "69caa3dfd0aae32efdbedb65",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:44.100Z] GET list request details
+{
+  "classId": "69caa3dfd0aae32efdbedb65",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:44.116Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:44.116Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:44.150Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:44.150Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:48.129Z] GET list request details
+{
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:48.174Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:48.175Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:48.528Z] GET list request details
+{
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:48.573Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:48.574Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:54.257Z] Mark request details
+{
+  "studentId": "69caa9467e825994815e0980",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:54.299Z] Mark request details
+{
+  "studentId": "69ef025369306ef9655df93d",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:54.301Z] Mark request details
+{
+  "studentId": "69caa9457e825994815e097f",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:54.302Z] Mark request details
+{
+  "studentId": "69caa9457e825994815e097e",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:54.303Z] Mark request details
+{
+  "studentId": "69caa9467e825994815e0981",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:54.303Z] Mark request details
+{
+  "studentId": "69caa9477e825994815e0982",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:54.304Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:54.304Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:54.346Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:54.346Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:54.347Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:54.347Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:54.348Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:54.348Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:54.349Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:54.349Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:54.350Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:54.350Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.060Z] Mark request details
+{
+  "studentId": "69caa9447e825994815e097c",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.083Z] Mark request details
+{
+  "studentId": "69caa9437e825994815e097a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.085Z] Mark request details
+{
+  "studentId": "69caa9417e825994815e0978",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.086Z] Mark request details
+{
+  "studentId": "69caa9417e825994815e0977",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.087Z] Mark request details
+{
+  "studentId": "69caa9427e825994815e0979",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.087Z] Mark request details
+{
+  "studentId": "69caa9437e825994815e097b",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.105Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.105Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.130Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.130Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.134Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.134Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.135Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.135Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.136Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.136Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.137Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.137Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.797Z] Mark request details
+{
+  "studentId": "69caa9407e825994815e0975",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.798Z] Mark request details
+{
+  "studentId": "69caa93e7e825994815e0972",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.799Z] Mark request details
+{
+  "studentId": "69caa93f7e825994815e0974",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.801Z] Mark request details
+{
+  "studentId": "69caa93e7e825994815e0971",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.802Z] Mark request details
+{
+  "studentId": "69caa9407e825994815e0976",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.813Z] Mark request details
+{
+  "studentId": "69caa93d7e825994815e0970",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:55.841Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.842Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.843Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.843Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.844Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.844Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.846Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.847Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.847Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.847Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:55.858Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:55.859Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:56.476Z] Mark request details
+{
+  "studentId": "69caa93d7e825994815e096f",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:56.490Z] Mark request details
+{
+  "studentId": "69caa93c7e825994815e096d",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:56.493Z] Mark request details
+{
+  "studentId": "69caa93c7e825994815e096e",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:56.494Z] Mark request details
+{
+  "studentId": "6a24fb8e7a75ba0d8757ee64",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:56.496Z] Mark request details
+{
+  "studentId": "69ef025369306ef9655df93d",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:56.498Z] Mark request details
+{
+  "studentId": "69caa9477e825994815e0982",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:56.521Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:56.521Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:56.538Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:56.539Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:56.539Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:56.540Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:56.541Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:56.541Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:56.542Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:56.542Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:56.543Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:56.543Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.214Z] Mark request details
+{
+  "studentId": "69caa9467e825994815e0980",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.215Z] Mark request details
+{
+  "studentId": "69caa9457e825994815e097f",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.222Z] Mark request details
+{
+  "studentId": "69caa9467e825994815e0981",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.232Z] Mark request details
+{
+  "studentId": "69caa9457e825994815e097e",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.234Z] Mark request details
+{
+  "studentId": "69caa9437e825994815e097b",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.235Z] Mark request details
+{
+  "studentId": "69caa9447e825994815e097c",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.257Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.258Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.258Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.258Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.272Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.273Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.278Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.279Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.282Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.282Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.282Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.283Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.897Z] Mark request details
+{
+  "studentId": "69caa9437e825994815e097a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.906Z] Mark request details
+{
+  "studentId": "69caa9427e825994815e0979",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.907Z] Mark request details
+{
+  "studentId": "69caa9417e825994815e0978",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.919Z] Mark request details
+{
+  "studentId": "69caa9407e825994815e0976",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.920Z] Mark request details
+{
+  "studentId": "69caa9407e825994815e0975",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.921Z] Mark request details
+{
+  "studentId": "69caa9417e825994815e0977",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:57.942Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.943Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.950Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.950Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.952Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.952Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.966Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.966Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.970Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.970Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:57.971Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:57.971Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:58.572Z] Mark request details
+{
+  "studentId": "69caa93f7e825994815e0974",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:58.600Z] Mark request details
+{
+  "studentId": "69caa93e7e825994815e0971",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:58.601Z] Mark request details
+{
+  "studentId": "69caa93d7e825994815e0970",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:58.602Z] Mark request details
+{
+  "studentId": "69caa93d7e825994815e096f",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:58.603Z] Mark request details
+{
+  "studentId": "69caa93c7e825994815e096e",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:58.604Z] Mark request details
+{
+  "studentId": "69caa93e7e825994815e0972",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:58.616Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:58.616Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:58.647Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:58.648Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:58.649Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:58.649Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:58.652Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:58.652Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:58.653Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:58.654Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:58.655Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:58.655Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:59.221Z] Mark request details
+{
+  "studentId": "69caa93c7e825994815e096d",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:59.232Z] Mark request details
+{
+  "studentId": "6a24fb8e7a75ba0d8757ee64",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:38:59.266Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:59.267Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:38:59.279Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:38:59.279Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:39:10.267Z] Mark request details
+{
+  "studentId": "69caa93c7e825994815e096d",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:39:10.317Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:39:10.317Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:39:10.825Z] Mark request details
+{
+  "studentId": "69caa93c7e825994815e096d",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:39:10.869Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:39:10.869Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:39:12.414Z] GET list request details
+{
+  "classId": "69caa3e7d0aae32efdbedb66",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:39:12.459Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:39:12.459Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:39:17.894Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:39:17.946Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:39:17.947Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:52:11.332Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:52:11.333Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:52:11.377Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:52:11.377Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:52:11.379Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:52:11.380Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:52:11.540Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:52:11.589Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:52:11.589Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:52:12.766Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:52:12.813Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:52:12.813Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:52:23.308Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:52:23.356Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:52:23.356Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:52:54.402Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:52:54.475Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:52:54.476Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:52:59.554Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:52:59.599Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:52:59.599Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:58:46.084Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:58:46.127Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:58:46.168Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:58:46.169Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:58:46.214Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:58:46.214Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:58:46.551Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:58:46.609Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:58:46.609Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:58:46.840Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:58:46.886Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:58:46.886Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:59:18.618Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:59:18.630Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:59:18.662Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:59:18.663Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:59:18.678Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:59:18.679Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:59:18.833Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:59:18.879Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:59:18.879Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T08:59:19.330Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T08:59:19.382Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T08:59:19.384Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:14:21.896Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:14:21.954Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:14:21.955Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:14:27.515Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:14:27.567Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:14:27.567Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:06.315Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:06.361Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:06.361Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:06.460Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:06.514Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:06.514Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:10.027Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-11",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:10.074Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:10.075Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:10.505Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-11",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:10.550Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:10.551Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:10.799Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-11",
+  "status": "LATE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:10.860Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:10.860Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:11.302Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-11",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:11.348Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:11.348Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:12.733Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-12",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:12.778Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:12.779Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:13.315Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-12",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:13.363Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:13.364Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:13.727Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-12",
+  "status": "LATE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:13.775Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:13.775Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:14.260Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-12",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:14.307Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:14.309Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:15.181Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:15.227Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:15.227Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:15.614Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:15.660Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:15.660Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:15.956Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "LATE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:16.012Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:16.012Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:16.455Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:16.501Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:16.502Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:17.668Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:17.716Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:17.716Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:17.967Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:18.012Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:18.013Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:18.423Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "LATE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:18.468Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:18.468Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:18.979Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:19.025Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:19.026Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:19.662Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-14",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:19.708Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:19.708Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:20.160Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-14",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:20.205Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:20.206Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:20.691Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-14",
+  "status": "LATE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:21.011Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:21.011Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:21.253Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-14",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:21.300Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:21.301Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:22.162Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-15",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:22.208Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:22.208Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:22.693Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-15",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:22.742Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:22.742Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:23.190Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-15",
+  "status": "LATE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:23.240Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:23.240Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:18:23.657Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-15",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:18:23.717Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:18:23.718Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:19:20.817Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-10",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:19:20.863Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:19:20.863Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:19:21.197Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:19:21.243Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:19:21.243Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:23:44.010Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:23:44.013Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:23:44.057Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:23:44.057Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:23:44.059Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:23:44.060Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:28:57.523Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:28:57.539Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:28:57.569Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:28:57.569Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:28:57.586Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:28:57.586Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:28:58.162Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:28:58.249Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:28:58.249Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T09:28:58.780Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T09:28:58.825Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T09:28:58.826Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:00:28.264Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-15",
+  "status": "LEAVE_PENDING",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:00:28.266Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-11",
+  "status": "LEAVE_PENDING",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:00:28.267Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-16",
+  "status": "LEAVE_PENDING",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:00:28.268Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-14",
+  "status": "LEAVE_PENDING",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:00:28.269Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-12",
+  "status": "LEAVE_PENDING",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:00:28.313Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:00:28.314Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:00:28.315Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:00:28.315Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:00:28.316Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:00:28.316Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:00:28.317Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:00:28.317Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:00:28.988Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:00:28.988Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:00:28.989Z] Mark request details
+{
+  "studentId": "69caa1a77e825994815e0930",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cbc53c1983f18febd69",
+  "dateString": "2026-07-13",
+  "status": "LEAVE_PENDING",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:00:29.088Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:00:29.088Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:00:32.756Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:00:32.802Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:00:32.802Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:04:07.283Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:04:07.289Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T10:04:07.333Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:04:07.333Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T10:04:07.335Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T10:04:07.335Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T13:42:28.312Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T13:42:28.364Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T13:42:28.364Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T13:42:33.455Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T13:42:33.501Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T13:42:33.501Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T13:43:02.753Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T13:43:02.798Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T13:43:02.798Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T13:49:42.950Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T13:49:42.997Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T13:49:42.998Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:07:29.930Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:07:29.934Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:07:29.977Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:07:29.977Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:07:29.982Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:07:29.982Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:07:30.145Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:07:30.190Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:07:30.191Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:07:30.389Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:07:30.435Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:07:30.436Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:09:04.957Z] GET list request details
+{
+  "classId": "69b03cbc53c1983f18febd69",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:09:05.004Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:09:05.004Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:09:07.650Z] GET list request details
+{
+  "classId": "",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:09:07.697Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:09:07.697Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:12:42.276Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:12:42.278Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:12:42.323Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:12:42.324Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:12:42.326Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:12:42.326Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:15:50.319Z] Mark request details
+{
+  "studentId": "69cb35c57e825994815e0a89",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cf453c1983f18febd6a",
+  "dateString": "2026-07-10",
+  "status": "PRESENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:15:50.366Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:15:50.366Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:15:51.545Z] Mark request details
+{
+  "studentId": "69cb35c57e825994815e0a89",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cf453c1983f18febd6a",
+  "dateString": "2026-07-10",
+  "status": "LEAVE",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:15:51.593Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:15:51.593Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:15:52.164Z] Mark request details
+{
+  "studentId": "69cb35c57e825994815e0a89",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "classId": "69b03cf453c1983f18febd6a",
+  "dateString": "2026-07-10",
+  "status": "ABSENT",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:15:52.211Z] Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:15:52.211Z] isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:34:50.247Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:34:50.250Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:34:50.294Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:34:50.294Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:34:50.295Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:34:50.295Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:34:50.470Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:34:50.515Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:34:50.515Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:34:50.560Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:34:50.604Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:34:50.604Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:35:17.476Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:35:17.480Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:35:17.526Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:35:17.526Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:35:17.528Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:35:17.528Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:35:17.690Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": "2026-07-10",
+  "month": null,
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:35:17.748Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:35:17.748Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-07-10T14:35:17.939Z] GET list request details
+{
+  "classId": "69b03cf453c1983f18febd6a",
+  "instituteId": "69b03c35b2ae6e1d28ae2137",
+  "dateString": null,
+  "month": "2026-07",
+  "sessionUser": {
+    "id": "69b03aa4a7d9d04cb964ccd0",
+    "email": "hmdselim10@gmill.com",
+    "role": "ADMIN"
+  }
+}
+
+[2026-07-10T14:35:18.043Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "69b03aa4a7d9d04cb964ccd0"
+    ]
+  },
+  "userId": "69b03aa4a7d9d04cb964ccd0"
+}
+
+[2026-07-10T14:35:18.043Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
