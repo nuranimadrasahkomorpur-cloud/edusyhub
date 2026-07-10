@@ -82,7 +82,7 @@ function GuardianShareContent() {
 
   const entries = diary.entries || {};
   const currentEntries = entries[dateStr || ""] || {};
-  const config = diary.config as Array<{ className: string; books: Array<{ id: string; name: string }> }>;
+  const config = (Array.isArray(diary.config) ? diary.config : []) as Array<{ className: string; books: Array<{ id: string; name: string }> }>;
   const allowedClasses = config.map(c => c.className);
 
   const formattedDate = dateStr 

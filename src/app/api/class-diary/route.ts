@@ -35,32 +35,49 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Missing required fields' }, { status: 400 });
         }
 
-        const data = {
-            instituteId,
-            userId,
-            name,
-            startDate,
-            type,
-            config: config || {},
-            entries: entries || {},
-            holidays: holidays || [],
-            teacherLinks: teacherLinks || [],
-            publishTime,
-            logTypes: logTypes || [],
-            coverTemplate,
-            targetClass: targetClass || [],
-            targetDates: targetDates || [],
-            printSettings: printSettings || {}
-        };
-
         let diary;
         if (id) {
+            // Partial update: only include fields that are explicitly provided
+            const updateData: any = {};
+            if (instituteId !== undefined) updateData.instituteId = instituteId;
+            if (userId !== undefined) updateData.userId = userId;
+            if (name !== undefined) updateData.name = name;
+            if (startDate !== undefined) updateData.startDate = startDate;
+            if (type !== undefined) updateData.type = type;
+            if (config !== undefined) updateData.config = config;
+            if (entries !== undefined) updateData.entries = entries;
+            if (holidays !== undefined) updateData.holidays = holidays;
+            if (teacherLinks !== undefined) updateData.teacherLinks = teacherLinks;
+            if (publishTime !== undefined) updateData.publishTime = publishTime;
+            if (logTypes !== undefined) updateData.logTypes = logTypes;
+            if (coverTemplate !== undefined) updateData.coverTemplate = coverTemplate;
+            if (targetClass !== undefined) updateData.targetClass = targetClass;
+            if (targetDates !== undefined) updateData.targetDates = targetDates;
+            if (printSettings !== undefined) updateData.printSettings = printSettings;
+
             // @ts-ignore
             diary = await prisma.classDiary.update({
                 where: { id },
-                data,
+                data: updateData,
             });
         } else {
+            const data = {
+                instituteId,
+                userId,
+                name,
+                startDate,
+                type,
+                config: config || {},
+                entries: entries || {},
+                holidays: holidays || [],
+                teacherLinks: teacherLinks || [],
+                publishTime,
+                logTypes: logTypes || [],
+                coverTemplate,
+                targetClass: targetClass || [],
+                targetDates: targetDates || [],
+                printSettings: printSettings || {}
+            };
             // @ts-ignore
             diary = await prisma.classDiary.create({
                 data,

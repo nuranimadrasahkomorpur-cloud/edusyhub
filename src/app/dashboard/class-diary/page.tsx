@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import Toast from '@/components/Toast';
 import {
   Plus as FiPlus,
   Trash2 as FiTrash2,
@@ -31,6 +32,30 @@ import {
   Search as FiSearch,
   Settings as FiSettings,
 } from "lucide-react";
+
+// Helper to safely parse config since Prisma sometimes returns JSON arrays as objects with numeric keys
+export const parseDiaryConfig = (config: any): Array<any> => {
+  if (!config) return [];
+  if (Array.isArray(config)) return config;
+  if (typeof config === "string") {
+    try {
+      const parsed = JSON.parse(config);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  if (typeof config === "object") {
+    // Check if it's an array-like object from Prisma
+    const vals = Object.values(config);
+    if (vals.length > 0 && typeof vals[0] === "object" && vals[0] !== null && "className" in (vals[0] as any)) {
+      return vals;
+    }
+    return [];
+  }
+  return [];
+};
+
 import EdusyModal from "@/components/Modal";
 import PrintPreviewModal from "./_components/PrintPreviewModal";
 import AdminDiaryDetailedView from "./_components/AdminDiaryDetailedView";
@@ -160,11 +185,15 @@ const useDeleteClassDiaryMutation = () => {
   return [deleteDiary, { isLoading: false }] as const;
 };
 
+let showToast: (msg: string, type: 'success' | 'error' | 'info') => void = () => {};
+
 const toast = {
-  success: (msg: string) => alert(msg),
-  error: (msg: string) => alert(msg),
-  info: (msg: string) => alert(msg),
-  warning: (msg: string) => alert(msg),
+  success: (msg: string) => showToast(msg, 'success'),
+  error: (msg: string) => showToast(msg, 'error'),
+  info: (msg: string) => showToast(msg, 'info'),
+  warning: (msg: string) => showToast(msg, 'info'),
+  loading: (msg: string) => { showToast(msg, 'info'); return 1; },
+  dismiss: (id?: any) => {},
 };
 // -------------------------------------
 
@@ -537,13 +566,21 @@ export default function ClassDiaryPage() {
   // Edit Diary State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDiary, setEditingDiary] = useState<any>(null);
+  
+  const [toastMsg, setToastMsg] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
+
+  useEffect(() => {
+    showToast = (message, type) => {
+      setToastMsg({ message, type });
+    };
+  }, []);
   const [editDiaryName, setEditDiaryName] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editTemplate, setEditTemplate] = useState("moleskine");
 
   // Step 2 query (only active when step === 2 and selectedInsId is set)
   const { data: resultSyncData, isLoading: isResultLoading } = useGetResultSyncQuery(selectedInsId, {
-    skip: step !== 2 || !selectedInsId,
+    skip: !selectedInsId,
   });
 
   // Selected books configuration state: Record<className, Array<bookId>>
@@ -660,8 +697,9 @@ export default function ClassDiaryPage() {
 
   // Load configured classes for the active diary
   const activeDiaryClasses = useMemo(() => {
-    if (!activeDiary?.config) return [];
-    return activeDiary.config as Array<{ className: string; books: Array<{ id: string; name: string }> }>;
+    const parsed = parseDiaryConfig(activeDiary?.config);
+    if (!parsed || parsed.length === 0) return [];
+    return parsed as Array<{ className: string; books: Array<{ id: string; name: string }> }>;
   }, [activeDiary]);
 
   // Persist printSettings to localStorage on change
@@ -730,7 +768,7 @@ export default function ClassDiaryPage() {
       datesToFetch = getDatesInRange(range.start, range.end);
     }
 
-    const classesList = d.config || [];
+    const classesList = parseDiaryConfig(d.config);
     classesList.forEach((c: any) => {
       c.books.forEach((b: any) => {
         const mergedLog: Record<string, string> = {};
@@ -827,7 +865,6 @@ export default function ClassDiaryPage() {
     return resultSyncData.data.books;
   }, [resultSyncData]);
 
-  // Map resultClass array
   const syncedClasses = useMemo(() => {
     return resultSyncData?.data?.classes || [];
   }, [resultSyncData]);
@@ -838,7 +875,7 @@ export default function ClassDiaryPage() {
     setDiaryName("");
     setStartDate(new Date().toISOString().split("T")[0]);
     setDiaryType("daily");
-    setSelectedInsId(institutes?.[0]?.id || "");
+    setSelectedInsId(sessionActiveInstitute?.id || institutes?.[0]?.id || "");
     setSelectedConfig({});
     setDiaryTemplate("moleskine");
     setIsCreateModalOpen(true);
@@ -967,7 +1004,7 @@ export default function ClassDiaryPage() {
     setIsEditing(false);
     setActiveInputBookId(null);
     setInputText("");
-    const classesList = diary.config || [];
+    const classesList = parseDiaryConfig(diary.config);
     if (classesList.length > 0) {
       setActiveTabClass(classesList[0].className);
     }
@@ -1327,7 +1364,7 @@ export default function ClassDiaryPage() {
     setTeacherConfig({});
     setGeneratedTeacherLink("");
     setTeacherLinkQr("");
-    const classes = activeDiary.config as Array<{ className: string; books: any[] }>;
+    const classes = parseDiaryConfig(activeDiary.config) as Array<{ className: string; books: any[] }>;
     setActiveTeacherClassTab(classes?.[0]?.className || "");
     setShowTeacherShareModal(true);
   };
@@ -1592,7 +1629,8 @@ export default function ClassDiaryPage() {
           ) : filteredDiaries.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-5 sm:gap-6 md:gap-8 justify-items-center sm:justify-items-start">
               {filteredDiaries.map((diary: any) => {
-                const totalClasses = diary.config?.length || 0;
+                const parsedConfig = parseDiaryConfig(diary.config);
+                const totalClasses = parsedConfig.length;
                 const template = diary.entries?._meta?.coverTemplate || diary.coverTemplate || "moleskine";
                 const templateType = template.startsWith("spiral") ? "spiral" : "moleskine";
                 const templateColor = template.split("-")[1] || "default";
@@ -1802,6 +1840,60 @@ export default function ClassDiaryPage() {
             }
           }}
           diaryMode={diaryMode}
+          onLoadDefaultConfig={async () => {
+            if (!activeDiary?.instituteId) {
+              toast.error("প্রতিষ্ঠান নির্বাচন করা নেই!");
+              return;
+            }
+            const toastId = toast.loading("ডিফল্ট শ্রেণী লোড হচ্ছে...");
+            try {
+              const [cRes, bRes] = await Promise.all([
+                fetch(`/api/admin/classes?instituteId=${activeDiary.instituteId}`).then(r => r.json()),
+                fetch(`/api/admin/books?instituteId=${activeDiary.instituteId}`).then(r => r.json())
+              ]);
+              const classes = cRes.data || cRes.classes || cRes || [];
+              const books = bRes.data || bRes.books || bRes || [];
+
+              if (classes.length === 0) {
+                toast.error("প্রতিষ্ঠান থেকে ডেটা লোড করা সম্ভব হয়নি!");
+                toast.dismiss(toastId);
+                return;
+              }
+
+              const configData: Array<{ className: string; books: Array<{ id: string; name: string }> }> = [];
+              classes.forEach((cls: any) => {
+                const classBooks = books.filter((b: any) => b.classId === cls.id);
+                if (classBooks.length > 0) {
+                  configData.push({
+                    className: cls.name,
+                    books: classBooks.map((b: any) => ({ id: b.id, name: b.name }))
+                  });
+                }
+              });
+              
+              if (configData.length === 0) {
+                toast.error("প্রতিষ্ঠানে কোনো শ্রেণী বা বিষয় যুক্ত করা নেই!");
+                toast.dismiss(toastId);
+                return;
+              }
+
+              await saveDiary({
+                id: activeDiary.id,
+                name: activeDiary.name,
+                startDate: activeDiary.startDate,
+                type: activeDiary.type,
+                instituteId: activeDiary.instituteId,
+                config: configData,
+              }).unwrap();
+              
+              toast.dismiss(toastId);
+              toast.success("সকল শ্রেণী ও বিষয় সফলভাবে যুক্ত হয়েছে!");
+              refetchDiaries();
+            } catch (err: any) {
+              toast.dismiss(toastId);
+              toast.error(err.message || "শ্রেণী লোড করতে ব্যর্থ হয়েছে");
+            }
+          }}
           headerActions={
             <div className="flex flex-row overflow-x-auto lg:overflow-x-visible whitespace-nowrap gap-2 items-center w-full lg:w-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-1 px-4 lg:px-0 -mx-4 lg:mx-0">
               {/* Holiday button */}
@@ -1837,7 +1929,7 @@ export default function ClassDiaryPage() {
                   setTeacherConfig({});
                   setGeneratedTeacherLink("");
                   setTeacherLinkQr("");
-                  const classes = activeDiary.config as Array<{ className: string; books: any[] }>;
+                  const classes = parseDiaryConfig(activeDiary.config) as Array<{ className: string; books: any[] }>;
                   setActiveTeacherClassTab(classes?.[0]?.className || "");
                   
                   setShareModalTab("guardian");
@@ -2865,8 +2957,8 @@ export default function ClassDiaryPage() {
         className="z-[9999]"
         modalComponent={
           (() => {
-            const diaryConfig = (activeDiary?.config as Array<{ className: string; books: Array<{ id: string; name: string }> }>) || [];
-            const activeClassData = diaryConfig.find((c) => c.className === activeTeacherClassTab);
+            const diaryConfig = parseDiaryConfig(activeDiary?.config);
+            const activeClassData = diaryConfig.find((c: any) => c.className === activeTeacherClassTab);
             const activeBooks = activeClassData?.books || [];
             const totalSelected = Object.values(teacherConfig).reduce((sum, arr) => sum + arr.length, 0);
 
@@ -2987,7 +3079,7 @@ export default function ClassDiaryPage() {
                     {teacherModalTab === "create" && (
                       <div className="border-y border-gray-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/50 -mx-6">
                         <div className="flex gap-1.5 overflow-x-auto px-6 py-2.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none">
-                          {diaryConfig.map((cls) => {
+                          {diaryConfig.map((cls: any) => {
                             const selCount = (teacherConfig[cls.className] || []).length;
                             const isActive = cls.className === activeTeacherClassTab;
                             return (
@@ -3038,7 +3130,7 @@ export default function ClassDiaryPage() {
 
                             {/* Book grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                              {activeBooks.map((book) => {
+                              {activeBooks.map((book: any) => {
                                 const isSelected = (teacherConfig[activeTeacherClassTab] || []).includes(book.id);
                                 return (
                                   <label
@@ -3337,6 +3429,40 @@ export default function ClassDiaryPage() {
               >
                 {isSavingDiary ? "সংরক্ষণ করা হচ্ছে..." : "পরিবর্তন সেভ করুন"}
               </Button>
+            </div>
+          </div>
+        }
+      />
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <ModalLayout
+        isOpen={isDeleteModalOpen}
+        onChange={() => setIsDeleteModalOpen(false)}
+        title="ডায়েরি মুছে ফেলুন"
+        description="আপনি কি নিশ্চিত যে এই ডায়েরিটি মুছে ফেলতে চান?"
+        modalSize="md"
+        className="z-[9999]"
+        modalComponent={
+          <div className="flex flex-col gap-6 py-4 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/30">
+              <FiTrash2 className="h-8 w-8 text-rose-600 dark:text-rose-400" />
+            </div>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
+              এই ডায়েরিটি মুছে ফেললে এর সকল লগ এবং ডেটা স্থায়ীভাবে মুছে যাবে। এটি আর ফেরত পাওয়া যাবে না।
+            </p>
+            <div className="flex justify-center gap-4 mt-2">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="rounded-xl border border-gray-300 dark:border-slate-600 px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
+              >
+                বাতিল করুন
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="rounded-xl bg-rose-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-rose-700 shadow-md shadow-rose-100"
+              >
+                মুছে ফেলুন
+              </button>
             </div>
           </div>
         }
@@ -4178,6 +4304,8 @@ export default function ClassDiaryPage() {
         }
       />
 
+      {/* TOAST MESSAGE */}
+      {toastMsg && <Toast message={toastMsg.message} type={toastMsg.type} onClose={() => setToastMsg(null)} />}
     </div>
   );
 }

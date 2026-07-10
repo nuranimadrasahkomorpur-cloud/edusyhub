@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import Toast from '@/components/Toast';
 import {
   Book as FiBook,
   Send as FiSend,
@@ -29,15 +30,39 @@ import ModalLayout from "@/components/Modal";
 import CheckupModal from "./CheckupModal";
 import { useSession } from '@/components/SessionProvider';
 
-// --- Polyfills for Easy-Q dependencies ---
+let showToast: (msg: string, type: 'success' | 'error' | 'info') => void = () => {};
+
 const toast = {
-  success: (msg: string) => alert(msg),
-  error: (msg: string) => alert(msg),
-  info: (msg: string) => alert(msg),
-  warning: (msg: string) => alert(msg),
-  loading: (msg: string) => { alert(msg); return 1; },
+  success: (msg: string) => showToast(msg, 'success'),
+  error: (msg: string) => showToast(msg, 'error'),
+  info: (msg: string) => showToast(msg, 'info'),
+  warning: (msg: string) => showToast(msg, 'info'),
+  loading: (msg: string) => { showToast(msg, 'info'); return 1; },
   dismiss: (id?: any) => {},
 };
+
+// Helper to safely parse config since Prisma sometimes returns JSON arrays as objects with numeric keys
+const parseDiaryConfig = (config: any): Array<any> => {
+  if (!config) return [];
+  if (Array.isArray(config)) return config;
+  if (typeof config === "string") {
+    try {
+      const parsed = JSON.parse(config);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  if (typeof config === "object") {
+    const vals = Object.values(config);
+    if (vals.length > 0 && typeof vals[0] === "object" && vals[0] !== null && "className" in (vals[0] as any)) {
+      return vals;
+    }
+    return [];
+  }
+  return [];
+};
+
 const updateMe = (data: any) => data;
 const authApi = { endpoints: { getMe: { initiate: () => ({ type: 'GET_ME' }) } } };
 const toBanglaNumber = (num: any) => num?.toString() || '';
@@ -296,6 +321,7 @@ interface AdminDiaryDetailedViewProps {
   onSave: (entries: any, logTypes?: any, targetClass?: string | string[], targetDates?: string[], updatedConfig?: any) => Promise<void>;
   headerActions?: React.ReactNode;
   diaryMode: "daily" | "weekly";
+  onLoadDefaultConfig?: () => void;
 }
 
 export default function AdminDiaryDetailedView({
@@ -306,6 +332,7 @@ export default function AdminDiaryDetailedView({
   onSave,
   headerActions,
   diaryMode,
+  onLoadDefaultConfig,
 }: AdminDiaryDetailedViewProps) {
   const { user } = useSession();
   const token = "";
@@ -316,13 +343,25 @@ export default function AdminDiaryDetailedView({
   const aiTokens = actualTokens;
   
   const [currentDiary, setCurrentDiary] = useState(diary);
+  const [toastMsg, setToastMsg] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
+
+  useEffect(() => {
+    showToast = (message, type) => {
+      setToastMsg({ message, type });
+    };
+  }, []);
+
+  // Sync state with parent prop changes
+  useEffect(() => {
+    setCurrentDiary(diary);
+  }, [diary]);
   const [selectedDate, setSelectedDate] = useState(initialDate || new Date().toISOString().split("T")[0]);
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [requiredCredits, setRequiredCredits] = useState(0);
 
 
   // Tabs config
-  const allowedClasses: string[] = useMemo(() => diary.config?.map((c: any) => c.className) || [], [diary.config]);
+  const allowedClasses: string[] = useMemo(() => parseDiaryConfig(diary.config).map((c: any) => c.className), [diary.config]);
   const [activeTabClass, setActiveTabClass] = useState(allowedClasses[0] || "");
 
   // Modal and composer states
@@ -348,7 +387,7 @@ export default function AdminDiaryDetailedView({
     Object.keys(classEntries).forEach((bookId) => {
       const log = classEntries[bookId];
       if (log?.notice) {
-        const bookName = bookId === 'CLASS_NOTICE' ? 'সাধারণ নোটিশ' : (diary.config?.find((c: any) => c.className === activeTabClass)?.books?.find((b: any) => b.id === bookId)?.name || "শ্রেণী নোটিশ");
+        const bookName = bookId === 'CLASS_NOTICE' ? 'সাধারণ নোটিশ' : (parseDiaryConfig(diary.config).find((c: any) => c.className === activeTabClass)?.books?.find((b: any) => b.id === bookId)?.name || "শ্রেণী নোটিশ");
         list.push({
           bookId,
           bookName,
@@ -582,8 +621,8 @@ export default function AdminDiaryDetailedView({
 
   // Filter books of the active tab className
   const activeClassBooks = useMemo(() => {
-    return (currentDiary.config as Array<{ className: string; books: any[] }>)?.find(
-      (c) => c.className === activeTabClass
+    return (parseDiaryConfig(currentDiary.config) as Array<{ className: string; books: any[] }>).find(
+      (c: any) => c.className === activeTabClass
     )?.books || [];
   }, [currentDiary, activeTabClass]);
 
@@ -824,8 +863,9 @@ export default function AdminDiaryDetailedView({
     }
 
     const targetClass = activeTabClass;
-    const className = diary.config?.find((c: any) => c.className === targetClass)?.className || targetClass;
-    const subjectName = diary.config?.find((c: any) => c.className === targetClass)?.books?.find((b: any) => b.id === bookId)?.name || bookId;
+    const configArray = parseDiaryConfig(diary.config);
+    const className = configArray.find((c: any) => c.className === targetClass)?.className || targetClass;
+    const subjectName = configArray.find((c: any) => c.className === targetClass)?.books?.find((b: any) => b.id === bookId)?.name || bookId;
 
     const selectedTypesData = logTypes.filter((t: any) => aiSelectedTaskTypes.includes(t.id));
     const content = inputText.replace(/<[^>]*>?/gm, ' ').replace(/&nbsp;/g, ' ').trim();
@@ -1057,7 +1097,7 @@ export default function AdminDiaryDetailedView({
       currentEntries[selectedDate][activeTabClass][bookId].isHidden = false;
     }
 
-    const updatedConfig = JSON.parse(JSON.stringify(currentDiary.config || []));
+    const updatedConfig = JSON.parse(JSON.stringify(parseDiaryConfig(currentDiary.config)));
     const classConfig = updatedConfig.find((c: any) => c.className === activeTabClass);
     if (classConfig) {
       const book = classConfig.books?.find((b: any) => b.id === bookId);
@@ -1085,7 +1125,7 @@ export default function AdminDiaryDetailedView({
         toast.success("বিষয়টি আজকের জন্য অফ করা হয়েছে!");
       }
     } else if (type === "permanent") {
-      const updatedConfig = JSON.parse(JSON.stringify(currentDiary.config || []));
+      const updatedConfig = JSON.parse(JSON.stringify(parseDiaryConfig(currentDiary.config)));
       const classConfig = updatedConfig.find((c: any) => c.className === activeTabClass);
       if (classConfig) {
         const book = classConfig.books?.find((b: any) => b.id === bookId);
@@ -1119,8 +1159,8 @@ export default function AdminDiaryDetailedView({
         let prevClassFound = false;
         for (let i = classIndex - 1; i >= 0; i--) {
           const prevClass = allowedClasses[i];
-          const prevClassBooks = (currentDiary.config as Array<{ className: string; books: any[] }>)?.find(
-            (c) => c.className === prevClass
+          const prevClassBooks = (parseDiaryConfig(currentDiary.config) as Array<{ className: string; books: any[] }>).find(
+            (c: any) => c.className === prevClass
           )?.books || [];
           
           if (prevClassBooks.length > 0) {
@@ -1159,8 +1199,8 @@ export default function AdminDiaryDetailedView({
         let nextClassFound = false;
         for (let i = classIndex + 1; i < allowedClasses.length; i++) {
           const nextClass = allowedClasses[i];
-          const nextClassBooks = (currentDiary.config as Array<{ className: string; books: any[] }>)?.find(
-            (c) => c.className === nextClass
+          const nextClassBooks = (parseDiaryConfig(currentDiary.config) as Array<{ className: string; books: any[] }>).find(
+            (c: any) => c.className === nextClass
           )?.books || [];
           
           if (nextClassBooks.length > 0) {
@@ -1252,7 +1292,7 @@ export default function AdminDiaryDetailedView({
             </div>
             <div className="p-3 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar flex-1">
               {allowedClasses.map((className: string) => {
-                const classConfig = diary.config?.find((c: any) => c.className === className);
+                const classConfig = parseDiaryConfig(diary.config).find((c: any) => c.className === className);
                 const classBooks = classConfig?.books || [];
                 const totalSubjects = classBooks.length;
                 let addedSubjects = 0;
@@ -2073,7 +2113,26 @@ export default function AdminDiaryDetailedView({
                 })}
               </div>
             ) : (
-              <div className="text-center py-10 text-gray-400 italic">শ্রেণী লোড হচ্ছে...</div>
+              <div className="flex flex-col items-center justify-center text-center py-12 px-4 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 my-10 mx-6">
+                <div className="h-16 w-16 bg-indigo-50 rounded-full flex items-center justify-center mb-4">
+                  <FiBookOpen className="h-8 w-8 text-indigo-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-700 mb-2">কোনো শ্রেণী বা বিষয় কনফিগার করা নেই</h3>
+                <p className="text-sm text-gray-500 mb-6 max-w-sm">
+                  এই ডায়েরিতে এখনো কোনো শ্রেণী বা বিষয় যুক্ত করা হয়নি। আপনি চাইলে প্রতিষ্ঠানের সকল শ্রেণী ও বিষয় এক ক্লিকে যুক্ত করতে পারেন।
+                </p>
+                {onLoadDefaultConfig ? (
+                  <button
+                    onClick={onLoadDefaultConfig}
+                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-100 transition-all active:scale-95"
+                  >
+                    <FiRefreshCw className="h-4 w-4" />
+                    <span>ডিফল্ট শ্রেণী ও বিষয়সমূহ লোড করুন</span>
+                  </button>
+                ) : (
+                  <div className="text-gray-400 italic">শ্রেণী লোড হচ্ছে...</div>
+                )}
+              </div>
             )}
           </div>
 
@@ -2471,8 +2530,8 @@ export default function AdminDiaryDetailedView({
                             onClick={() => {
                               setActiveTabClass(c);
                               setIsModalClassMenuOpen(false);
-                              const newClassBooks = ((currentDiary.config as Array<{ className: string; books: any[] }>)?.find(
-                                (cls) => cls.className === c
+                              const newClassBooks = ((parseDiaryConfig(currentDiary.config) as Array<{ className: string; books: any[] }>).find(
+                                (cls: any) => cls.className === c
                               )?.books || []).filter((b: any) => b.isPermanentlyHidden !== true);
                               if (newClassBooks.length > 0) {
                                 setActiveInputBookId(newClassBooks[0].id);
