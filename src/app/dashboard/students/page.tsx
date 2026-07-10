@@ -5461,9 +5461,9 @@ export default function StudentManagementPage() {
                                         <div
                                             className="fixed w-[200px] bg-white rounded-xl shadow-2xl border border-slate-100 py-1 z-[999999] overflow-y-auto max-h-[70vh] custom-scrollbar text-slate-700 animate-in fade-in zoom-in duration-100"
                                             style={{
-                                                top: menuPosition.top !== undefined ? `${menuPosition.top}px` : undefined,
-                                                bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom}px` : undefined,
-                                                left: `${menuPosition.left}px`
+                                                top: menuPosition?.top !== undefined ? `${menuPosition.top}px` : undefined,
+                                                bottom: menuPosition?.bottom !== undefined ? `${menuPosition.bottom}px` : undefined,
+                                                left: menuPosition?.left !== undefined ? `${menuPosition.left}px` : undefined
                                             }}
                                         >
                                             <button
