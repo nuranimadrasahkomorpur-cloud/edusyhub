@@ -59,13 +59,13 @@ interface StudentProfileModalProps {
     student: any;
     onEdit?: (student: any, context?: any) => void;
     onUpdate?: () => void;
-    initialTab?: 'fees' | 'attendance' | 'assignments' | 'login' | 'face' | 'qr';
+    initialTab?: 'info' | 'fees' | 'attendance' | 'assignments' | 'login' | 'face' | 'qr';
 }
 
 export default function StudentProfileModal({ isOpen, onClose, student, onEdit, onUpdate, initialTab }: StudentProfileModalProps) {
     const { activeInstitute, user: currentUser, activeRole, login } = useSession();
     const { alert, confirm } = useUI();
-    const [activeTab, setActiveTab] = useState<'fees' | 'attendance' | 'assignments' | 'login' | 'face' | 'qr'>(initialTab || 'fees');
+    const [activeTab, setActiveTab] = useState<'info' | 'fees' | 'attendance' | 'assignments' | 'login' | 'face' | 'qr'>(initialTab || 'fees');
     const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
     const [showTierSettings, setShowTierSettings] = useState(false);
     const [showEnrollment, setShowEnrollment] = useState(false);
