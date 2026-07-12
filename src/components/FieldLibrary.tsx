@@ -58,7 +58,7 @@ export const POSSIBLE_FIELDS: FieldDefinition[] = [
     { id: 'hobby', label: 'শখ', type: 'text', category: 'মৌলিক তথ্য', icon: HeartPulse, placeholder: 'যেমন: বই পড়া, বাগান করা' },
 
     // Identity
-    { id: 'dob', label: 'জন্ম তারিখ', type: 'date', category: 'পরিচয়', icon: Calendar, required: true },
+    { id: 'dob', label: 'জন্ম তারিখ', type: 'date', category: 'পরিচয়', icon: Calendar },
     { id: 'birthRegNo', label: 'জন্ম নিবন্ধন নম্বর', type: 'text', category: 'পরিচয়', icon: Fingerprint, placeholder: '১৭ ডিজিটের নম্বর' },
     { id: 'nid', label: 'এনআইডি নম্বর (প্রযোজ্য ক্ষেত্রে)', type: 'text', category: 'পরিচয়', icon: Fingerprint, placeholder: 'জাতীয় পরিচয়পত্র নম্বর' },
     { id: 'residentialStatus', label: 'আবাসিক অবস্থা', type: 'select', category: 'পরিচয়', options: ['আবাসিক', 'অনাবাসিক'], icon: Building2 },
@@ -76,8 +76,8 @@ export const POSSIBLE_FIELDS: FieldDefinition[] = [
     { id: 'district', label: 'জেলা', type: 'text', category: 'যোগাযোগ', icon: MapPin, placeholder: 'জেলার নাম' },
 
     // Guardian Info
-    { id: 'guardianName', label: 'অভিভাবকের নাম', type: 'text', category: 'অভিভাবক তথ্য', icon: UsersIcon, placeholder: 'অভিভাবকের নাম', required: true },
-    { id: 'guardianRelation', label: 'সম্পর্ক', type: 'select', category: 'অভিভাবক তথ্য', options: ['বাবা', 'মা', 'ভাই', 'বোন', 'চাচা', 'মামা', 'অন্যান্য'], icon: UsersIcon, required: true },
+    { id: 'guardianName', label: 'অভিভাবকের নাম', type: 'text', category: 'অভিভাবক তথ্য', icon: UsersIcon, placeholder: 'অভিভাবকের নাম' },
+    { id: 'guardianRelation', label: 'সম্পর্ক', type: 'select', category: 'অভিভাবক তথ্য', options: ['বাবা', 'মা', 'ভাই', 'বোন', 'চাচা', 'মামা', 'অন্যান্য'], icon: UsersIcon },
     { id: 'guardianPhone', label: 'অভিভাবকের মোবাইল (লগইন আইডি - ঐচ্ছিক)', type: 'text', category: 'অভিভাবক তথ্য', icon: Smartphone, placeholder: 'লগইন আইডি হিসেবে ব্যবহার হবে' },
     { id: 'guardianNid', label: 'অভিভাবকের এনআইডি', type: 'text', category: 'অভিভাবক তথ্য', icon: Fingerprint, placeholder: 'এনআইডি নম্বর' },
     { id: 'guardianOccupation', label: 'অভিভাবকের পেশা', type: 'text', category: 'অভিভাবক তথ্য', icon: Briefcase, placeholder: 'যেমন: শিক্ষক, ব্যবসায়ী' },

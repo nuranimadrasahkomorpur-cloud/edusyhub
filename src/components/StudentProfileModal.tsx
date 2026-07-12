@@ -652,6 +652,7 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
     };
 
     const tabs = [
+        { id: 'info', label: 'সাধারণ তথ্য', icon: User },
         { id: 'fees', label: 'ফি', icon: CreditCard },
         { id: 'attendance', label: 'উপস্থিতি', icon: Calendar },
         { id: 'assignments', label: 'ক্লাস ডাইরি', icon: BookOpen },
@@ -772,6 +773,56 @@ export default function StudentProfileModal({ isOpen, onClose, student, onEdit, 
 
                     {/* Tab Content */}
                     <div className="p-6 font-bengali">
+                        {activeTab === 'info' && (
+                            <div className="space-y-6 animate-fade-in font-bengali">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">পিতার নাম</p>
+                                        <p className="text-sm font-bold text-slate-800">{student.metadata?.fathersName || 'নেই'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">মাতার নাম</p>
+                                        <p className="text-sm font-bold text-slate-800">{student.metadata?.mothersName || 'নেই'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">পিতার মোবাইল</p>
+                                        <p className="text-sm font-bold text-slate-800">{student.metadata?.fathersPhone || 'নেই'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">মাতার মোবাইল</p>
+                                        <p className="text-sm font-bold text-slate-800">{student.metadata?.mothersPhone || 'নেই'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 md:col-span-2 hover:border-slate-200 transition-colors">
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">বর্তমান ঠিকানা</p>
+                                        <p className="text-sm font-bold text-slate-800 whitespace-pre-wrap">{student.metadata?.presentAddress || 'নেই'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 md:col-span-2 hover:border-slate-200 transition-colors">
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">স্থায়ী ঠিকানা</p>
+                                        <p className="text-sm font-bold text-slate-800 whitespace-pre-wrap">{student.metadata?.permanentAddress || 'নেই'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">ভর্তির তারিখ</p>
+                                        <p className="text-sm font-bold text-slate-800">
+                                            {student.metadata?.admissionDate 
+                                                ? new Date(student.metadata.admissionDate).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })
+                                                : new Date(student.createdAt).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                        </p>
+                                    </div>
+                                    {student.metadata?.guardianName && (
+                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">অন্যান্য অভিভাবকের নাম</p>
+                                            <p className="text-sm font-bold text-slate-800">{student.metadata.guardianName}</p>
+                                        </div>
+                                    )}
+                                    {student.metadata?.guardianRelation && (
+                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
+                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">সম্পর্ক</p>
+                                            <p className="text-sm font-bold text-slate-800">{student.metadata.guardianRelation}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         {activeTab === 'fees' && (
                             <div className="space-y-6 animate-fade-in">
 

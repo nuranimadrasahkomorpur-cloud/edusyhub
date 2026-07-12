@@ -333,21 +333,9 @@ export async function GET(req: Request) {
 
         if (lightweight && role === 'STUDENT') {
             projectStage = {
-                name: 1,
-                email: 1,
-                phone: 1,
-                role: 1,
-                updatedAt: 1,
-                createdAt: 1,
-                'metadata.classId': 1,
-                'metadata.groupId': 1,
-                'metadata.studentId': 1,
-                'metadata.rollNumber': 1,
-                'metadata.phone': 1,
-                'metadata.guardianPhone': 1,
-                'metadata.status': 1,
-                'metadata.feeTier': 1,
-                'metadata.guardianId': 1
+                faceDescriptor: 0,
+                'metadata.faceDescriptors': 0,
+                institutes: 0
             };
         }
 
@@ -680,8 +668,17 @@ export async function PATCH(req: Request) {
         if (name) set.name = name;
         if (phone) set.phone = phone;
 
-        // Safely construct the updated metadata to avoid Mongo path conflicts
-        let updatedMetadata = { ...(metadata || {}) };
+        const existingUserRaw = await (prisma as any).$runCommandRaw({
+            find: 'User',
+            filter: { _id: { $oid: id } },
+            limit: 1,
+            projection: { metadata: 1 }
+        });
+        const existingUser = existingUserRaw.cursor?.firstBatch?.[0];
+        const existingMetadata = existingUser?.metadata || {};
+
+        // Safely construct the updated metadata merging with existing to avoid wiping fields
+        let updatedMetadata = { ...existingMetadata, ...(metadata || {}) };
         
         if (password) {
             // Hash the password for DB security

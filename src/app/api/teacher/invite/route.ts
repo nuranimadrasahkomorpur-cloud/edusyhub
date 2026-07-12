@@ -12,12 +12,17 @@ export async function POST(request: Request) {
         }
 
         // 1. Check if User exists
+        const orConditions = [];
+        if (email) orConditions.push({ email: email });
+        if (phone) orConditions.push({ phone: phone });
+
+        if (orConditions.length === 0) {
+            return NextResponse.json({ error: 'Email or Phone is required to find or create a user' }, { status: 400 });
+        }
+
         let user = await prisma.user.findFirst({
             where: {
-                OR: [
-                    { email: email },
-                    { phone: phone }
-                ]
+                OR: orConditions
             }
         });
 

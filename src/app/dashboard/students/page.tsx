@@ -1777,8 +1777,8 @@ export default function StudentManagementPage() {
                 skipAccountSetup: shouldSkipAccount,
                 faceDescriptor: finalFaceDescriptor,
                 metadata: editingStudent?.metadata?.admissionStatus === 'PENDING'
-                    ? { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Admission)', reason: 'প্রবেশাধিকার (Admission)' }] }
-                    : (editingStudent ? { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount } : { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount, admissionStatus: 'APPROVED', admissionDate: new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Creation)', reason: 'প্রবেশাধিকার (Admission)' }] }),
+                    ? { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount, admissionStatus: 'APPROVED', admissionDate: cleanedMetadata.admissionDate || new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Admission)', reason: 'প্রবেশাধিকার (Admission)' }] }
+                    : (editingStudent ? { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount } : { ...cleanedMetadata, skipAccountSetup: shouldSkipAccount, admissionStatus: 'APPROVED', admissionDate: cleanedMetadata.admissionDate || new Date().toISOString(), status: 'ACTIVE', statusLastChangedAt: new Date().toISOString(), statusHistory: [{ status: 'ACTIVE', timestamp: new Date().toISOString(), changedBy: currentUser?.name || 'System (Creation)', reason: 'প্রবেশাধিকার (Admission)' }] }),
                 instituteIds: editingStudent ? undefined : [activeInstitute.id] // only for POST
             };
 
@@ -4739,9 +4739,9 @@ export default function StudentManagementPage() {
 
                                         const isSectionComplete = (section: string) => {
                                             switch (section) {
-                                                case 'basic': return !!(formData.name && formData.metadata?.dob && formData.metadata?.gender && formData.metadata?.religion);
+                                                case 'basic': return !!(formData.name && formData.metadata?.gender && formData.metadata?.religion);
                                                 case 'academic': return !!(formData.metadata?.classId);
-                                                case 'guardian': return !!((formData.metadata?.fatherName || formData.metadata?.motherName || formData.metadata?.guardianName) && formData.metadata?.guardianPhone);
+                                                case 'guardian': return true;
                                                 case 'address': return !!(formData.metadata?.presentAddress && formData.metadata?.permanentAddress);
                                                 case 'fees': return true;
                                                 case 'other': return true;

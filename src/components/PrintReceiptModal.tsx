@@ -255,7 +255,7 @@ export default function PrintReceiptModal({ transaction, onClose }: PrintReceipt
                 date=""
                 pageSize="A5"
                 previewOnly={isPreview}
-                hideLogo={true}
+                hideLogo={false}
                 footerCenterContent={qrCodeContent}
                 pagePadding={24}
             >

@@ -87,11 +87,10 @@ export default function PublicLedgerPage({ params }: { params: { studentId: stri
                     
                     // Fetch institute data to get the logo/name if needed.
                     if (firstTx.instituteId) {
-                        const instRes = await fetch(`/api/admin/institutes?id=${firstTx.instituteId}`);
+                        const instRes = await fetch(`/api/public/institute/${firstTx.instituteId}`);
                         if (instRes.ok) {
                             const instData = await instRes.json();
-                            const instituteData = Array.isArray(instData.institutes) ? instData.institutes.find((i: any) => i.id === firstTx.instituteId || i._id === firstTx.instituteId) : instData;
-                            if (instituteData) setInstitute(instituteData);
+                            if (instData) setInstitute(instData);
                         }
                     }
                 }
@@ -121,20 +120,26 @@ export default function PublicLedgerPage({ params }: { params: { studentId: stri
     const sortedTxns = [...transactions].reverse(); // Oldest first for ledger print
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 font-bengali">
-            <div className="max-w-[1100px] mx-auto bg-white rounded-2xl shadow-xl overflow-hidden print:shadow-none print:bg-transparent">
-                {/* Action Bar (hidden in print) */}
-                <div className="bg-gradient-to-r from-[#045c84] to-[#067ab0] p-4 flex justify-between items-center print:hidden">
-                    <h1 className="text-white font-black">লেনদেন লেজার</h1>
+        <div className="min-h-screen bg-slate-200/50 font-bengali flex flex-col items-center">
+            {/* Action Bar (hidden in print) */}
+            <div className="w-full bg-gradient-to-r from-[#045c84] to-[#067ab0] p-4 flex justify-center print:hidden shadow-md z-10">
+                <div className="w-full max-w-[210mm] flex justify-between items-center px-2">
+                    <h1 className="text-white font-black text-lg tracking-wide">লেনদেন লেজার</h1>
                     <button 
                         onClick={() => window.print()}
-                        className="px-4 py-2 bg-white text-[#045c84] rounded-lg font-bold text-sm shadow hover:bg-slate-50"
+                        className="px-5 py-2.5 bg-white text-[#045c84] rounded-xl font-bold text-sm shadow-md hover:bg-slate-50 transition-colors"
                     >
                         প্রিন্ট করুন
                     </button>
                 </div>
+            </div>
 
-                <div className="p-6">
+            <div className="flex-1 w-full flex justify-center items-start py-8 px-2 sm:px-4 print:p-0">
+                <div 
+                    className="shadow-2xl bg-white flex-shrink-0 rounded-xl border border-slate-200 overflow-hidden print:shadow-none print:border-none print:rounded-none" 
+                    style={{ width: 'min(210mm, 100vw)', minHeight: '297mm' }}
+                >
+                    <div className="p-4 sm:p-8">
                     <PrintLayout 
                         title="লেনদেন লেজার" 
                         institute={institute || { name: 'Education Institute' }} 
@@ -238,6 +243,7 @@ export default function PublicLedgerPage({ params }: { params: { studentId: stri
                             </table>
                         </div>
                     </PrintLayout>
+                    </div>
                 </div>
             </div>
             

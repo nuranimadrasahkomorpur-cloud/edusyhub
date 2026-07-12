@@ -369,7 +369,7 @@ function OnboardingRouter({ role, user, onComplete }: { role: string, user: any,
 
 // --- Admin Dashboard ---
 function AdminDashboard({ activeInstitute }: { activeInstitute: any }) {
-    const { user, setAllInstitutes } = useSession();
+    const { user, setAllInstitutes, refreshInstitutes } = useSession();
     const { openAssignmentModal } = useUI();
     const router = useRouter();
     const [isInstModalOpen, setIsInstModalOpen] = useState(false);
@@ -398,6 +398,9 @@ function AdminDashboard({ activeInstitute }: { activeInstitute: any }) {
                 const data = await res.json();
                 if (isMounted) {
                     setStatsData(data);
+                    if (data.institute && refreshInstitutes) {
+                        refreshInstitutes(data.institute);
+                    }
                 }
             } catch (err) {
                 console.error('Failed to fetch institute stats:', err);
@@ -486,7 +489,6 @@ function AdminDashboard({ activeInstitute }: { activeInstitute: any }) {
                     </div>
                 ) : (
                     <div className="w-full h-[150px] bg-gradient-to-r from-[#045c84] via-[#047cac] to-[#639fb0] relative overflow-hidden shadow-[inset_0_-60px_60px_-30px_rgba(0,0,0,0.3)]">
-                        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                     </div>
                 )}
 
@@ -494,7 +496,7 @@ function AdminDashboard({ activeInstitute }: { activeInstitute: any }) {
                 <div className="md:hidden absolute top-4 right-4 z-20">
                     <button
                         onClick={() => setShowInstituteSwitcher(true)}
-                        className="px-4 py-2 bg-white/90 backdrop-blur-md border border-white/50 text-slate-700 font-bold rounded-xl shadow-lg hover:bg-white transition-all active:scale-95 text-xs uppercase tracking-wider font-bengali"
+                        className="px-4 py-2 bg-white border border-white/50 text-slate-700 font-bold rounded-xl shadow-lg hover:bg-slate-50 transition-all active:scale-95 text-xs uppercase tracking-wider font-bengali"
                     >
                         প্রতিষ্ঠান পরিবর্তন
                     </button>

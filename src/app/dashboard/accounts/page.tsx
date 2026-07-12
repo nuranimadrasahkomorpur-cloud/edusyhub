@@ -2192,14 +2192,16 @@ export default function AccountsPage() {
                         </div>
 
                         {activeSubTab === 'categories' ? (
-                            <div className="p-4">
-                                <CategoryManagementView 
-                                    externalSearchQuery={searchQuery} 
-                                    addTrigger={addTrigger}
-                                    forcedType={activeMainTab === 'overview' ? undefined : activeMainTab}
-                                    categoryFilterMode={categoryFilterMode}
-                                    setCategoryFilterMode={setCategoryFilterMode}
-                                />
+                            <div className="flex-1 overflow-y-auto" data-lenis-prevent>
+                                <div className="p-4">
+                                    <CategoryManagementView 
+                                        externalSearchQuery={searchQuery} 
+                                        addTrigger={addTrigger}
+                                        forcedType={activeMainTab === 'overview' ? undefined : activeMainTab}
+                                        categoryFilterMode={categoryFilterMode}
+                                        setCategoryFilterMode={setCategoryFilterMode}
+                                    />
+                                </div>
                             </div>
                         ) : (
                             <>

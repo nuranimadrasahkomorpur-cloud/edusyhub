@@ -1,39 +1,93 @@
-"use client";
+import prisma from "@/utils/db";
+import { notFound } from "next/navigation";
+import TeacherDiaryClient from "./TeacherDiaryClient";
 
-import React, { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+export const dynamic = "force-dynamic";
 
-function TeacherShareContent() {
-  const searchParams = useSearchParams();
-  const id = searchParams.get('id');
-  const tId = searchParams.get('tId');
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
-      <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border border-slate-200">
-        <h2 className="text-xl font-bold text-slate-800 mb-2">শিক্ষক ডায়েরি পোর্টাল</h2>
-        <p className="text-slate-600 mb-4">এই পোর্টালে শিক্ষকরা তাদের বিষয় অনুযায়ী ডায়েরি আপডেট করতে পারবেন।</p>
-        <div className="bg-indigo-50 text-indigo-700 p-3 rounded-lg text-sm mb-4">
-          <strong>ডায়েরি আইডি:</strong> {id}
-          <br/>
-          <strong>শিক্ষক আইডি:</strong> {tId}
-        </div>
-        <p className="text-xs text-slate-500">
-          (এখানে ডায়েরি আপডেট করার ফর্ম প্রদর্শিত হবে)
-        </p>
-      </div>
-    </div>
-  );
+interface PageProps {
+  searchParams: Promise<{ id?: string; token?: string; date?: string; class?: string; tId?: string }>;
 }
 
-export default function TeacherSharePage() {
+export default async function SharedTeacherDiaryPage({ searchParams }: PageProps) {
+  const { id, token, tId, date, class: className } = await searchParams;
+
+  if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return notFound();
+  }
+
+  if (!token && !tId) {
+    return notFound();
+  }
+
+  // 1. Fetch Class Diary master record from DB
+  const diary = await (prisma as any).classDiary.findUnique({
+    where: { id },
+  });
+
+  if (!diary) {
+    return notFound();
+  }
+
+  // 2. Decode the teacher sharing token or get from tId
+  let tName = "";
+  let config: any = null;
+
+  if (tId) {
+    const links = diary.teacherLinks || [];
+    const linkObj = links.find((l: any) => l.id === tId);
+    if (!linkObj || !linkObj.config) {
+      return notFound();
+    }
+    tName = linkObj.name;
+    config = linkObj.config;
+  } else if (token) {
+    let decoded;
+    try {
+      decoded = JSON.parse(decodeURIComponent(escape(atob(token))));
+    } catch (e) {
+      return notFound();
+    }
+    tName = decoded.tName;
+    config = decoded.config;
+  } else {
+    return notFound();
+  }
+
+  if (!tName || !config) {
+    return notFound();
+  }
+
+  // 3. Fetch Institute details
+  const institute = await prisma.institute.findUnique({
+    where: { id: diary.instituteId },
+    select: { name: true },
+  });
+
+  const instituteName = institute?.name || "Easy-Q Software";
+
+  // Normalize diary structure
+  const normalizedDiary = {
+    ...diary,
+    id: diary.id.toString(),
+    userId: diary.userId.toString(),
+    instituteId: diary.instituteId.toString(),
+  };
+
+  const defaultDate = date || new Date().toISOString().split("T")[0];
+
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
-      </div>
-    }>
-      <TeacherShareContent />
-    </Suspense>
+    <div className="min-h-screen bg-slate-50 md:py-10">
+      <main className="w-full">
+        <TeacherDiaryClient
+          diary={normalizedDiary}
+          token={token || ""}
+          tId={tId || ""}
+          instituteName={instituteName}
+          allowedConfig={config}
+          teacherName={tName}
+          initialDate={defaultDate}
+        />
+      </main>
+    </div>
   );
 }
