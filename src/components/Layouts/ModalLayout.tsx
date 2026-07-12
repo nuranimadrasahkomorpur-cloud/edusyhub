@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import React, { useEffect, useRef, useState } from "react";
 import { IoMdClose } from "react-icons/io";
-import Button from "../shared/Button";
+
 import "./styles.css";
 
 interface Props {
@@ -211,9 +211,12 @@ const ModalLayout: React.FC<Props> = ({
         {/* Optional Action Button */}
         {isAction && onAction && (
           <div className="mt-6 text-right">
-            <Button onClick={onAction}>
+            <button 
+              onClick={onAction}
+              className="px-4 py-2 bg-[#045c84] text-white rounded-xl hover:bg-[#03496a] transition-colors font-medium text-sm sm:text-base shadow-sm font-bengali"
+            >
               {actionTitle || "Save changes"}
-            </Button>
+            </button>
           </div>
         )}
       </div>
