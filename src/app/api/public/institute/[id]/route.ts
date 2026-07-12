@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/utils/db';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = params;
+        const { id } = await params;
         
         if (!id) {
             return NextResponse.json({ message: 'Institute ID is required' }, { status: 400 });
