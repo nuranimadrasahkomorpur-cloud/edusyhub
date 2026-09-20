@@ -379,7 +379,7 @@ export default function StudentManagementPage() {
     const [activeFormTab, setActiveFormTab] = useState<'student' | 'guardian' | 'academic' | 'fees' | 'documents'>('student');
     const [residentialStatus, setResidentialStatus] = useState<'all' | 'abasik' | 'onabasik'>('onabasik');
     const [applicableCategories, setApplicableCategories] = useState<any[]>([]);
-    const [admissionFees, setAdmissionFees] = useState<{ [categoryId: string]: { selected: boolean, baseAmount: number, waiver: number, paid: number, applyWaiverForFuture?: boolean } }>({});
+    const [admissionFees, setAdmissionFees] = useState<{ [categoryId: string]: { selected: boolean, baseAmount: number, waiver: number, paid: number, applyWaiverForFuture?: boolean, startMonthIndex?: number } }>({});
     const [formData, setFormData] = useState<any>({
         name: '',
         email: '',
@@ -1812,6 +1812,7 @@ export default function StudentManagementPage() {
                             waiver: admissionFees[catId].waiver,
                             paid: admissionFees[catId].paid,
                             applyWaiverForFuture: admissionFees[catId].applyWaiverForFuture || false,
+                            startMonthIndex: admissionFees[catId].startMonthIndex,
                             classId: payload.metadata.classId
                         }));
                         
@@ -5109,10 +5110,10 @@ export default function StudentManagementPage() {
                                                             {applicableCategories.length > 0 && (
                                                                     <div className="space-y-3">
                                                                         <label className="text-xs font-black text-slate-500 uppercase tracking-widest">প্রযোজ্য ফি সমূহ</label>
-                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                        <div className="flex flex-col gap-4">
                                                                             {applicableCategories.map(cat => {
                                                                             const fee = admissionFees[cat.id] || { selected: false, baseAmount: cat.amount || 0, waiver: 0, paid: 0 };
-                                                                            const due = Math.max(0, fee.baseAmount - fee.waiver);
+                                                                            const due = Math.max(0, fee.baseAmount - (fee.waiver || 0) - (fee.paid || 0));
                                                                             return (
                                                                                 <div key={cat.id} className={`p-4 rounded-xl border-2 transition-all ${fee.selected ? 'border-[#045c84] bg-white' : 'border-slate-200 bg-slate-50'}`}>
                                                                                     <div className="flex items-center justify-between w-full">
@@ -5199,6 +5200,45 @@ export default function StudentManagementPage() {
                                                                                                     <label htmlFor={`future-waiver-${cat.id}`} className="text-[10px] font-bold text-[#045c84] cursor-pointer leading-tight">
                                                                                                         পরবর্তী কিস্তিতেও এই ছাড় প্রযোজ্য করুন (Apply waiver for future)
                                                                                                     </label>
+                                                                                                </div>
+                                                                                            )}
+
+                                                                                            {cat.config?.interval === 'monthly' && (
+                                                                                                <div className="mt-4 pt-4 border-t border-slate-100">
+                                                                                                    <label className="text-[10px] font-black text-[#045c84] uppercase tracking-wider mb-3 block flex items-center gap-2">
+                                                                                                        <span>ফি শুরুর মাস (Starting Month)</span>
+                                                                                                        <span className="flex-1 h-px bg-slate-100"></span>
+                                                                                                    </label>
+                                                                                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                                                                                                        {['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'].map((month, index) => {
+                                                                                                            const currentMonth = new Date().getMonth();
+                                                                                                            const startIndex = fee.startMonthIndex !== undefined ? fee.startMonthIndex : currentMonth;
+                                                                                                            const isStart = index === startIndex;
+                                                                                                            const isApplied = index > startIndex;
+                                                                                                            
+                                                                                                            return (
+                                                                                                                <button
+                                                                                                                    key={month}
+                                                                                                                    type="button"
+                                                                                                                    onClick={(e) => {
+                                                                                                                        e.preventDefault();
+                                                                                                                        setAdmissionFees({...admissionFees, [cat.id]: { ...fee, startMonthIndex: index }})
+                                                                                                                    }}
+                                                                                                                    className={`text-xs font-bold py-2 px-1 rounded-xl border transition-all duration-200 text-center
+                                                                                                                        ${isStart ? 'bg-[#045c84] text-white border-[#045c84] shadow-md shadow-[#045c84]/20 ring-2 ring-[#045c84]/20 scale-[1.02] z-10' : 
+                                                                                                                          isApplied ? 'bg-[#045c84]/10 text-[#045c84] border-[#045c84]/30 hover:bg-[#045c84]/20' : 
+                                                                                                                          'bg-slate-50 text-slate-400 border-slate-100 opacity-50 hover:opacity-100 hover:bg-slate-100'}
+                                                                                                                    `}
+                                                                                                                >
+                                                                                                                    {month}
+                                                                                                                </button>
+                                                                                                            );
+                                                                                                        })}
+                                                                                                    </div>
+                                                                                                    <p className="text-[10px] text-slate-500 mt-3 font-medium bg-slate-50/80 border border-slate-100 px-3 py-2 rounded-lg inline-flex items-start gap-2">
+                                                                                                        <Info size={14} className="text-[#045c84] mt-0.5 shrink-0" />
+                                                                                                        <span>নির্বাচিত মাস থেকে পরবর্তী সকল মাসের ফি ধার্য করা হবে। পূর্বের মাসের ফি মওকুফ বলে গণ্য হবে।</span>
+                                                                                                    </p>
                                                                                                 </div>
                                                                                             )}
                                                                                         </div>

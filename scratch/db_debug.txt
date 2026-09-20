@@ -248147,3 +248147,115 @@
   "isOwner": true
 }
 
+[2026-09-20T18:37:15.700Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "699098e09008db95d6a549e8",
+  "dateString": "2026-09-21",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c1440f",
+    "email": "superadmin@edusy.com",
+    "role": "SUPER_ADMIN"
+  }
+}
+
+[2026-09-20T18:37:15.705Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "699098e09008db95d6a549e8",
+  "dateString": null,
+  "month": "2026-09",
+  "sessionUser": {
+    "id": "6990835251ab03d764c1440f",
+    "email": "superadmin@edusy.com",
+    "role": "SUPER_ADMIN"
+  }
+}
+
+[2026-09-20T18:37:15.750Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c1440f"
+    ]
+  },
+  "userId": "6990835251ab03d764c1440f"
+}
+
+[2026-09-20T18:37:15.751Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-09-20T18:37:15.754Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c1440f"
+    ]
+  },
+  "userId": "6990835251ab03d764c1440f"
+}
+
+[2026-09-20T18:37:15.758Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-09-20T18:37:15.931Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "699098e09008db95d6a549e8",
+  "dateString": "2026-09-21",
+  "month": null,
+  "sessionUser": {
+    "id": "6990835251ab03d764c1440f",
+    "email": "superadmin@edusy.com",
+    "role": "SUPER_ADMIN"
+  }
+}
+
+[2026-09-20T18:37:15.966Z] GET list request details
+{
+  "classId": "all",
+  "instituteId": "699098e09008db95d6a549e8",
+  "dateString": null,
+  "month": "2026-09",
+  "sessionUser": {
+    "id": "6990835251ab03d764c1440f",
+    "email": "superadmin@edusy.com",
+    "role": "SUPER_ADMIN"
+  }
+}
+
+[2026-09-20T18:37:15.981Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c1440f"
+    ]
+  },
+  "userId": "6990835251ab03d764c1440f"
+}
+
+[2026-09-20T18:37:15.981Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+
+[2026-09-20T18:37:16.016Z] GET list: Institute admin check
+{
+  "inst": {
+    "adminIds": [
+      "6990835251ab03d764c1440f"
+    ]
+  },
+  "userId": "6990835251ab03d764c1440f"
+}
+
+[2026-09-20T18:37:16.016Z] GET list: isOwner evaluation
+{
+  "isOwner": true
+}
+

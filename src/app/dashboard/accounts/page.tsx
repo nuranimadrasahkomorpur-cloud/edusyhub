@@ -164,6 +164,7 @@ export default function AccountsPage() {
     };
     const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+    const [isSavingCategory, setIsSavingCategory] = useState(false);
     const [showScanner, setShowScanner] = useState(false);
 
     // Auto-close scanner when navigating away from Accounts page to prevent background processing
@@ -2756,6 +2757,8 @@ export default function AccountsPage() {
 
 function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, categoryFilterMode, setCategoryFilterMode }: { externalSearchQuery: string, addTrigger: number, forcedType?: 'income' | 'expense', categoryFilterMode?: 'all' | 'income' | 'expense' | 'archived', setCategoryFilterMode?: (mode: 'all' | 'income' | 'expense' | 'archived') => void }) {
     const { activeInstitute } = useSession();
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+    const [isSavingCategory, setIsSavingCategory] = useState(false);
     const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -2898,6 +2901,7 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
     };
 
     const handleSave = async (data: any) => {
+        setIsSavingCategory(true);
         try {
             const res = await fetch('/api/admin/accounts/categories', {
                 method: selectedCategory ? 'PUT' : 'POST',
@@ -2907,9 +2911,15 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
             if (res.ok) {
                 setIsModalOpen(false);
                 fetchCategories();
+                setToast({ message: selectedCategory ? 'খাত সফলভাবে আপডেট হয়েছে' : 'নতুন খাত তৈরি হয়েছে', type: 'success' });
+            } else {
+                setToast({ message: 'খাত তৈরি করতে সমস্যা হয়েছে', type: 'error' });
             }
         } catch (error) {
             console.error('Save error:', error);
+            setToast({ message: 'একটি ত্রুটি ঘটেছে', type: 'error' });
+        } finally {
+            setIsSavingCategory(false);
         }
     };
 
@@ -3034,6 +3044,36 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
                         initialData={selectedCategory}
                         onSave={handleSave}
                     />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isSavingCategory && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200000] flex items-center justify-center bg-slate-900/40 backdrop-blur-md"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-8 border border-white/20"
+                        >
+                            <div className="relative w-24 h-24">
+                                <div className="absolute inset-0 border-[6px] border-slate-100 rounded-full"></div>
+                                <div className="absolute inset-0 border-[6px] border-[#045c84] rounded-full border-t-transparent animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center text-[#045c84]">
+                                    <Loader2 size={32} className="animate-spin text-[#045c84]" />
+                                </div>
+                            </div>
+                            <div className="text-center space-y-3">
+                                <h3 className="text-2xl font-black text-slate-800 tracking-tight">খাত তৈরি হচ্ছে...</h3>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest bg-slate-50 px-4 py-2 rounded-xl inline-block">অনুগ্রহ করে অপেক্ষা করুন</p>
+                            </div>
+                        </motion.div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 
@@ -3168,6 +3208,14 @@ function CategoryManagementView({ externalSearchQuery, addTrigger, forcedType, c
                         </div>
                     </motion.div>
                 </div>
+            )}
+
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
             )}
         </div>
     );

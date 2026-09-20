@@ -1,15 +1,11 @@
 {
   "body": {
-    "email": "easyqbd@gmail.com",
-    "phone": "easyqbd@gmail.com",
-    "password": "123456"
+    "email": "admin",
+    "phone": "admin",
+    "password": "admin"
   },
-  "identifier": "easyqbd@gmail.com",
+  "identifier": "admin",
   "rawQueryResults": [
-    {
-      "step": 1,
-      "rawEmail": []
-    },
     {
       "step": 2,
       "rawPhone": []
