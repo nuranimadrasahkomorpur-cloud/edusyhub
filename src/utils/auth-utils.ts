@@ -1,9 +1,39 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import prisma from './db';
 
-export async function getServerSession() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('edusy_auth_token')?.value;
+export async function getServerSession(req?: Request) {
+    let token: string | undefined;
+
+    try {
+        const cookieStore = await cookies();
+        token = cookieStore.get('edusy_auth_token')?.value;
+    } catch {
+        // cookies() might fail in some contexts
+    }
+
+    if (!token) {
+        try {
+            const headerList = await headers();
+            const authHeader = headerList.get('authorization');
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                token = authHeader.substring(7).trim();
+            } else if (headerList.get('x-user-id')) {
+                token = headerList.get('x-user-id')?.trim();
+            }
+        } catch {
+            // headers() might fail in some contexts
+        }
+    }
+
+    if (!token && req) {
+        try {
+            const url = new URL(req.url);
+            const queryUserId = url.searchParams.get('userId');
+            if (queryUserId) token = queryUserId.trim();
+        } catch {
+            // URL parse error
+        }
+    }
 
     if (!token) return null;
 

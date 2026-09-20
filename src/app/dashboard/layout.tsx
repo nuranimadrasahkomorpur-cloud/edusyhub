@@ -28,6 +28,8 @@ import {
     MessageSquare,
     PenTool,
     BarChart3,
+    FlaskConical,
+    Sparkles,
     Loader2
 } from 'lucide-react';
 
@@ -57,6 +59,7 @@ const AttendanceSummaryPage = dynamic(() => import('./attendance/summary/page'),
 const AccountsPage = dynamic(() => import('./accounts/page'), { ssr: false, loading: PageLoader });
 const AssignmentsPage = dynamic(() => import('./assignments/page'), { ssr: false, loading: PageLoader });
 const ClassroomPage = dynamic(() => import('./classroom/page'), { ssr: false, loading: PageLoader });
+const ResearchPage = dynamic(() => import('./research/page'), { ssr: false, loading: PageLoader });
 const LibraryPage = dynamic(() => import('./library/page'), { ssr: false, loading: PageLoader });
 const AdminLibraryPage = dynamic(() => import('./admin/library/page'), { ssr: false, loading: PageLoader });
 const NoticesPage = dynamic(() => import('./notices/page'), { ssr: false, loading: PageLoader });
@@ -67,6 +70,7 @@ const GuardiansPage = dynamic(() => import('./guardians/page'), { ssr: false, lo
 const DonorsPage = dynamic(() => import('./donors/page'), { ssr: false, loading: PageLoader });
 const AdminUsersPage = dynamic(() => import('./admin/users/page'), { ssr: false, loading: PageLoader });
 const BrandingSettingsPage = dynamic(() => import('./admin/settings/branding/page'), { ssr: false, loading: PageLoader });
+const GeminiSettingsPage = dynamic(() => import('./admin/settings/ai/page'), { ssr: false, loading: PageLoader });
 const NotificationSettingsPage = dynamic(() => import('./admin/settings/notifications/page'), { ssr: false, loading: PageLoader });
 const NotificationAnalyticsPage = dynamic(() => import('./admin/notifications/analytics/page'), { ssr: false, loading: PageLoader });
 const ReportsPage = dynamic(() => import('./reports/page'), { ssr: false, loading: PageLoader });
@@ -86,6 +90,7 @@ const KEEPALIVE_PATHS = [
     '/dashboard/accounts',
     '/dashboard/assignments',
     '/dashboard/classroom',
+    '/dashboard/research',
     '/dashboard/library',
     '/dashboard/admin/library',
     '/dashboard/notices',
@@ -96,6 +101,7 @@ const KEEPALIVE_PATHS = [
     '/dashboard/donors',
     '/dashboard/admin/users',
     '/dashboard/admin/settings/branding',
+    '/dashboard/admin/settings/ai',
     '/dashboard/admin/settings/notifications',
     '/dashboard/admin/notifications/analytics',
     '/dashboard/reports',
@@ -128,6 +134,8 @@ const getKeepAliveComponent = (path: string) => {
             return <AssignmentsPage />;
         case '/dashboard/classroom':
             return <ClassroomPage />;
+        case '/dashboard/research':
+            return <ResearchPage />;
         case '/dashboard/library':
             return <LibraryPage />;
         case '/dashboard/admin/library':
@@ -148,6 +156,8 @@ const getKeepAliveComponent = (path: string) => {
             return <AdminUsersPage />;
         case '/dashboard/admin/settings/branding':
             return <BrandingSettingsPage />;
+        case '/dashboard/admin/settings/ai':
+            return <GeminiSettingsPage />;
         case '/dashboard/admin/settings/notifications':
             return <NotificationSettingsPage />;
         case '/dashboard/admin/notifications/analytics':
@@ -261,6 +271,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'হিসাব', icon: CreditCard, href: '/dashboard/accounts', section: 'দৈনন্দিন কার্যক্রম' },
         { name: 'ক্লাস ডাইরি', icon: ClipboardList, href: '/dashboard/class-diary', section: 'দৈনন্দিন কার্যক্রম' },
         { name: 'ক্লাস রুম', icon: Presentation, href: '/dashboard/classroom', section: 'দৈনন্দিন কার্যক্রম' },
+        { name: 'গবেষণা', icon: FlaskConical, href: '/dashboard/research', section: 'দৈনন্দিন কার্যক্রম' },
 
         // একাডেমিক
         { name: 'পরীক্ষা', icon: PenTool, href: '/dashboard/exams', section: 'একাডেমিক' },
@@ -275,6 +286,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'দাতা', icon: HeartPulse, href: '/dashboard/donors', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'ইউজার ডাটাবেস', icon: Users, href: '/dashboard/admin/users', roles: ['SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'অ্যাপ ব্র্যান্ডিং', icon: Settings, href: '/dashboard/admin/settings/branding', roles: ['SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
+        { name: 'এআই সেটিংস (Gemini)', icon: Sparkles, href: '/dashboard/admin/settings/ai', roles: ['SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'নোটিফিকেশন সেট', icon: Bell, href: '/dashboard/admin/settings/notifications', roles: ['ADMIN', 'SUPER_ADMIN'], section: 'ব্যবস্থাপনা' },
         { name: 'নোটিফিকেশন এনালিটিক্স', icon: BarChart3, href: '/dashboard/admin/notifications/analytics', roles: ['ADMIN', 'SUPER_ADMIN', 'TEACHER'], section: 'বিশ্লেষণ ও রিপোর্ট' },
 
@@ -296,7 +308,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
 
         if (activeRole === 'SUPER_ADMIN') {
-            const allowed = ['/dashboard', '/dashboard/admin/library', '/dashboard/admin/users', '/dashboard/admin/institutes', '/dashboard/admin/settings/branding', '/dashboard/admin/settings/notifications', '/dashboard/admin/notifications/analytics'];
+            const allowed = ['/dashboard', '/dashboard/admin/library', '/dashboard/admin/users', '/dashboard/admin/institutes', '/dashboard/admin/settings/branding', '/dashboard/admin/settings/ai', '/dashboard/admin/settings/notifications', '/dashboard/admin/notifications/analytics', '/dashboard/research'];
             return allowed.includes(item.href);
         }
         if (activeRole === 'STUDENT') {
