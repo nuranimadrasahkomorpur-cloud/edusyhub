@@ -38,6 +38,7 @@ model User {
   faceDescriptor  Json?
   attendances     Attendance[] @relation("StudentAttendance")
   classDiaries    ClassDiary[]
+  researchTopics  ResearchTopic[]
 }
 
 model Institute {
@@ -81,6 +82,7 @@ model Institute {
   formSequences FormSequence[]
   admissionDrafts AdmissionDraft[]
   classDiaries    ClassDiary[]
+  researchTopics  ResearchTopic[]
 }
 
 model Class {
@@ -490,4 +492,54 @@ model ClassDiary {
 
   @@index([userId])
   @@index([instituteId])
+}
+
+model ResearchTopic {
+  id                   String     @id @default(auto()) @map("_id") @db.ObjectId
+  humanId              String     @unique // e.g., TOP-2026-000101
+  title                String
+  problemToSolve       String
+  category             String
+  researchType         String     @default("Writing Improvement")
+  status               String     @default("Running") // Idea, Researching, Running, Tested, Validated, Improved, Archived
+  visibility           String     @default("public")  // public, invite-only, private
+
+  // Relation to User & Institute
+  userId               String?    @db.ObjectId
+  user                 User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  instituteId          String?    @db.ObjectId
+  institute            Institute? @relation(fields: [instituteId], references: [id], onDelete: SetNull)
+
+  // Curriculum & Book info
+  bookInfo             Json?      // { board, grade, subject, bookName, chapter, lesson, pageNumber }
+  
+  // Progress & Execution
+  totalDays            Int        @default(7)
+  currentDayNumber     Int        @default(1)
+  progress             Int        @default(0) // 0-100
+  
+  // Dynamic Days, Sources, Evidence, and Final Report stored as structured JSON
+  days                 Json?      // Array of ResearchDayActivity
+  sources              Json?      // Array of SourceDocument
+  evidenceList         Json?      // Array of BeforeAfterEvidence
+  finalReport          Json?      // FinalReport object
+  
+  // Metadata & Metrics
+  authorId             String?
+  authorName           String
+  authorRole           String?
+  instituteName        String?
+  tags                 String[]
+  fieldTestedCount     Int        @default(0)
+  completedCount       Int        @default(0)
+  improvedVersionCount Int        @default(0)
+  contributors         Json?      // Array of ResearchContributor
+  
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([instituteId])
+  @@index([status])
+  @@index([category])
 }
