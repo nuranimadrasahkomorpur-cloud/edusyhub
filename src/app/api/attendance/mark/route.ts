@@ -8,7 +8,7 @@ import path from 'path';
 
 function writeDebugLog(message: string, data: any) {
     try {
-        const logDir = 'f:/Edusy User flow/Edusy app/scratch';
+        const logDir = path.join(process.cwd(), 'scratch');
         if (!fs.existsSync(logDir)) {
             fs.mkdirSync(logDir, { recursive: true });
         }
