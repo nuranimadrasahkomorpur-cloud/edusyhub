@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 export default function GlobalError({
   error,
   reset,
@@ -18,7 +16,7 @@ export default function GlobalError({
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: '100vh',
-          fontFamily: 'sans-serif',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
           padding: '20px',
           textAlign: 'center'
         }}>
@@ -27,6 +25,7 @@ export default function GlobalError({
             {error?.message || 'An unexpected application error occurred.'}
           </p>
           <button
+            type="button"
             onClick={() => reset()}
             style={{
               padding: '10px 20px',
